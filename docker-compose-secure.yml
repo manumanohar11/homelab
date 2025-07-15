@@ -1,0 +1,409 @@
+version: '3.9'
+
+# Common environment variables
+x-common-env: &common-env
+  PUID: ${PUID:-1000}
+  PGID: ${PGID:-1000}
+  TZ: ${TZ:-Etc/UTC}
+
+# Common security options
+x-security-opts: &security-opts
+  security_opt:
+    - no-new-privileges:true
+    - apparmor:unconfined
+  cap_drop:
+    - ALL
+  read_only: true
+
+# Dependency configuration for arr services
+x-arr-depends-on: &arr-depends-on
+  gluetun:
+    condition: service_healthy
+  prowlarr:
+    condition: service_healthy
+  qbittorrent:
+    condition: service_healthy
+
+# Networks for better segmentation
+networks:
+  # Public-facing services (reverse proxy)
+  frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+  
+  # Backend services (internal only)
+  backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24
+  
+  # VPN network for protected services
+  vpn:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.22.0.0/24
+  
+  # Media server network
+  media:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.23.0.0/24
+
+services:
+  # === Section 1: Core Networking and Security ===
+  
+  # Cloudflare tunnel for secure external access
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write access for tunnel
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    networks:
+      - frontend
+    depends_on:
+      caddy:
+        condition: service_started
+    environment:
+      - NO_AUTOUPDATE=true
+    user: "${PUID}:${PGID}"
+
+  # Caddy reverse proxy with automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for certificates
+    cap_add:
+      - NET_BIND_SERVICE
+    networks:
+      - frontend
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./media-stack/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./media-stack/caddy/data:/data
+      - ./media-stack/caddy/config:/config
+      - ./media-stack/caddy/logs:/data/logs
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Authelia for authentication
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for session/notification
+    networks:
+      - backend
+    volumes:
+      - ./media-stack/authelia:/config
+    environment:
+      TZ: ${TZ}
+      AUTHELIA_SESSION_SECRET: ${AUTHELIA_SESSION_SECRET}
+      AUTHELIA_JWT_SECRET: ${AUTHELIA_JWT_SECRET}
+      AUTHELIA_STORAGE_ENCRYPTION_KEY: ${AUTHELIA_STORAGE_ENCRYPTION_KEY}
+      AUTHELIA_OIDC_HMAC_SECRET: ${AUTHELIA_OIDC_HMAC_SECRET:-}
+      DOMAIN_NAME: ${DOMAIN_NAME}
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9091/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    user: "${PUID}:${PGID}"
+
+  # VPN container for privacy
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ${DOCKER_BASE_DIR}/gluetun:/gluetun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER}
+      OPENVPN_USER: ${OPENVPN_USER}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      SERVER_REGIONS: ${SERVER_REGIONS}
+      FIREWALL_OUTBOUND_SUBNETS: "172.20.0.0/24,172.21.0.0/24,172.23.0.0/24"
+      SHADOWSOCKS: "off"
+      DOT: "off"
+      BLOCK_MALICIOUS: "on"
+      BLOCK_SURVEILLANCE: "on"
+      BLOCK_ADS: "off"
+      KILL_SWITCH: "on"
+      FIREWALL_INPUT_PORTS: "8080,7878,8989,9696,8686,6767"
+      HEALTH_TARGET_ADDRESS: "1.1.1.1:443"
+      HEALTH_VPN_DURATION_INITIAL: "30s"
+      HEALTH_VPN_DURATION_ADDITION: "5s"
+    networks:
+      - frontend  # For Caddy access
+      - vpn      # Internal VPN network
+    healthcheck:
+      test: ["CMD", "/gluetun-entrypoint", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # === Section 2: Downloaders and Indexers (behind VPN) ===
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+      WEBUI_PORT: 8080
+      TORRENTING_PORT: 6881
+    volumes:
+      - ${DOCKER_BASE_DIR}/qbittorrent:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/prowlarr:/config
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === Section 3: Media Management - The *Arr Suite (behind VPN) ===
+
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/radarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    depends_on: *arr-depends-on
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/sonarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    depends_on: *arr-depends-on
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/lidarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    depends_on: *arr-depends-on
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/bazarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data:ro
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === Section 4: Media Servers ===
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for transcoding
+    cap_add:
+      - NET_BROADCAST  # For DLNA
+    environment:
+      <<: *common-env
+      JELLYFIN_PublishedServerUrl: https://jellyfin.${DOMAIN_NAME}
+    volumes:
+      - ${DOCKER_BASE_DIR}/jellyfin:/config
+      - ${DOCKER_MEDIA_DIR}/media:/data/media:ro
+      - ${DOCKER_BASE_DIR}/jellyfin/cache:/cache
+      - ${DOCKER_BASE_DIR}/jellyfin/transcodes:/transcodes
+    networks:
+      - frontend
+      - media
+    devices:
+      # For hardware acceleration (if available)
+      # - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for metadata
+    cap_add:
+      - NET_BROADCAST  # For DLNA
+    networks:
+      - frontend
+      - media
+    environment:
+      <<: *common-env
+      VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM:-}
+      ADVERTISE_IP: https://plex.${DOMAIN_NAME}/
+    volumes:
+      - ${DOCKER_BASE_DIR}/plex:/config
+      - ${DOCKER_MEDIA_DIR}/media:/data/media:ro
+      - ${DOCKER_BASE_DIR}/plex/transcode:/transcode
+    devices:
+      # For hardware acceleration (if available)
+      # - /dev/dri:/dev/dri
+
+  # === Section 5: Utility and Management ===
+
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for cache
+    environment:
+      <<: *common-env
+      HOMEPAGE_VAR_RADARR_API_KEY: ${HOMEPAGE_VAR_RADARR_API_KEY}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${HOMEPAGE_VAR_SONARR_API_KEY}
+      HOMEPAGE_VAR_LIDARR_API_KEY: ${HOMEPAGE_VAR_LIDARR_API_KEY}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${HOMEPAGE_VAR_BAZARR_API_KEY}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${HOMEPAGE_VAR_PROWLARR_API_KEY}
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${HOMEPAGE_VAR_JELLYFIN_API_KEY}
+      HOMEPAGE_VAR_QBITTORRENT_USER: ${HOMEPAGE_VAR_QBITTORRENT_USER}
+      HOMEPAGE_VAR_QBITTORRENT_PASS: ${HOMEPAGE_VAR_QBITTORRENT_PASS}
+    volumes:
+      - ${DOCKER_BASE_DIR}/homepage:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - frontend
+      - backend
+    user: "${PUID}:${PGID}"
+
+  portainer:
+    image: portainer/portainer-ce:alpine
+    container_name: portainer
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: false  # Needs write for data
+    cap_add:
+      - DAC_OVERRIDE  # For Docker socket access
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_BASE_DIR}/portainer:/data
+    networks:
+      - frontend
+      - backend
+    command: --http-disabled --ssl-enabled --ssl-cert /data/cert.pem --ssl-key /data/key.pem
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    <<: *security-opts
+    read_only: true
+    cap_add:
+      - DAC_OVERRIDE  # For Docker socket access
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - backend
+    environment:
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_TIMEOUT: "30s"
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_NOTIFICATIONS: "email"
+      WATCHTOWER_NOTIFICATION_EMAIL_FROM: ${SMTP_FROM:-}
+      WATCHTOWER_NOTIFICATION_EMAIL_TO: ${SMTP_TO:-}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER: ${SMTP_SERVER:-}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: ${SMTP_PORT:-587}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: ${SMTP_USERNAME:-}
+      WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: ${SMTP_PASSWORD:-}
+      WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 500

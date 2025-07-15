@@ -1,0 +1,19 @@
+{
+	"sans": [
+		"auth.manoharsolleti.com"
+	],
+	"issuer_data": {
+		"url": "https://acme-v02.api.letsencrypt.org/acme/cert/050130e575d0dc7c5b86da472f1de0b6a48d",
+		"ca": "https://acme-v02.api.letsencrypt.org/directory",
+		"account": "https://acme-v02.api.letsencrypt.org/acme/acct/2528360791",
+		"renewal_info": {
+			"suggestedWindow": {
+				"start": "2025-09-11T16:08:00Z",
+				"end": "2025-09-13T11:18:49Z"
+			},
+			"_uniqueIdentifier": "kydGmAOpUWiOmNbEQkjbI79YlNI.BQEw5XXQ3HxbhtpHLx3gtqSN",
+			"_retryAfter": "2025-07-14T20:22:27.790071306Z",
+			"_selectedTime": "2025-09-12T19:23:46Z"
+		}
+	}
+}
