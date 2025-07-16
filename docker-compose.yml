@@ -1,5 +1,4 @@
 # ~/media-stack/docker-compose.yml
-version: "3.9"
 name: media-stack
 
 # ---------------- Anchors -----------------------------------------------
@@ -185,7 +184,7 @@ services:
       - ${DOCKER_MEDIA_DIR}:/data
     user: "${PUID}:${PGID}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      test: ["CMD", "curl", "-f", "http://localhost:6969/ping"]
       interval: 1m
       timeout: 10s
       retries: 3
@@ -266,7 +265,7 @@ services:
   #   networks:
   #     - media-stack
   #   ports:
-  #     - "8080:8088"
+  #     - "8088:8080"
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -281,3 +280,17 @@ services:
       - media-stack
     ports:
       - "9443:9443"   # Uncomment for LAN access
+
+  ## -------- File Management --------------------
+  nextcloud:
+    image: lscr.io/linuxserver/nextcloud:latest
+    container_name: nextcloud
+    environment: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/nextcloud:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+      - media-stack
+    ports:
+      - "8443:443"
+    restart: unless-stopped
