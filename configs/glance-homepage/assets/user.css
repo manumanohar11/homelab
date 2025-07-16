@@ -1,0 +1,392 @@
+/* Enhanced Glance Theme - Media Stack Edition */
+
+/* Color scheme with vibrant gradients */
+:root {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #141927;
+  --bg-tertiary: #1e2436;
+  --text-primary: #e1e8f0;
+  --text-secondary: #a8b2c7;
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-success: #10b981;
+  --accent-warning: #f59e0b;
+  --accent-danger: #ef4444;
+  --border-color: #2a3142;
+  --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --gradient-4: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+/* Smooth animations throughout */
+* {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhance page navigation */
+.page-navigation {
+  background: var(--bg-secondary) !important;
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid var(--border-color);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.page-navigation-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.page-navigation-item:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--accent-primary) !important;
+}
+
+.page-navigation-item-active {
+  color: var(--accent-primary) !important;
+  background: var(--bg-tertiary) !important;
+}
+
+.page-navigation-item-active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--gradient-1);
+}
+
+/* Widget enhancements */
+.widget {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  overflow: hidden;
+}
+
+.widget:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  border-color: var(--accent-primary) !important;
+}
+
+.widget-title {
+  font-weight: 700 !important;
+  font-size: 18px !important;
+  background: var(--gradient-1);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  padding-bottom: 12px !important;
+  margin-bottom: 16px !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* Bookmarks styling */
+.bookmarks-group {
+  background: var(--bg-tertiary) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  margin-bottom: 16px !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.bookmarks-group:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+}
+
+.bookmarks-group-title {
+  font-weight: 600 !important;
+  font-size: 16px !important;
+  margin-bottom: 12px !important;
+}
+
+.bookmarks-link {
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.bookmarks-link:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  transform: translateX(4px);
+}
+
+/* Docker containers enhancement */
+.docker-containers-container {
+  background: var(--bg-tertiary) !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  margin: 8px 0 !important;
+  border: 1px solid var(--border-color) !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.docker-containers-container-running {
+  border-left: 4px solid var(--accent-success) !important;
+}
+
+.docker-containers-container-running:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+.docker-containers-container-exited {
+  border-left: 4px solid var(--accent-danger) !important;
+  opacity: 0.7;
+}
+
+.docker-containers-container-exited:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Monitor widget status */
+.monitor-site {
+  background: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  padding: 10px 14px !important;
+  margin: 6px 0 !important;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.monitor-site-status-ok::before {
+  content: '✓';
+  color: var(--accent-success);
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+.monitor-site-status-error::before {
+  content: '✗';
+  color: var(--accent-danger);
+  font-weight: bold;
+  margin-right: 4px;
+}
+
+/* Weather widget enhancement */
+.weather-widget {
+  background: var(--gradient-3) !important;
+  color: white !important;
+  padding: 20px !important;
+  border-radius: 16px !important;
+}
+
+.weather-widget-temperature {
+  font-size: 48px !important;
+  font-weight: 700 !important;
+}
+
+/* Market widget */
+.markets-market {
+  background: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  margin: 6px 0 !important;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.markets-market-positive {
+  border-left: 3px solid var(--accent-success) !important;
+}
+
+.markets-market-positive:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+.markets-market-negative {
+  border-left: 3px solid var(--accent-danger) !important;
+}
+
+.markets-market-negative:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Clock widget */
+.clock-widget {
+  background: var(--gradient-4) !important;
+  color: white !important;
+  padding: 20px !important;
+  border-radius: 16px !important;
+  text-align: center;
+}
+
+/* Calendar widget */
+.calendar-widget {
+  background: var(--bg-tertiary) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+}
+
+.calendar-day-today {
+  background: var(--accent-primary) !important;
+  color: white !important;
+  font-weight: bold !important;
+  border-radius: 8px !important;
+}
+
+/* RSS and Reddit feeds */
+.rss-feed-item, .reddit-post, .hacker-news-item {
+  background: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  margin: 8px 0 !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.rss-feed-item:hover, .reddit-post:hover, .hacker-news-item:hover {
+  background: rgba(99, 102, 241, 0.05) !important;
+  border-color: var(--accent-primary) !important;
+  transform: translateX(4px);
+}
+
+/* Videos widget */
+.videos-grid {
+  gap: 16px !important;
+}
+
+.videos-video {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
+}
+
+.videos-video:hover {
+  transform: scale(1.05);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Search widget */
+.search-widget input {
+  background: var(--bg-tertiary) !important;
+  border: 2px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  padding: 12px 16px !important;
+  border-radius: 12px !important;
+  font-size: 16px !important;
+}
+
+.search-widget input:focus {
+  border-color: var(--accent-primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+}
+
+/* Twitch channels and games */
+.twitch-channel, .twitch-game {
+  background: var(--bg-tertiary) !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  margin: 6px 0 !important;
+}
+
+.twitch-channel-live {
+  border-left: 3px solid #9146ff !important;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  border: 2px solid var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
+}
+
+/* Group widget */
+.group-widget {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+}
+
+/* Responsive design improvements */
+@media (max-width: 768px) {
+  .widget {
+    margin: 8px !important;
+    border-radius: 12px !important;
+  }
+  
+  .widget-title {
+    font-size: 16px !important;
+  }
+  
+  .bookmarks-link {
+    font-size: 14px !important;
+    padding: 6px 10px !important;
+  }
+}
+
+/* Loading states */
+.widget-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.widget-loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  to {
+    left: 100%;
+  }
+}
+
+/* Extension widget */
+.extension-widget {
+  background: var(--bg-tertiary) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+}
+
+/* Repository widget */
+.repository-widget {
+  background: var(--bg-tertiary) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+}
+
+.repository-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.repository-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}

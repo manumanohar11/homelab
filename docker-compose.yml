@@ -250,22 +250,22 @@ services:
     ports:
       - "61208:61208" # Uncomment for LAN access
 
-  # glance-homepage:
-  #   image: glanceapp/glance:latest
-  #   container_name: glance-homepage
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
-  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   environment:
-  #     GLANCE_UID: ${PUID}
-  #     GLANCE_GID: ${PGID}
-  #     TZ: ${TZ}
-  #   networks:
-  #     - media-stack
-  #   ports:
-  #     - "8088:8080"
+  glance-homepage:
+    image: glanceapp/glance:latest
+    container_name: glance-homepage
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      GLANCE_UID: ${PUID}
+      GLANCE_GID: ${PGID}
+      TZ: ${TZ}
+    networks:
+      - media-stack
+    ports:
+      - "8088:8080"
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -285,7 +285,9 @@ services:
   nextcloud:
     image: lscr.io/linuxserver/nextcloud:latest
     container_name: nextcloud
-    environment: *common-env
+    environment:
+      <<: *common-env
+      NEXTCLOUD_TRUSTED_DOMAINS: "cloud.manoharsolleti.com"
     volumes:
       - ${DOCKER_BASE_DIR}/nextcloud:/config
       - ${DOCKER_MEDIA_DIR}:/data

@@ -1,88 +1,445 @@
 - name: Home
-  # Optionally, if you only have a single page you can hide the desktop navigation for a cleaner look
-  # hide-desktop-navigation: true
   columns:
     - size: small
       widgets:
+        - type: weather
+          location: Kaikaluru, Andhra Pradesh, India
+          units: metric
+          hour-format: 12h
+          hide-location: false
+          show-area-name: true
+
+        - type: clock
+          hour-format: 12h
+          timezones:
+            - timezone: Asia/Kolkata
+              label: India
+            - timezone: America/Los_Angeles
+              label: California
+            - timezone: America/New_York
+              label: New York
+            - timezone: Europe/London
+              label: London
+
         - type: calendar
-          first-day-of-week: monday
-
-        - type: rss
-          limit: 10
-          collapse-after: 3
-          cache: 12h
-          feeds:
-            - url: https://selfh.st/rss/
-              title: selfh.st
-            - url: https://ciechanow.ski/atom.xml
-            - url: https://www.joshwcomeau.com/rss.xml
-              title: Josh Comeau
-            - url: https://samwho.dev/rss.xml
-            - url: https://ishadeed.com/feed.xml
-              title: Ahmad Shadeed
-
-        - type: twitch-channels
-          channels:
-            - theprimeagen
-            - j_blow
-            - piratesoftware
-            - cohhcarnage
-            - christitustech
-            - EJ_SA
+          first-day-of-week: sunday
+          hide-today: false
 
     - size: full
       widgets:
-        - type: group
-          widgets:
-            - type: hacker-news
-            - type: lobsters
+        - type: bookmarks
+          title: Quick Access
+          groups:
+            - title: 🎬 Media Services
+              color: 10 70 50
+              links:
+                - title: Jellyfin
+                  url: https://jellyfin.manoharsolleti.com
+                  icon: si:jellyfin
+                - title: Plex
+                  url: https://plex.manoharsolleti.com
+                  icon: si:plex
+                - title: Radarr
+                  url: https://radarr.manoharsolleti.com
+                  icon: si:radarr
+                - title: Sonarr
+                  url: https://sonarr.manoharsolleti.com
+                  icon: si:sonarr
+                - title: Prowlarr
+                  url: https://prowlarr.manoharsolleti.com
+                  icon: si:prowlarr
+                - title: Bazarr
+                  url: https://bazarr.manoharsolleti.com
+                  icon: si:bazarr
+                - title: Whisparr
+                  url: https://whisparr.manoharsolleti.com
+                - title: qBittorrent
+                  url: https://qbittorrent.manoharsolleti.com
+                  icon: si:qbittorrent
 
-        - type: videos
-          channels:
-            - UCXuqSBlHAE6Xw-yeJA0Tunw # Linus Tech Tips
-            - UCR-DXc1voovS8nhAvccRZhg # Jeff Geerling
-            - UCsBjURrPoezykLs9EqgamOA # Fireship
-            - UCBJycsmduvYEL83R_U4JriQ # Marques Brownlee
-            - UCHnyfMqiRRG1u-2MsSQLbXA # Veritasium
+            - title: 🛠️ System Tools
+              color: 200 50 50
+              links:
+                - title: Portainer
+                  url: https://portainer.manoharsolleti.com
+                  icon: si:portainer
+                - title: Glances
+                  url: https://glances.manoharsolleti.com
+                  icon: si:grafana
+                - title: Nextcloud
+                  url: https://cloud.manoharsolleti.com
+                  icon: si:nextcloud
+                - title: Homepage
+                  url: https://manoharsolleti.com
+                  icon: si:home
+
+        - type: monitor
+          title: Service Health
+          cache: 30s
+          sites:
+            - title: Jellyfin
+              url: http://jellyfin:8096
+              icon: si:jellyfin
+            - title: Plex
+              url: http://plex:32400
+              icon: si:plex
+            - title: Portainer
+              url: https://portainer:9443
+              icon: si:portainer
+              allow-insecure: true
+            - title: Nextcloud
+              url: http://nextcloud:443
+              icon: si:nextcloud
 
         - type: group
+          title: News & Updates
           widgets:
-            - type: reddit
-              subreddit: technology
-              show-thumbnails: true
+            - type: rss
+              title: Tech News
+              limit: 5
+              collapse-after: 3
+              cache: 3h
+              feeds:
+                - url: https://techcrunch.com/feed/
+                  title: TechCrunch
+                - url: https://www.theverge.com/rss/index.xml
+                  title: The Verge
+                - url: https://arstechnica.com/feed/
+                  title: Ars Technica
+
             - type: reddit
               subreddit: selfhosted
+              limit: 5
+              collapse-after: 3
               show-thumbnails: true
 
     - size: small
       widgets:
-        - type: weather
-          location: London, United Kingdom
-          units: metric # alternatively "imperial"
-          hour-format: 12h # alternatively "24h"
-          # Optionally hide the location from being displayed in the widget
-          # hide-location: true
-
         - type: markets
+          title: Markets
           markets:
             - symbol: SPY
               name: S&P 500
             - symbol: BTC-USD
               name: Bitcoin
+            - symbol: ETH-USD
+              name: Ethereum
             - symbol: NVDA
               name: NVIDIA
             - symbol: AAPL
               name: Apple
             - symbol: MSFT
               name: Microsoft
+            - symbol: GOOGL
+              name: Google
+            - symbol: TSLA
+              name: Tesla
+
+        - type: twitch-channels
+          title: Live Streams
+          channels:
+            - theprimeagen
+            - ThePrimeTimeagen
+            - teej_dv
+            - rwxrob
+            - melkey
+            - cohhcarnage
 
         - type: releases
-          cache: 1d
-          # Without authentication the Github API allows for up to 60 requests per hour. You can create a
-          # read-only token from your Github account settings and use it here to increase the limit.
-          # token: ...
+          title: Software Updates
+          cache: 12h
           repositories:
             - glanceapp/glance
-            - go-gitea/gitea
-            - immich-app/immich
-            - syncthing/syncthing
+            - jellyfin/jellyfin
+            - plexinc/pms-docker
+            - containrrr/watchtower
+            - qdm12/gluetun
+
+- name: Media Dashboard
+  columns:
+    - size: full
+      widgets:
+        - type: bookmarks
+          title: Media Library Management
+          groups:
+            - title: 📺 TV Shows
+              color: 150 70 50
+              links:
+                - title: Sonarr
+                  url: https://sonarr.manoharsolleti.com
+                  icon: si:sonarr
+                - title: Episodes Calendar
+                  url: https://sonarr.manoharsolleti.com/calendar
+                - title: Series Editor
+                  url: https://sonarr.manoharsolleti.com/serieseditor
+                - title: Activity History
+                  url: https://sonarr.manoharsolleti.com/activity/history
+
+            - title: 🎬 Movies
+              color: 30 70 50
+              links:
+                - title: Radarr
+                  url: https://radarr.manoharsolleti.com
+                  icon: si:radarr
+                - title: Movie Calendar
+                  url: https://radarr.manoharsolleti.com/calendar
+                - title: Movie Editor
+                  url: https://radarr.manoharsolleti.com/movie/editor
+                - title: Activity Queue
+                  url: https://radarr.manoharsolleti.com/activity/queue
+
+            - title: 🎭 Adult Content
+              color: 270 70 50
+              links:
+                - title: Whisparr
+                  url: https://whisparr.manoharsolleti.com
+                - title: Whisparr Calendar
+                  url: https://whisparr.manoharsolleti.com/calendar
+                - title: Whisparr Activity
+                  url: https://whisparr.manoharsolleti.com/activity
+
+        - type: docker-containers
+          title: Media Stack Containers
+          running-only: false
+          sock-path: /var/run/docker.sock
+          filter:
+            - jellyfin
+            - plex
+            - radarr
+            - sonarr
+            - prowlarr
+            - bazarr
+            - whisparr
+            - qbittorrent
+
+    - size: small
+      widgets:
+        - type: videos
+          title: Media Tutorials
+          limit: 6
+          channels:
+            - UCpzRJpPhEUlHUNQSKai2p5Q # DB Tech
+            - UCX89ULcoE-clNGJtbzJgc3Q # TRaSH Guides
+            - UCvEdeev3sZoxi5hMksZI4KA # Byte My Bits
+            - UC0H1enE8tPzHKJMh-_5vAcg # IBRACORP
+            - UCjy91m_Pq0PnUcP12hLSI8g # Spaceinvader One
+
+        - type: search
+          title: Quick Search
+          search-engines:
+            - title: The Movie DB
+              shortcut: tmdb
+              url: https://www.themoviedb.org/search?query=%s
+            - title: IMDB
+              shortcut: imdb
+              url: https://www.imdb.com/find?q=%s
+            - title: YouTube
+              shortcut: yt
+              url: https://www.youtube.com/results?search_query=%s
+            - title: Reddit
+              shortcut: r
+              url: https://www.reddit.com/search?q=%s
+
+- name: System Monitor
+  columns:
+    - size: full
+      widgets:
+        - type: docker-containers
+          title: All Containers
+          running-only: false
+          sock-path: /var/run/docker.sock
+          format-container-names: true
+
+        - type: monitor
+          title: All Services Status
+          cache: 30s
+          sites:
+            - title: Jellyfin
+              url: http://jellyfin:8096
+            - title: Plex
+              url: http://plex:32400
+            - title: qBittorrent
+              url: http://localhost:8080
+            - title: Radarr
+              url: http://localhost:7878
+            - title: Sonarr
+              url: http://localhost:8989
+            - title: Prowlarr
+              url: http://localhost:9696
+            - title: Bazarr
+              url: http://localhost:6767
+            - title: Whisparr
+              url: http://localhost:6969
+            - title: Nextcloud
+              url: http://nextcloud:443
+            - title: Glances
+              url: http://glances:61208
+            - title: Portainer
+              url: https://portainer:9443
+              allow-insecure: true
+
+    - size: small
+      widgets:
+        - type: bookmarks
+          title: System Resources
+          groups:
+            - title: Monitoring
+              color: 300 50 50
+              links:
+                - title: Glances Dashboard
+                  url: https://glances.manoharsolleti.com
+                - title: Portainer
+                  url: https://portainer.manoharsolleti.com
+                - title: Docker Logs
+                  url: https://portainer.manoharsolleti.com/#/containers
+                - title: Container Stats
+                  url: https://portainer.manoharsolleti.com/#/containers
+
+        - type: bookmarks
+          title: Quick Stats
+          groups:
+            - title: View Details
+              color: 250 50 50
+              links:
+                - title: Full System Stats
+                  url: https://glances.manoharsolleti.com
+                  icon: si:grafana
+
+- name: Entertainment
+  columns:
+    - size: full
+      widgets:
+        - type: group
+          title: Entertainment Hub
+          widgets:
+            - type: hacker-news
+              limit: 10
+              collapse-after: 5
+
+            - type: lobsters
+              limit: 10
+              collapse-after: 5
+              
+            - type: reddit
+              subreddit: movies
+              limit: 10
+              collapse-after: 5
+              show-thumbnails: true
+
+        - type: videos
+          title: Tech Channels
+          limit: 12
+          channels:
+            - UCXuqSBlHAE6Xw-yeJA0Tunw # Linus Tech Tips
+            - UCBJycsmduvYEL83R_U4JriQ # MKBHD
+            - UCR-DXc1voovS8nhAvccRZhg # Jeff Geerling
+            - UCsBjURrPoezykLs9EqgamOA # Fireship
+            - UCHnyfMqiRRG1u-2MsSQLbXA # Veritasium
+            - UC2eYFnH61tmytImy1mTYvhA # Luke Smith
+
+    - size: small
+      widgets:
+        - type: rss
+          title: Gaming News
+          limit: 5
+          cache: 3h
+          feeds:
+            - url: https://www.polygon.com/rss/index.xml
+              title: Polygon
+            - url: https://www.pcgamer.com/rss/
+              title: PC Gamer
+
+        - type: reddit
+          subreddit: homelab
+          limit: 10
+          collapse-after: 5
+          show-thumbnails: true
+
+        - type: bookmarks
+          title: Gaming
+          groups:
+            - title: Popular Games
+              color: 270 70 50
+              links:
+                - title: Twitch
+                  url: https://www.twitch.tv/directory
+                - title: Steam Charts
+                  url: https://steamcharts.com/
+                - title: Metacritic
+                  url: https://www.metacritic.com/game
+
+- name: Tools
+  columns:
+    - size: full
+      widgets:
+        - type: bookmarks
+          title: Development Tools
+          groups:
+            - title: 🔧 Admin Tools
+              color: 60 70 50
+              links:
+                - title: Portainer
+                  url: https://portainer.manoharsolleti.com
+                - title: Glances
+                  url: https://glances.manoharsolleti.com
+                - title: Watchtower
+                  url: https://portainer.manoharsolleti.com/#/containers/watchtower
+                - title: Newt Status
+                  url: https://portainer.manoharsolleti.com/#/containers/newt
+
+            - title: 📊 Monitoring
+              color: 120 70 50
+              links:
+                - title: Docker Containers
+                  url: https://portainer.manoharsolleti.com/#/containers
+                - title: Docker Images
+                  url: https://portainer.manoharsolleti.com/#/images
+                - title: Docker Networks
+                  url: https://portainer.manoharsolleti.com/#/networks
+                - title: Docker Volumes
+                  url: https://portainer.manoharsolleti.com/#/volumes
+
+            - title: 🌐 Network
+              color: 180 70 50
+              links:
+                - title: Gluetun VPN
+                  url: https://portainer.manoharsolleti.com/#/containers/gluetun
+                - title: Pangolin Dashboard
+                  url: https://pangolin.manoharsolleti.com
+                - title: Speed Test
+                  url: https://www.speedtest.net/
+                - title: What's My IP
+                  url: https://whatismyipaddress.com/
+
+        - type: search
+          title: Quick Tools
+          search-engines:
+            - title: Docker Hub
+              shortcut: dh
+              url: https://hub.docker.com/search?q=%s
+            - title: GitHub
+              shortcut: gh
+              url: https://github.com/search?q=%s
+            - title: Stack Overflow
+              shortcut: so
+              url: https://stackoverflow.com/search?q=%s
+            - title: Google
+              shortcut: g
+              url: https://www.google.com/search?q=%s
+
+    - size: small
+      widgets:
+        - type: repository
+          title: Glance Repo
+          repository: glanceapp/glance
+          show-details: true
+          pull-requests-limit: 5
+          issues-limit: 5
+
+        - type: rss
+          title: Docker Blog
+          limit: 5
+          cache: 6h
+          feeds:
+            - url: https://www.docker.com/blog/feed/
+              title: Docker Blog
