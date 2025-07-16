@@ -1,0 +1,95 @@
+# ~/media-stack/glance-homepage/data/config.yml
+
+meta:
+  # The title of your dashboard
+  title: Media Stack Dashboard
+  # Some popular theme options: dark, light, dracula, gruvbox, nord, catppuccin
+  theme: dark
+
+# In config.yml
+
+apps:
+  # -- Media Management --
+  - name: Sonarr
+    description: TV Show Management
+    url: sonarr.manoharsolleti.com
+    icon: mdi:television-classic
+
+  - name: Radarr
+    description: Movie Management
+    url: radarr.manoharsolleti.com
+    icon: mdi:movie-roll
+
+  - name: Bazarr
+    description: Subtitle Management
+    url: bazarr.manoharsolleti.com
+    icon: mdi:subtitles-outline
+
+  - name: Whisparr
+    description: Adult Content Management
+    url: whisparr.manoharsolleti.com
+    icon: mdi:heart-outline
+
+  # -- Downloaders & Indexers --
+  - name: qBittorrent
+    description: Torrent Client
+    url: qbittorrent.manoharsolleti.com
+    icon: mdi:download-box
+
+  - name: Prowlarr
+    description: Indexer Manager
+    url: prowlarr.manoharsolleti.com
+    icon: mdi:magnify
+
+  # -- Media Servers --
+  - name: Plex
+    description: Media Server
+    url: plex.manoharsolleti.com/web
+    icon: mdi:plex
+
+  - name: Jellyfin
+    description: Media Server
+    url: jellyfin.manoharsolleti.com
+    icon: mdi:jellyfish
+
+  # -- Utilities --
+  - name: Portainer
+    description: Container Management
+    url: portainer.manoharsolleti.com
+    icon: mdi:docker
+
+  - name: Glances
+    description: System Monitoring
+    url: glancesmanoharsolleti.com
+    icon: mdi:chart-bar
+
+
+groups:
+  - name: Media Management
+    apps:
+      - Sonarr
+      - Radarr
+      - Bazarr
+      - Whisparr
+
+  - name: Downloaders
+    apps:
+      - qBittorrent
+      - Prowlarr
+
+  - name: Media Servers
+    apps:
+      - Plex
+      - Jellyfin
+
+  - name: Utilities
+    apps:
+      - Portainer
+      - Glances
+
+widgets:
+  - type: docker
+    # Optional: list containers you want to hide from the widget
+    hidden:
+      - newt
+      - watchtower

@@ -1,14 +1,13 @@
 # ~/media-stack/docker-compose.yml
+version: "3.9"
+name: media-stack
 
-version: "3.8"
-
-# This is a shortcut to define common environment variables for all services.
+# ---------------- Anchors -----------------------------------------------
 x-common-env: &common-env
   PUID: ${PUID}
   PGID: ${PGID}
   TZ: ${TZ}
 
-# This is a shortcut for services that depend on the download stack being ready.
 x-arr-depends-on: &arr-depends-on
   gluetun:
     condition: service_healthy
@@ -17,31 +16,41 @@ x-arr-depends-on: &arr-depends-on
   qbittorrent:
     condition: service_healthy
 
-# This creates a private network for our containers to talk to each other.
+# ---------------- Network ------------------------------------------------
 networks:
   media-stack:
     driver: bridge
-    name: media-stack
 
+# ---------------- Services ----------------------------------------------
 services:
-  # --- Section 1: Tunneling and Networking ---
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - --schedule
+      - "0 0 4 * * *"
+      - --cleanup
+    networks:
+      - media-stack
 
-  # This container creates the secure tunnel to your VPS.
+  # ---------- Tunnelling & Networking -----------------------------------
   newt:
-    image: ghcr.io/fosrl/newt:latest
+    image: fosrl/newt
     container_name: newt
     restart: unless-stopped
     environment:
-      - PANGOLIN_ENDPOINT=https://pangolin.manoharsolleti.com
-      - NEWT_ID=${NEWT_ID}
-      - NEWT_SECRET=${NEWT_SECRET}
-    # This allows Newt to use Docker's internal DNS to find your other services.
+      PANGOLIN_ENDPOINT: https://pangolin.manoharsolleti.com
+      NEWT_ID: ${NEWT_ID}
+      NEWT_SECRET: ${NEWT_SECRET}
+      TZ: ${TZ}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - media-stack
 
-  # This container creates a VPN tunnel for your downloaders to hide their traffic.
   gluetun:
     image: qmcgaw/gluetun:latest
     container_name: gluetun
@@ -53,27 +62,43 @@ services:
     volumes:
       - ${DOCKER_BASE_DIR}/gluetun:/gluetun
     environment:
-      - VPN_SERVICE_PROVIDER=${VPN_SERVICE_PROVIDER}
-      - OPENVPN_USER=${OPENVPN_USER}
-      - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
-      - SERVER_REGIONS=${SERVER_REGIONS}
-      - FIREWALL_OUTBOUND_SUBNETS=172.16.0.0/12,192.168.0.0/16
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER}
+      OPENVPN_USER: ${OPENVPN_USER}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      SERVER_REGIONS: ${SERVER_REGIONS}
+      FIREWALL_OUTBOUND_SUBNETS: 172.16.0.0/12,192.168.0.0/16
+      TZ: ${TZ}
     networks:
       - media-stack
+    # ── Uncomment the lines below for Local / LAN access ────────────────
+    ports:
+      - "8080:8080"   # qBittorrent
+      - "9696:9696"   # Prowlarr
+      - "7878:7878"   # Radarr
+      - "8989:8989"   # Sonarr
+      - "6767:6767"   # Bazarr
+      - "6969:6969"   # Whisparr
+      - "6881:6881"
+      - "6881:6881/udp"
 
-  # --- Section 2: Downloaders and Indexers (Traffic goes through Gluetun VPN) ---
-
+  # ---------- Downloaders & Indexers ------------------------------------
   qbittorrent:
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
     restart: unless-stopped
-    network_mode: "service:gluetun" # This forces all traffic through Gluetun
+    network_mode: "service:gluetun"
     environment:
       <<: *common-env
       WEBUI_PORT: 8080
     volumes:
       - ${DOCKER_BASE_DIR}/qbittorrent:/config
-      - ${DOCKER_MEDIA_DIR}:/downloads # Downloads go directly to your media drive
+      - ${DOCKER_MEDIA_DIR}:/downloads
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     depends_on:
       gluetun: { condition: service_healthy }
 
@@ -85,11 +110,16 @@ services:
     environment: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/prowlarr:/config
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     depends_on:
       gluetun: { condition: service_healthy }
 
-  # --- Section 3: Media Management - The *Arr Suite (Traffic goes through Gluetun VPN) ---
-
+  # ---------- Media Management (*Arr) -----------------------------------
   radarr:
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
@@ -98,7 +128,13 @@ services:
     environment: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/radarr:/config
-      - ${DOCKER_MEDIA_DIR}:/data # Sees /mnt/media as /data
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     depends_on: *arr-depends-on
 
   sonarr:
@@ -109,7 +145,13 @@ services:
     environment: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/sonarr:/config
-      - ${DOCKER_MEDIA_DIR}:/data # Sees /mnt/media as /data
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     depends_on: *arr-depends-on
 
   bazarr:
@@ -120,14 +162,49 @@ services:
     environment: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/bazarr:/config
-      - ${DOCKER_MEDIA_DIR}:/data # Sees /mnt/media as /data
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     depends_on:
       gluetun: { condition: service_healthy }
-      radarr: { condition: service_healthy }
-      sonarr: { condition: service_healthy }
+      radarr:  { condition: service_healthy }
+      sonarr:  { condition: service_healthy }
 
-  # --- Section 4: Media Servers (Accessed via Pangolin/Newt tunnel) ---
+  whisparr:
+    image: ghcr.io/hotio/whisparr:latest
+    container_name: whisparr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/whisparr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on: *arr-depends-on
 
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    environment:
+      LOG_LEVEL: "info"
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: "none"
+      TZ: ${TZ}
+    depends_on:
+      gluetun: { condition: service_healthy }
+    restart: unless-stopped
+
+  # ---------- Media Servers ---------------------------------------------
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
@@ -135,9 +212,12 @@ services:
     environment: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/jellyfin:/config
-      - ${DOCKER_MEDIA_DIR}:/data # Sees /mnt/media as /data
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
     networks:
       - media-stack
+    ports:
+      - "8096:8096"   # Uncomment for LAN access
 
   plex:
     image: lscr.io/linuxserver/plex:latest
@@ -147,13 +227,15 @@ services:
       <<: *common-env
       VERSION: docker
     volumes:
-      - ${DOCKER_SSD_CONFIG_DIR}/plex:/config # Config on fast SSD storage
-      - ${DOCKER_MEDIA_DIR}:/data # Sees /mnt/media as /data
+      - ${DOCKER_SSD_CONFIG_DIR}/plex:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
     networks:
       - media-stack
+    ports:
+      - "32400:32400" # Uncomment for LAN access
 
-  # --- Section 5: Utility and Management (Accessed via Pangolin/Newt tunnel) ---
-
+  # ---------- Utility & Management --------------------------------------
   glances:
     image: nicolargo/glances:latest-full
     container_name: glances
@@ -163,9 +245,28 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ${DOCKER_BASE_DIR}/glances:/glances/conf
     environment:
-      - GLANCES_OPT=-w
+      GLANCES_OPT: -w
     networks:
       - media-stack
+    ports:
+      - "61208:61208" # Uncomment for LAN access
+
+  # glance-homepage:
+  #   image: glanceapp/glance:latest
+  #   container_name: glance-homepage
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
+  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #   environment:
+  #     GLANCE_UID: ${PUID}
+  #     GLANCE_GID: ${PGID}
+  #     TZ: ${TZ}
+  #   networks:
+  #     - media-stack
+  #   ports:
+  #     - "8080:8088"
 
   portainer:
     image: portainer/portainer-ce:latest
@@ -178,11 +279,5 @@ services:
       - ${DOCKER_BASE_DIR}/portainer:/data
     networks:
       - media-stack
-
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    command: --schedule "0 0 4 * * *" --cleanup
+    ports:
+      - "9443:9443"   # Uncomment for LAN access
