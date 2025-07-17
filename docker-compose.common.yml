@@ -1,0 +1,15 @@
+# ~/media-stack/docker-compose.common.yml
+# This file contains common YAML anchors to be reused across other compose files.
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-arr-depends-on: &arr-depends-on
+  gluetun:
+    condition: service_healthy
+  prowlarr:
+    condition: service_healthy
+  qbittorrent:
+    condition: service_healthy

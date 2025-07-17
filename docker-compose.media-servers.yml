@@ -1,0 +1,48 @@
+# ~/media-stack/docker-compose.media-servers.yml
+# Contains media servers like Jellyfin and Plex.
+
+services:
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/jellyfin:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+      - media-stack
+    ports:
+      - "8096:8096"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      VERSION: docker
+    volumes:
+      - ${DOCKER_SSD_CONFIG_DIR}/plex:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+      - media-stack
+    ports:
+      - "32400:32400"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s

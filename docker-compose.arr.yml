@@ -1,0 +1,106 @@
+# ~/media-stack/docker-compose.arr.yml
+# Contains the *Arr suite for media management.
+
+services:
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/radarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/sonarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy
+
+  bazarr:
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/bazarr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6767"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+
+  whisparr:
+    image: ghcr.io/hotio/whisparr:latest
+    container_name: whisparr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/whisparr:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6969/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy

@@ -1,0 +1,28 @@
+# ~/media-stack/docker-compose.files.yml
+# Contains services for file management like Nextcloud.
+
+services:
+  nextcloud:
+    image: lscr.io/linuxserver/nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      NEXTCLOUD_TRUSTED_DOMAINS: "cloud.manoharsolleti.com"
+    volumes:
+      - ${DOCKER_BASE_DIR}/nextcloud:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+      - media-stack
+    ports:
+      - "8443:443"
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost/status.php"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 5m

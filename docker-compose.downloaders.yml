@@ -1,0 +1,112 @@
+# ~/media-stack/docker-compose.downloaders.yml
+# Contains services for downloading and indexing.
+
+services:
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      WEBUI_PORT: 8080
+    volumes:
+      - ${DOCKER_BASE_DIR}/qbittorrent:/config
+      - ${DOCKER_MEDIA_DIR}:/downloads
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/prowlarr:/config
+    user: "${PUID}:${PGID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun:
+        condition: service_healthy
+
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    network_mode: "service:gluetun"
+    environment:
+      LOG_LEVEL: "info"
+      LOG_HTML: "false"
+      CAPTCHA_SOLVER: "none"
+      TZ: ${TZ}
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    restart: unless-stopped
+
+  bitmagnet:
+    image: ghcr.io/bitmagnet-io/bitmagnet:latest
+    container_name: bitmagnet
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+    volumes:
+      - ${DOCKER_BASE_DIR}/bitmagnet:/root/.config/bitmagnet
+    command:
+      - worker
+      - run
+      - --keys=http_server
+      - --keys=queue_server
+      - --keys=dht_crawler
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      bitmagnet-postgres:
+        condition: service_started
+
+  bitmagnet-postgres:
+    image: postgres:16-alpine
+    container_name: bitmagnet-postgres
+    network_mode: "service:gluetun"
+    volumes:
+      - bitmagnet_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
+      POSTGRES_DB: bitmagnet
+      PGUSER: postgres
+      POSTGRES_INITDB_ARGS: "-c shared_buffers=256MB -c max_connections=200"
+    shm_size: 1g
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready
+      start_period: 20s
+      interval: 10s
+
+volumes:
+  bitmagnet_postgres_data:
+

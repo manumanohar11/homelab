@@ -1,0 +1,56 @@
+# ~/media-stack/docker-compose.core.yml
+# Contains core infrastructure: VPN and auto-updates.
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command:
+      - --schedule
+      - "0 0 4 * * *"
+      - --cleanup
+    networks:
+      - media-stack
+
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ${DOCKER_BASE_DIR}/gluetun:/gluetun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER}
+      OPENVPN_USER: ${OPENVPN_USER}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      SERVER_REGIONS: ${SERVER_REGIONS}
+      FIREWALL_OUTBOUND_SUBNETS: 172.16.0.0/12,192.168.0.0/16
+      TZ: ${TZ}
+    networks:
+      - media-stack
+    ports:
+      # Ports for services running through the VPN
+      - "8080:8080"   # qBittorrent
+      - "9696:9696"   # Prowlarr
+      - "7878:7878"   # Radarr
+      - "8989:8989"   # Sonarr
+      - "6767:6767"   # Bazarr
+      - "6969:6969"   # Whisparr
+      # Bitmagnet ports
+      - "3333:3333"   # Bitmagnet API and WebUI
+      - "3334:3334/tcp"   # Bitmagnet BitTorrent TCP
+      - "3334:3334/udp"   # Bitmagnet BitTorrent UDP
+      # qBittorrent specific ports
+      - "6881:6881"
+      - "6881:6881/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5

@@ -1,0 +1,63 @@
+# ~/media-stack/docker-compose.management.yml
+# Contains utility and management tools.
+
+services:
+  newt:
+    image: fosrl/newt
+    container_name: newt
+    restart: unless-stopped
+    environment:
+      PANGOLIN_ENDPOINT: https://pangolin.manoharsolleti.com
+      NEWT_ID: ${NEWT_ID}
+      NEWT_SECRET: ${NEWT_SECRET}
+      TZ: ${TZ}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - media-stack
+
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    restart: unless-stopped
+    pid: "host"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_BASE_DIR}/glances:/glances/conf
+    environment:
+      GLANCES_OPT: -w
+    networks:
+      - media-stack
+    ports:
+      - "61208:61208"
+
+  glance-homepage:
+    image: glanceapp/glance:latest
+    container_name: glance-homepage
+    restart: unless-stopped
+    volumes:
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      GLANCE_UID: ${PUID}
+      GLANCE_GID: ${PGID}
+      TZ: ${TZ}
+    networks:
+      - media-stack
+    ports:
+      - "8088:8080"
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_BASE_DIR}/portainer:/data
+    networks:
+      - media-stack
+    ports:
+      - "9443:9443"
