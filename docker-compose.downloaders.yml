@@ -14,7 +14,7 @@ services:
       WEBUI_PORT: 8080
     volumes:
       - ${DOCKER_BASE_DIR}/qbittorrent:/config
-      - ${DOCKER_MEDIA_DIR}:/downloads
+      - ${DOCKER_MEDIA_DIR}/downloads:/downloads
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]

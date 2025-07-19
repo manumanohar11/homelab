@@ -54,6 +54,30 @@ services:
       qbittorrent:
         condition: service_healthy
 
+  lidarr:
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    network_mode: "service:gluetun"
+    restart: unless-stopped
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    user: "${PUID}:${PGID}"
+    volumes:
+      - ${DOCKER_BASE_DIR}/lidarr:/config
+      - ${DOCKER_MEDIA_DIR}/Songs:/music_library # Lidarr sees the main "Songs" folder
+      - ${DOCKER_BASE_DIR}/downloads:/downloads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      gluetun: { condition: service_healthy }
+      qbittorrent: { condition: service_healthy }
+      prowlarr: { condition: service_healthy }
+
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr

@@ -46,3 +46,33 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  stash:
+    image: stashapp/stash:latest
+    container_name: stash
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      STASH_STASH: /data/
+      STASH_GENERATED: /generated/
+      STASH_METADATA: /metadata/
+      STASH_CACHE: /cache/
+      STASH_PORT: 9998
+    volumes:
+      - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
+      - ${DOCKER_MEDIA_DIR}:/data
+      - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
+      - ${DOCKER_BASE_DIR}/stash/cache:/cache
+      - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
+      - ${DOCKER_BASE_DIR}/stash/generated:/generated
+    logging:
+      driver: "json-file"
+      options:
+        max-file: "10"
+        max-size: "2m"
+    depends_on:
+      gluetun:
+        condition: service_healthy
