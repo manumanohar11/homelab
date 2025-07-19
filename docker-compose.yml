@@ -18,4 +18,5 @@ include:
   - docker-compose.arr.yml
   - docker-compose.media-servers.yml
   - docker-compose.management.yml
+  - docker-compose.monitoring.yml
   # - docker-compose.files.yml
