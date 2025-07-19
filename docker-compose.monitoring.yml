@@ -139,3 +139,23 @@ services:
     devices:
       - /dev/kmsg
     privileged: true
+
+  # Uptime monitoring
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    restart: unless-stopped
+    networks:
+      - media-stack
+    ports:
+      - "3001:3001"
+    volumes:
+      - ${DOCKER_BASE_DIR}/uptime-kuma:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - TZ=${TZ}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
