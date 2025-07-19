@@ -1,4 +1,72 @@
+# Environment files (may contain secrets)
 .env
-media-stack
-portainer-data
-uptime-kuma-data
+.env.local
+.env.*.local
+
+# Runtime data directories
+data/
+uptime-kuma-data/
+portainer-data/
+media-stack/
+*/data/
+*-data/
+
+# Container config directories (except those meant for git)
+config/
+!configs/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Docker volumes (if mounted locally)
+volumes/
+
+# IDE specific files
+.idea/
+.vscode/
+*.code-workspace
+
+# Cache directories
+.cache/
+cache/
+__pycache__/
+*.pyc
+
+# Downloaded files
+downloads/
+*.download
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# Other sensitive files
+secrets/
+credentials/
+auth/
