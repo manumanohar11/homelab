@@ -1,0 +1,645 @@
+{
+  "name": "COMPLETE - Wardrobe with Tags & VTON",
+  "nodes": [
+    {
+      "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "clothingPhoto",
+              "type": "binary"
+            },
+            {
+              "name": "tagPhoto",
+              "type": "binary"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        400
+      ],
+      "notes": "Upload TWO images: the clothing item and its care/material tag."
+    },
+    {
+      "parameters": {
+        "binaryData": true,
+        "binaryPropertyName": "={{$node['Start'].json.binary.clothingPhoto}}",
+        "options": {}
+      },
+      "name": "HTTP Request: Remove Background",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        720,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_PHOTOROOM_API_KEY_ID",
+          "name": "PhotoRoom API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileId": "={{$node['Google Drive: Upload Original Clothing'].json['id']}}",
+        "options": {
+          "publiclyAccessible": true
+        }
+      },
+      "name": "Google Drive: Share Original Clothing",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "options": {
+          "parentId": "YOUR_GOOGLE_DRIVE_PROCESSED_FOLDER_ID"
+        }
+      },
+      "name": "Google Drive: Upload Processed",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        920,
+        200
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileId": "={{$node['Google Drive: Upload Processed'].json['id']}}",
+        "options": {
+          "publiclyAccessible": true
+        }
+      },
+      "name": "Google Drive: Share Processed",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        200
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "clothingPhoto",
+        "options": {
+          "parentId": "YOUR_GOOGLE_DRIVE_ORIGINALS_FOLDER_ID"
+        }
+      },
+      "name": "Google Drive: Upload Original Clothing",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        200
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "options": {
+          "body": "={\n  \"model\": \"anthropic/claude-3-haiku-20240307\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"You are a fashion expert. Analyze this clothing item. Respond ONLY with a valid JSON object. The JSON should include: itemName, category, subCategory, color (as an array), pattern, style, and season (as an array). Do not include any text before or after the JSON object.\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"{{$node[\\\"Google Drive: Share Original Clothing\\\"].json[\\\"webViewLink\\\"]}}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"max_tokens\": 500\n}"
+        }
+      },
+      "name": "HTTP Request: AI Clothing Analysis (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        920,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_OPENROUTER_API_KEY_ID",
+          "name": "OpenRouter API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Wardrobe",
+        "fields": {
+          "fields": [
+            {
+              "name": "Name",
+              "value": "={{$node['HTTP Request: AI Clothing Analysis (Haiku)'].json.choices[0].message.content.json.itemName}}"
+            },
+            {
+              "name": "Category",
+              "value": "={{$node['HTTP Request: AI Clothing Analysis (Haiku)'].json.choices[0].message.content.json.category}}"
+            },
+            {
+              "name": "OriginalImageURL",
+              "value": "={{$node['Google Drive: Share Original Clothing'].json.webViewLink}}"
+            },
+            {
+              "name": "ProcessedImageURL",
+              "value": "={{$node['Google Drive: Share Processed'].json.webViewLink}}"
+            },
+            {
+              "name": "Materials",
+              "value": "={{$node['HTTP Request: AI Tag Analysis (Haiku)'].json.choices[0].message.content.json.materials}}"
+            },
+            {
+              "name": "WashingInstructions",
+              "value": "={{$node['HTTP Request: AI Tag Analysis (Haiku)'].json.choices[0].message.content.json.washingInstructions}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Airtable: Add New Item",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        400
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIALS_ID",
+          "name": "Airtable Account"
+        }
+      },
+      "notes": "Merges data from clothing and tag analysis into one Airtable record."
+    },
+    {
+      "parameters": {
+        "baseId": "YOUR_AIRTABLE_BASE_ID",
+        "table": "Wardrobe",
+        "operation": "getAll",
+        "options": {}
+      },
+      "name": "Airtable: Get All Wardrobe",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        400
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "YOUR_AIRTABLE_CREDENTIALS_ID",
+          "name": "Airtable Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "options": {
+          "body": "={\n  \"model\": \"nousresearch/nous-hermes-2-mixtral-8x7b-dpo\",\n  \"response\": { \"type\": \"json\" },\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are a helpful fashion assistant. Your task is to create outfits. Respond ONLY with a JSON object in the format: { \\\"outfits\\\": [ { \\\"outfitName\\\": \\\"Outfit 1\\\", \\\"items\\\": [\\\"Item Name 1\\\", \\\"Item Name 2\\\"] } ] }. Do not include any explanations.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"My new clothing item is: {{$node['Airtable: Add New Item'].json.fields.Name}}. My entire wardrobe is: {{ $node['Airtable: Get All Wardrobe'].json.map(item => item.fields.Name).join(', ') }}. Please generate 3 stylish outfit combinations featuring my new item.\"\n    }\n  ]\n}"
+        }
+      },
+      "name": "HTTP Request: Generate Outfits (Free Model)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1720,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_OPENROUTER_API_KEY_ID",
+          "name": "OpenRouter API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "subject": "New Item, Care Info & Virtual Try-On Ready!",
+        "html": "=Your new item, <b>{{$node['Airtable: Add New Item'].json.fields.Name}}</b>, has been added.<br><hr>\n<b>Care Instructions:</b><br>\nMaterials: {{$node['Airtable: Add New Item'].json.fields.Materials}}<br>\nWashing: {{$node['Airtable: Add New Item'].json.fields.WashingInstructions}}<br><hr>\n<b>Outfit Suggestions & Virtual Try-Ons:</b><br>\n{{ $node['Merge VTON Results'].json.map(item => `\n  <div>\n    <h3>${item.json.outfitData.outfitName}</h3>\n    <p>${item.json.outfitData.items.join(', ')}</p>\n    <img src=\\\"https://drive.google.com/uc?id=${item.json.vtonImageId}\\\" width=\\\"300\\\" />\n  </div>\n`).join('') }}\n"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 2.1,
+      "position": [
+        2480,
+        620
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_EMAIL_CREDENTIALS_ID",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {
+          "fieldToSplit": "={{$node['HTTP Request: Generate Outfits (Free Model)'].json.choices[0].message.content.outfits}}"
+        }
+      },
+      "name": "Loop Over Outfits",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        620
+      ],
+      "notes": "Processes each suggested outfit one by one to generate a VTON image for each."
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "myPhotoUrl",
+              "value": "PASTE_YOUR_PERMANENT_GOOGLE_DRIVE_PHOTO_URL_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set My Photo URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2.1,
+      "position": [
+        1520,
+        620
+      ],
+      "notes": "IMPORTANT: Paste the permanent, public URL of your own background-free photo here."
+    },
+    {
+      "parameters": {
+        "url": "https://api.zmo.ai/v2/tryon",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "garment_img",
+              "value": "={{$node['Airtable: Add New Item'].json.fields.ProcessedImageURL}}"
+            },
+            {
+              "name": "model_img",
+              "value": "={{$node['Set My Photo URL'].json['myPhotoUrl']}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "HTTP Request: Generate VTON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1900,
+        620
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_ZMO_AI_API_KEY_ID",
+          "name": "ZMO.AI API Key"
+        }
+      },
+      "notes": "This is the PREMIUM API Call for Virtual Try-On."
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "data",
+        "options": {
+          "parentId": "YOUR_GOOGLE_DRIVE_TRYONS_FOLDER_ID"
+        }
+      },
+      "name": "Google Drive: Upload VTON Image",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2080,
+        620
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "Merge VTON Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        420
+      ],
+      "notes": "Waits for all the VTON images to be generated before sending the final email."
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "tagPhoto",
+        "options": {
+          "parentId": "YOUR_GOOGLE_DRIVE_TAGS_FOLDER_ID"
+        }
+      },
+      "name": "Google Drive: Upload Tag Photo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        480,
+        600
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileId": "={{$node['Google Drive: Upload Tag Photo'].json['id']}}",
+        "options": {
+          "publiclyAccessible": true
+        }
+      },
+      "name": "Google Drive: Share Tag Photo",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        720,
+        600
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIALS_ID",
+          "name": "Google Drive Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "options": {
+          "body": "={\n  \"model\": \"anthropic/claude-3-haiku-20240307\",\n  \"response\": { \"type\": \"json\" },\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"text\",\n          \"text\": \"You are an expert at reading clothing care tags. Analyze the image. Extract the material composition and washing instructions. Respond ONLY with a valid JSON object in the format: {\\\"materials\\\": \\\"...\\\", \\\"washingInstructions\\\": \\\"...\\\"}. Be concise and clear.\"\n        },\n        {\n          \"type\": \"image_url\",\n          \"image_url\": {\n            \"url\": \"{{$node[\\\"Google Drive: Share Tag Photo\\\"].json[\\\"webViewLink\\\"]}}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"max_tokens\": 500\n}"
+        }
+      },
+      "name": "HTTP Request: AI Tag Analysis (Haiku)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        920,
+        600
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "YOUR_OPENROUTER_API_KEY_ID",
+          "name": "OpenRouter API Key"
+        }
+      },
+      "notes": "Uses Haiku for cost-effective OCR and data extraction from the tag photo."
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Upload Original Clothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Google Drive: Upload Tag Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Upload Original Clothing": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Share Original Clothing",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request: Remove Background",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Remove Background": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Upload Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Share Original Clothing": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: AI Clothing Analysis (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Upload Processed": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Share Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: AI Clothing Analysis (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Airtable: Add New Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Share Processed": {
+      "main": [
+        [
+          {
+            "node": "Airtable: Add New Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable: Add New Item": {
+      "main": [
+        [
+          {
+            "node": "Airtable: Get All Wardrobe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable: Get All Wardrobe": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Generate Outfits (Free Model)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Generate Outfits (Free Model)": {
+      "main": [
+        [
+          {
+            "node": "Set My Photo URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Outfits": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: Generate VTON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set My Photo URL": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Outfits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: Generate VTON": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Upload VTON Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Upload VTON Image": {
+      "main": [
+        [
+          {
+            "node": "Merge VTON Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge VTON Results": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Upload Tag Photo": {
+      "main": [
+        [
+          {
+            "node": "Google Drive: Share Tag Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive: Share Tag Photo": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request: AI Tag Analysis (Haiku)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request: AI Tag Analysis (Haiku)": {
+      "main": [
+        [
+          {
+            "node": "Airtable: Add New Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

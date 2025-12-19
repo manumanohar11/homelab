@@ -14,9 +14,10 @@ networks:
 include:
   - docker-compose.common.yml
   - docker-compose.core.yml
-  - docker-compose.downloaders.yml
-  - docker-compose.arr.yml
+  - docker-compose.photos.yml
+  # - docker-compose.downloaders.yml
+  # - docker-compose.arr.yml
   - docker-compose.media-servers.yml
   - docker-compose.management.yml
-  - docker-compose.monitoring.yml
+  # - docker-compose.monitoring.yml
   # - docker-compose.files.yml

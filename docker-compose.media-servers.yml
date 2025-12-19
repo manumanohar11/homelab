@@ -2,27 +2,27 @@
 # Contains media servers like Jellyfin and Plex.
 
 services:
-  jellyfin:
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    restart: unless-stopped
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    volumes:
-      - ${DOCKER_BASE_DIR}/jellyfin:/config
-      - ${DOCKER_MEDIA_DIR}:/data
-    networks:
-      - media-stack
-    ports:
-      - "8096:8096"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+  # jellyfin:
+  #   image: lscr.io/linuxserver/jellyfin:latest
+  #   container_name: jellyfin
+  #   restart: unless-stopped
+  #   environment:
+  #     PUID: ${PUID}
+  #     PGID: ${PGID}
+  #     TZ: ${TZ}
+  #   volumes:
+  #     - ${DOCKER_BASE_DIR}/jellyfin:/config
+  #     - ${DOCKER_MEDIA_DIR}:/data
+  #   networks:
+  #     - media-stack
+  #   ports:
+  #     - "8096:8096"
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+  #     interval: 1m
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 30s
 
   plex:
     image: lscr.io/linuxserver/plex:latest
@@ -33,6 +33,8 @@ services:
       PGID: ${PGID}
       TZ: ${TZ}
       VERSION: docker
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
     volumes:
       - ${DOCKER_SSD_CONFIG_DIR}/plex:/config
       - ${DOCKER_MEDIA_DIR}:/data
@@ -46,33 +48,40 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1          # Use 1 GPU (or 'all')
+              capabilities: [gpu]
 
-  stash:
-    image: stashapp/stash:latest
-    container_name: stash
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-      STASH_STASH: /data/
-      STASH_GENERATED: /generated/
-      STASH_METADATA: /metadata/
-      STASH_CACHE: /cache/
-      STASH_PORT: 9998
-    volumes:
-      - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
-      - ${DOCKER_MEDIA_DIR}:/data
-      - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
-      - ${DOCKER_BASE_DIR}/stash/cache:/cache
-      - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
-      - ${DOCKER_BASE_DIR}/stash/generated:/generated
-    logging:
-      driver: "json-file"
-      options:
-        max-file: "10"
-        max-size: "2m"
-    depends_on:
-      gluetun:
-        condition: service_healthy
+  # stash:
+  #   image: stashapp/stash:latest
+  #   container_name: stash
+  #   restart: unless-stopped
+  #   network_mode: "service:gluetun"
+  #   environment:
+  #     PUID: ${PUID}
+  #     PGID: ${PGID}
+  #     TZ: ${TZ}
+  #     STASH_STASH: /data/
+  #     STASH_GENERATED: /generated/
+  #     STASH_METADATA: /metadata/
+  #     STASH_CACHE: /cache/
+  #     STASH_PORT: 9998
+  #   volumes:
+  #     - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
+  #     - ${DOCKER_MEDIA_DIR}:/data
+  #     - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
+  #     - ${DOCKER_BASE_DIR}/stash/cache:/cache
+  #     - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
+  #     - ${DOCKER_BASE_DIR}/stash/generated:/generated
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-file: "10"
+  #       max-size: "2m"
+  #   depends_on:
+  #     gluetun:
+  #       condition: service_healthy

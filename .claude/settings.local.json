@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(tree:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker exec:*)",
+      "Bash(mkdir:*)",
+      "Bash(sudo netstat:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(docker inspect:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:docs.linuxserver.io)",
+      "Bash(docker ps:*)",
+      "WebFetch(domain:techhut.tv)",
+      "Bash(grep:*)",
+      "Bash(mv:*)"
+    ],
+    "deny": []
+  }
+}

@@ -1,0 +1,24 @@
+# ~/media-stack/docker-compose.automation.yml
+# Contains n8n workflow automation tool
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    networks:
+      - media-stack
+    ports:
+      - "5678:5678"
+    environment:
+      GENERIC_TIMEZONE: ${TZ}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+      N8N_HOST: "${SUBDOMAIN}.${DOMAIN_NAME}"
+      N8N_PORT: 5678
+      N8N_PROTOCOL: "https"
+      NODE_ENV: "production"
+      WEBHOOK_URL: https://${SUBDOMAIN}.${DOMAIN_NAME}/
+
+    volumes:
+      - ${DOCKER_BASE_DIR}/n8n:/home/node/.n8n
