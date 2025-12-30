@@ -1,33 +1,13 @@
 # ~/media-stack/docker-compose.media-servers.yml
-# Contains media servers like Jellyfin and Plex.
+# Contains media servers like Plex, Jellyfin, and Stash.
 
 services:
-  # jellyfin:
-  #   image: lscr.io/linuxserver/jellyfin:latest
-  #   container_name: jellyfin
-  #   restart: unless-stopped
-  #   environment:
-  #     PUID: ${PUID}
-  #     PGID: ${PGID}
-  #     TZ: ${TZ}
-  #   volumes:
-  #     - ${DOCKER_BASE_DIR}/jellyfin:/config
-  #     - ${DOCKER_MEDIA_DIR}:/data
-  #   networks:
-  #     - media-stack
-  #   ports:
-  #     - "8096:8096"
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
-  #     interval: 1m
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 30s
-
   plex:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -47,41 +27,190 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: 1          # Use 1 GPU (or 'all')
+              count: 1
               capabilities: [gpu]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Plex"
+      - "homepage.icon=plex"
+      - "homepage.href=http://plex.${DOMAIN_NAME:-localhost}:32400/web"
+      - "homepage.description=Media Server"
 
-  # stash:
-  #   image: stashapp/stash:latest
-  #   container_name: stash
-  #   restart: unless-stopped
-  #   network_mode: "service:gluetun"
-  #   environment:
-  #     PUID: ${PUID}
-  #     PGID: ${PGID}
-  #     TZ: ${TZ}
-  #     STASH_STASH: /data/
-  #     STASH_GENERATED: /generated/
-  #     STASH_METADATA: /metadata/
-  #     STASH_CACHE: /cache/
-  #     STASH_PORT: 9998
-  #   volumes:
-  #     - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
-  #     - ${DOCKER_MEDIA_DIR}:/data
-  #     - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
-  #     - ${DOCKER_BASE_DIR}/stash/cache:/cache
-  #     - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
-  #     - ${DOCKER_BASE_DIR}/stash/generated:/generated
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-file: "10"
-  #       max-size: "2m"
-  #   depends_on:
-  #     gluetun:
-  #       condition: service_healthy
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    volumes:
+      - ${DOCKER_BASE_DIR}/jellyfin:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+      - media-stack
+    ports:
+      - "8096:8096"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          memory: 1G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Jellyfin"
+      - "homepage.icon=jellyfin"
+      - "homepage.href=http://jellyfin.${DOMAIN_NAME:-localhost}:8096"
+      - "homepage.description=Media Server"
+    profiles:
+      - jellyfin
+
+  stash:
+    image: stashapp/stash:latest
+    container_name: stash
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      STASH_STASH: /data/
+      STASH_GENERATED: /generated/
+      STASH_METADATA: /metadata/
+      STASH_CACHE: /cache/
+      STASH_PORT: 9998
+    volumes:
+      - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
+      - ${DOCKER_MEDIA_DIR}:/data
+      - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
+      - ${DOCKER_BASE_DIR}/stash/cache:/cache
+      - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
+      - ${DOCKER_BASE_DIR}/stash/generated:/generated
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9998"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-file: "10"
+        max-size: "2m"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          memory: 512M
+    depends_on:
+      gluetun:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Stash"
+      - "homepage.icon=stash"
+      - "homepage.description=Adult Media Organizer"
+    profiles:
+      - stash
+
+  tdarr:
+    image: ghcr.io/haveagitgat/tdarr:latest
+    container_name: tdarr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      UMASK_SET: 002
+      serverIP: 0.0.0.0
+      serverPort: 8266
+      webUIPort: 8265
+      internalNode: "true"
+      inContainer: "true"
+      ffmpegVersion: 6
+      nodeName: MainNode
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+      - ${DOCKER_BASE_DIR}/tdarr/server:/app/server
+      - ${DOCKER_BASE_DIR}/tdarr/configs:/app/configs
+      - ${DOCKER_BASE_DIR}/tdarr/logs:/app/logs
+      - ${DOCKER_MEDIA_DIR}:/media
+      - ${DOCKER_BASE_DIR}/tdarr/transcode_cache:/temp
+    networks:
+      - media-stack
+    ports:
+      - "8265:8265"  # WebUI
+      - "8266:8266"  # Server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8265"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          memory: 1G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Tdarr"
+      - "homepage.icon=tdarr"
+      - "homepage.href=http://tdarr.${DOMAIN_NAME:-localhost}:8265"
+      - "homepage.description=Media Transcoding"
+    profiles:
+      - tdarr

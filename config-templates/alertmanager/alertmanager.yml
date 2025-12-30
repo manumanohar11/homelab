@@ -1,0 +1,92 @@
+# Alertmanager Configuration
+# https://prometheus.io/docs/alerting/latest/configuration/
+
+global:
+  # Global SMTP settings (uncomment and configure for email alerts)
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alertmanager@example.com'
+  # smtp_auth_username: 'your-email@gmail.com'
+  # smtp_auth_password: 'your-app-password'
+
+  # Global Slack settings (uncomment for Slack alerts)
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+  resolve_timeout: 5m
+
+# Route tree - defines how alerts are grouped and routed
+route:
+  # Default receiver
+  receiver: 'default-receiver'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'service']
+  
+  # How long to wait before sending a notification for a group
+  group_wait: 30s
+  
+  # How long to wait before sending subsequent notifications
+  group_interval: 5m
+  
+  # How long to wait before resending a notification
+  repeat_interval: 4h
+
+  # Child routes for specific alert types
+  routes:
+    # Critical alerts - send immediately
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      repeat_interval: 4h
+
+    # Info alerts - less urgent
+    - match:
+        severity: info
+      receiver: 'info-receiver'
+      repeat_interval: 24h
+
+# Inhibition rules - suppress notifications in certain conditions
+inhibit_rules:
+  # If a critical alert is firing, suppress warnings for the same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+# Receivers define notification integrations
+receivers:
+  - name: 'default-receiver'
+    # Webhook receiver (works with many services including Discord, Slack, etc.)
+    # webhook_configs:
+    #   - url: 'http://your-webhook-url'
+    #     send_resolved: true
+
+  - name: 'critical-receiver'
+    # Email for critical alerts (uncomment and configure)
+    # email_configs:
+    #   - to: 'admin@example.com'
+    #     send_resolved: true
+
+  - name: 'warning-receiver'
+    # Slack for warnings (uncomment and configure)
+    # slack_configs:
+    #   - channel: '#alerts'
+    #     send_resolved: true
+    #     title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+  - name: 'info-receiver'
+    # Info alerts - maybe just log them
+    # webhook_configs:
+    #   - url: 'http://your-logging-webhook'
+
+# Templates for notification formatting (optional)
+# templates:
+#   - '/etc/alertmanager/templates/*.tmpl'

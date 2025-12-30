@@ -1,11 +1,72 @@
 # ~/media-stack/docker-compose.common.yml
 # This file contains common YAML anchors to be reused across other compose files.
 
+# --- Common Environment Variables ---
 x-common-env: &common-env
   PUID: ${PUID}
   PGID: ${PGID}
   TZ: ${TZ}
 
+# --- Common LinuxServer.io Environment ---
+x-lsio-env: &lsio-env
+  <<: *common-env
+  DOCKER_MODS: ""
+
+# --- Common Logging Configuration ---
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# --- Common Health Check Defaults ---
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+# --- Common Resource Limits (Small) ---
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
+
+# --- Common Resource Limits (Medium) ---
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+# --- Common Resource Limits (Large) ---
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
+
+# --- Common Security Options ---
+x-security: &security-opts
+  security_opt:
+    - no-new-privileges:true
+
+# --- VPN Service Dependency ---
+x-vpn-depends-on: &vpn-depends-on
+  gluetun:
+    condition: service_healthy
+
+# --- Arr Suite Dependencies ---
 x-arr-depends-on: &arr-depends-on
   gluetun:
     condition: service_healthy
@@ -13,3 +74,7 @@ x-arr-depends-on: &arr-depends-on
     condition: service_healthy
   qbittorrent:
     condition: service_healthy
+
+# --- Common Labels ---
+x-watchtower-labels: &watchtower-labels
+  com.centurylinklabs.watchtower.enable: "true"

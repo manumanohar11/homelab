@@ -1,16 +1,20 @@
 # ~/media-stack/docker-compose.monitoring.yml
-# Contains monitoring stack: Prometheus, Grafana, InfluxDB, and Telegraf
+# Contains monitoring stack: Prometheus, Grafana, InfluxDB, Telegraf, and Alerting
 
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
     networks:
       - media-stack
     ports:
@@ -25,19 +29,86 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 512M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Prometheus"
+      - "homepage.icon=prometheus"
+      - "homepage.href=http://prometheus.${DOMAIN_NAME:-localhost}:9090"
+      - "homepage.description=Metrics Collection"
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - media-stack
+    ports:
+      - "9093:9093"
+    volumes:
+      - ${DOCKER_BASE_DIR}/alertmanager/config:/etc/alertmanager
+      - ${DOCKER_BASE_DIR}/alertmanager/data:/alertmanager
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Alertmanager"
+      - "homepage.icon=alertmanager"
+      - "homepage.href=http://alertmanager.${DOMAIN_NAME:-localhost}:9093"
+      - "homepage.description=Alert Management"
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - media-stack
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-clock-panel
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN_NAME:-localhost}
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ${DOCKER_BASE_DIR}/grafana/data:/var/lib/grafana
       - ${DOCKER_BASE_DIR}/grafana/provisioning:/etc/grafana/provisioning
@@ -49,64 +120,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Grafana"
+      - "homepage.icon=grafana"
+      - "homepage.href=http://grafana.${DOMAIN_NAME:-localhost}:3000"
+      - "homepage.description=Visualization"
 
-  influxdb:
-    image: influxdb:2.7-alpine
-    container_name: influxdb
-    restart: unless-stopped
-    networks:
-      - media-stack
-    ports:
-      - "8086:8086"
-    environment:
-      - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=${INFLUXDB_ADMIN_USER:-admin}
-      - DOCKER_INFLUXDB_INIT_PASSWORD=${INFLUXDB_ADMIN_PASSWORD:-adminpassword}
-      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG:-homelab}
-      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET:-monitoring}
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_ADMIN_TOKEN:-my-super-secret-auth-token}
-    volumes:
-      - ${DOCKER_BASE_DIR}/influxdb/data:/var/lib/influxdb2
-      - ${DOCKER_BASE_DIR}/influxdb/config:/etc/influxdb2
-    healthcheck:
-      test: ["CMD", "influx", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  telegraf:
-    image: telegraf:latest
-    container_name: telegraf
-    restart: unless-stopped
-    pid: "host"
-    user: telegraf:999
-    networks:
-      - media-stack
-    environment:
-      - HOST_ETC=/hostfs/etc
-      - HOST_PROC=/hostfs/proc
-      - HOST_SYS=/hostfs/sys
-      - HOST_VAR=/hostfs/var
-      - HOST_RUN=/hostfs/run
-      - HOST_MOUNT_PREFIX=/hostfs
-    volumes:
-      - ${DOCKER_BASE_DIR}/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /:/hostfs:ro
-      - /sys:/hostfs/sys:ro
-      - /proc:/hostfs/proc:ro
-      - /etc:/hostfs/etc:ro
-    depends_on:
-      influxdb:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  # Node Exporter for system metrics
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - media-stack
     ports:
@@ -120,8 +159,28 @@ services:
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "homepage.group=Monitoring"
+      - "homepage.name=Node Exporter"
+      - "homepage.description=System Metrics"
 
-  # cAdvisor for container metrics
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
@@ -138,24 +197,70 @@ services:
       - /dev/disk/:/dev/disk:ro
     devices:
       - /dev/kmsg
-    privileged: true
+    privileged: true  # Required for container metrics
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "homepage.group=Monitoring"
+      - "homepage.name=cAdvisor"
+      - "homepage.description=Container Metrics"
 
-  # Uptime monitoring
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - media-stack
     ports:
       - "3001:3001"
     volumes:
       - ${DOCKER_BASE_DIR}/uptime-kuma:/app/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - TZ=${TZ}
+      TZ: ${TZ}
+      # Use Docker socket proxy instead of direct socket access
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001"]
-      interval: 1m
+      test: ["CMD", "node", "/app/extra/healthcheck.js"]
+      interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Uptime Kuma"
+      - "homepage.icon=uptime-kuma"
+      - "homepage.href=http://uptime.${DOMAIN_NAME:-localhost}:3001"
+      - "homepage.description=Uptime Monitoring"

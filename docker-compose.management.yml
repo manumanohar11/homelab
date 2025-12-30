@@ -2,39 +2,6 @@
 # Contains utility and management tools.
 
 services:
-
-  # glances:
-  #   image: nicolargo/glances:latest-full
-  #   container_name: glances
-  #   restart: unless-stopped
-  #   pid: "host"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #     - ${DOCKER_BASE_DIR}/glances:/glances/conf
-  #   environment:
-  #     GLANCES_OPT: -w
-  #   networks:
-  #     - media-stack
-  #   ports:
-  #     - "61208:61208"
-
-  # glance-homepage:
-  #   image: glanceapp/glance:latest
-  #   container_name: glance-homepage
-  #   restart: unless-stopped
-  #   volumes:
-  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
-  #     - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   environment:
-  #     GLANCE_UID: ${PUID}
-  #     GLANCE_GID: ${PGID}
-  #     TZ: ${TZ}
-  #   networks:
-  #     - media-stack
-  #   ports:
-  #     - "8088:8080"
-
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -48,14 +15,171 @@ services:
       - media-stack
     ports:
       - "9443:9443"
+    # Note: Portainer CE uses a minimal image without wget/curl
+    # Using /docker CLI to verify container is responsive
+    healthcheck:
+      test: ["CMD", "/docker", "container", "top", "portainer"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Management"
+      - "homepage.name=Portainer"
+      - "homepage.icon=portainer"
+      - "homepage.href=https://portainer.${DOMAIN_NAME:-localhost}:9443"
+      - "homepage.description=Container Management"
 
   watchtower:
-    image: nickfedor/watchtower:latest
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command:
-      - --schedule
-      - "0 0 4 * * *"
-      - --cleanup
+    environment:
+      TZ: ${TZ}
+      DOCKER_API_VERSION: "1.44"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_TIMEOUT: "30s"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_NOTIFICATIONS: ${WATCHTOWER_NOTIFICATIONS:-}
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_NOTIFICATION_URL:-}
     networks:
       - media-stack
+    healthcheck:
+      test: ["CMD", "/watchtower", "--health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "homepage.group=Management"
+      - "homepage.name=Watchtower"
+      - "homepage.icon=watchtower"
+      - "homepage.description=Auto Container Updates"
+
+  glances:
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    restart: unless-stopped
+    pid: "host"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${DOCKER_BASE_DIR}/glances:/glances/conf
+    environment:
+      GLANCES_OPT: -w
+      TZ: ${TZ}
+      # Use Docker socket proxy instead of direct socket access
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    networks:
+      - media-stack
+    ports:
+      - "61208:61208"
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:61208/api/4/cpu"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Glances"
+      - "homepage.icon=glances"
+      - "homepage.href=http://glances.${DOMAIN_NAME:-localhost}:61208"
+      - "homepage.description=System Monitor"
+    profiles:
+      - monitoring
+
+  glance-homepage:
+    image: glanceapp/glance:latest
+    container_name: glance-homepage
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
+      - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
+    environment:
+      GLANCE_UID: ${PUID}
+      GLANCE_GID: ${PGID}
+      TZ: ${TZ}
+      # Use Docker socket proxy instead of direct socket access
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    networks:
+      - media-stack
+    ports:
+      - "8088:8080"
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Management"
+      - "homepage.name=Glance Homepage"
+      - "homepage.icon=homepage"
+      - "homepage.href=http://homepage.${DOMAIN_NAME:-localhost}:8088"
+      - "homepage.description=Dashboard"
+    profiles:
+      - dashboard

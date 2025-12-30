@@ -1,6 +1,10 @@
 # ~/media-stack/docker-compose.yml
 # This is the main file to run the entire stack.
 # Command: docker compose up -d
+#
+# Enable/disable modules by commenting/uncommenting the include lines below.
+# Use profiles to enable optional services within modules:
+#   docker compose --profile vpn --profile monitoring up -d
 
 name: media-stack
 
@@ -8,16 +12,51 @@ name: media-stack
 networks:
   media-stack:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 # --- Include all the component files ---
 # The common file with anchors is included first.
 include:
+  # Core infrastructure
   - docker-compose.common.yml
   - docker-compose.core.yml
+
+  # Media management
   - docker-compose.photos.yml
-  # - docker-compose.downloaders.yml
-  # - docker-compose.arr.yml
   - docker-compose.media-servers.yml
+  # - docker-compose.arr.yml
+  # - docker-compose.downloaders.yml
+  - docker-compose.requests.yml
+
+  # Management & monitoring
   - docker-compose.management.yml
-  # - docker-compose.monitoring.yml
+  - docker-compose.monitoring.yml
+  # - docker-compose.logging.yml  # Loki/Promtail stack (optional)
+
+  # Productivity
   # - docker-compose.files.yml
+  # - docker-compose.automation.yml
+
+  # Backup
+  - docker-compose.backup.yml
+
+  # Utilities (Homepage, Speedtest, Scrutiny, Dozzle, IT-Tools, Stirling PDF)
+  - docker-compose.utilities.yml
+
+  # Media extras (Tautulli, Plex Meta Manager, Maintainerr, Kavita, Navidrome)
+  - docker-compose.media-extras.yml
+
+# --- Available Profiles ---
+# monitoring    - Glances system monitor
+# dashboard     - Glance Homepage alternative dashboard
+# jellyfin      - Jellyfin + Jellyseerr (alternative to Plex)
+# stash         - Stash media organizer
+# tdarr         - Tdarr media transcoding
+# notifiarr     - Notifiarr unified notifications
+# restic        - Restic backup server
+# scrutiny      - Scrutiny disk S.M.A.R.T monitoring
+# speedtest     - Speedtest Tracker internet speed history
+# kavita        - Kavita ebook/comic reader
+# navidrome     - Navidrome music streaming

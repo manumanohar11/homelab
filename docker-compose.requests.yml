@@ -1,0 +1,135 @@
+# ~/media-stack/docker-compose.requests.yml
+# Contains media request services (Overseerr, Jellyseerr, Ombi).
+
+services:
+  overseerr:
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/overseerr:/config
+    networks:
+      - media-stack
+    ports:
+      - "5055:5055"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Overseerr"
+      - "homepage.icon=overseerr"
+      - "homepage.href=http://requests.${DOMAIN_NAME:-localhost}:5055"
+      - "homepage.description=Media Requests (Plex)"
+
+  # Alternative: Jellyseerr for Jellyfin users
+  jellyseerr:
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    volumes:
+      - ${DOCKER_BASE_DIR}/jellyseerr:/app/config
+    networks:
+      - media-stack
+    ports:
+      - "5056:5055"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5055/api/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Jellyseerr"
+      - "homepage.icon=jellyseerr"
+      - "homepage.href=http://jellyrequests.${DOMAIN_NAME:-localhost}:5056"
+      - "homepage.description=Media Requests (Jellyfin)"
+    profiles:
+      - jellyfin
+
+  # Notifiarr for unified notifications across *Arr apps
+  notifiarr:
+    image: golift/notifiarr:latest
+    container_name: notifiarr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    hostname: notifiarr
+    environment:
+      TZ: ${TZ}
+      DN_API_KEY: ${NOTIFIARR_API_KEY:-}
+    volumes:
+      - ${DOCKER_BASE_DIR}/notifiarr:/config
+      - /var/run/utmp:/var/run/utmp:ro
+    networks:
+      - media-stack
+    ports:
+      - "5454:5454"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5454"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Notifiarr"
+      - "homepage.icon=notifiarr"
+      - "homepage.href=http://notifiarr.${DOMAIN_NAME:-localhost}:5454"
+      - "homepage.description=Unified Notifications"
+    profiles:
+      - notifiarr

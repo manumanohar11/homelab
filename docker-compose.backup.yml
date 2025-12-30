@@ -1,0 +1,216 @@
+# ~/media-stack/docker-compose.backup.yml
+# Contains backup services for automated data protection.
+
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    container_name: duplicati
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/duplicati:/config
+      # Backup sources - all critical data directories
+      - ${DOCKER_BASE_DIR}:/source/docker-configs:ro
+      - ${DOCKER_BASE_DIR}/prometheus/data:/source/prometheus:ro
+      - ${DOCKER_BASE_DIR}/grafana/data:/source/grafana:ro
+      - ${DOCKER_BASE_DIR}/uptime-kuma:/source/uptime-kuma:ro
+      - ${DOCKER_BASE_DIR}/homepage:/source/homepage:ro
+      - ${DOCKER_BASE_DIR}/immich-server:/source/immich-server:ro
+      # Backup destination
+      - ${BACKUP_DESTINATION:-/mnt/backup}:/backups
+    networks:
+      - media-stack
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Management"
+      - "homepage.name=Duplicati"
+      - "homepage.icon=duplicati"
+      - "homepage.href=http://duplicati.${DOMAIN_NAME:-localhost}:8200"
+      - "homepage.description=Backup Solution"
+
+  # Alternative: Restic with REST server for more advanced backup scenarios
+  restic-rest-server:
+    image: restic/rest-server:latest
+    container_name: restic-rest-server
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      OPTIONS: "--prometheus --prometheus-no-auth"
+      DISABLE_AUTHENTICATION: "false"
+    volumes:
+      - ${DOCKER_BASE_DIR}/restic-server/data:/data
+      - ${DOCKER_BASE_DIR}/restic-server/.htpasswd:/data/.htpasswd:ro
+    networks:
+      - media-stack
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "homepage.group=Management"
+      - "homepage.name=Restic Server"
+      - "homepage.icon=restic"
+      - "homepage.description=Backup Repository"
+    profiles:
+      - restic
+
+  # Database backup service using docker-db-backup
+  # Backs up PostgreSQL databases automatically
+  db-backup:
+    image: tiredofit/db-backup:latest
+    container_name: db-backup
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TIMEZONE: ${TZ}
+      CONTAINER_ENABLE_MONITORING: "false"
+      DEFAULT_CHECKSUM: SHA1
+      DEFAULT_COMPRESSION: ZSTD
+      DEFAULT_BACKUP_INTERVAL: 1440  # 24 hours in minutes
+      DEFAULT_BACKUP_BEGIN: "0300"   # 3:00 AM
+      DEFAULT_CLEANUP_TIME: 8640     # 6 days in minutes
+      # Immich PostgreSQL
+      DB01_TYPE: pgsql
+      DB01_HOST: immich_postgres
+      DB01_NAME: ${DB_DATABASE_NAME:-immich}
+      DB01_USER: ${DB_USERNAME:-postgres}
+      DB01_PASS: ${DB_PASSWORD}
+      DB01_BACKUP_INTERVAL: 1440
+      DB01_BACKUP_BEGIN: "0300"
+      # Bitmagnet PostgreSQL (when downloaders enabled)
+      # DB02_TYPE: pgsql
+      # DB02_HOST: bitmagnet-postgres
+      # DB02_NAME: bitmagnet
+      # DB02_USER: postgres
+      # DB02_PASS: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
+      # DB02_BACKUP_INTERVAL: 1440
+      # DB02_BACKUP_BEGIN: "0315"
+    volumes:
+      - ${DOCKER_BASE_DIR}/db-backup:/backup
+    networks:
+      - media-stack
+    depends_on:
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f db-backup || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "homepage.group=Management"
+      - "homepage.name=DB Backup"
+      - "homepage.icon=database"
+      - "homepage.description=Database Backups"
+
+  # SQLite backup for *Arr apps and other SQLite-based services
+  # Runs daily to copy SQLite databases safely
+  sqlite-backup:
+    image: alpine:latest
+    container_name: sqlite-backup
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        apk add --no-cache sqlite
+        echo "SQLite backup service started"
+        while true; do
+          echo "[$(date)] Starting SQLite backups..."
+          BACKUP_DIR="/backups/sqlite/$(date +%Y-%m-%d)"
+          mkdir -p "$$BACKUP_DIR"
+
+          # Backup Uptime Kuma
+          if [ -f /source/uptime-kuma/kuma.db ]; then
+            sqlite3 /source/uptime-kuma/kuma.db ".backup '$$BACKUP_DIR/uptime-kuma.db'"
+            echo "  - Uptime Kuma backed up"
+          fi
+
+          # Backup Grafana (if using SQLite)
+          if [ -f /source/grafana/grafana.db ]; then
+            sqlite3 /source/grafana/grafana.db ".backup '$$BACKUP_DIR/grafana.db'"
+            echo "  - Grafana backed up"
+          fi
+
+          # Cleanup old backups (keep 7 days)
+          find /backups/sqlite -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+
+          echo "[$(date)] SQLite backups complete. Sleeping 24h..."
+          sleep 86400
+        done
+    volumes:
+      - ${DOCKER_BASE_DIR}/uptime-kuma:/source/uptime-kuma:ro
+      - ${DOCKER_BASE_DIR}/grafana/data:/source/grafana:ro
+      - ${DOCKER_BASE_DIR}/db-backup:/backups
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+        reservations:
+          memory: 16M
+    labels:
+      - "homepage.group=Management"
+      - "homepage.name=SQLite Backup"
+      - "homepage.description=SQLite Database Backups"

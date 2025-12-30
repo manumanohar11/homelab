@@ -1,0 +1,238 @@
+# ~/media-stack/docker-compose.media-extras.yml
+# Contains media enhancement services: Tautulli, Plex Meta Manager, Maintainerr, Kavita, Navidrome
+
+services:
+  # Tautulli - Plex media server monitoring and statistics
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/tautulli:/config
+    networks:
+      - media-stack
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Tautulli"
+      - "homepage.icon=tautulli"
+      - "homepage.href=http://tautulli.${DOMAIN_NAME:-localhost}:8181"
+      - "homepage.description=Plex Statistics"
+      - "homepage.widget.type=tautulli"
+      - "homepage.widget.url=http://tautulli:8181"
+      - "homepage.widget.key=${TAUTULLI_API_KEY:-}"
+
+  # Plex Meta Manager - Automated Plex metadata management
+  plex-meta-manager:
+    image: lscr.io/linuxserver/plex-meta-manager:latest
+    container_name: plex-meta-manager
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      PMM_CONFIG: /config/config.yml
+      PMM_TIME: "03:00"
+      PMM_RUN: "true"
+    volumes:
+      - ${DOCKER_BASE_DIR}/plex-meta-manager:/config
+    networks:
+      - media-stack
+    # No ports - runs on schedule
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /config/config.yml || exit 1"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Plex Meta Manager"
+      - "homepage.icon=plex-meta-manager"
+      - "homepage.description=Metadata Automation"
+
+  # Maintainerr - Automated media cleanup based on rules
+  maintainerr:
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/maintainerr:/opt/data
+    networks:
+      - media-stack
+    ports:
+      - "6246:6246"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6246/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Maintainerr"
+      - "homepage.icon=maintainerr"
+      - "homepage.href=http://maintainerr.${DOMAIN_NAME:-localhost}:6246"
+      - "homepage.description=Media Cleanup Rules"
+
+  # Kavita - Fast, feature-rich ebook/comic server
+  kavita:
+    image: lscr.io/linuxserver/kavita:latest
+    container_name: kavita
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/kavita:/config
+      - ${DOCKER_MEDIA_DIR}/Books:/books:ro
+      - ${DOCKER_MEDIA_DIR}/Comics:/comics:ro
+    networks:
+      - media-stack
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Kavita"
+      - "homepage.icon=kavita"
+      - "homepage.href=http://kavita.${DOMAIN_NAME:-localhost}:5000"
+      - "homepage.description=Ebook & Comic Server"
+    profiles:
+      - kavita
+
+  # Navidrome - Modern music server and streamer
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: ""
+      ND_ENABLETRANSCODINGCONFIG: "true"
+      ND_ENABLESHARING: "true"
+      ND_ENABLEFAVOURITES: "true"
+      ND_ENABLESTARRATING: "true"
+      ND_DEFAULTTHEME: "Dark"
+    volumes:
+      - ${DOCKER_BASE_DIR}/navidrome:/data
+      - ${DOCKER_MEDIA_DIR}/Songs:/music:ro
+    networks:
+      - media-stack
+    ports:
+      - "4533:4533"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4533/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Servers"
+      - "homepage.name=Navidrome"
+      - "homepage.icon=navidrome"
+      - "homepage.href=http://navidrome.${DOMAIN_NAME:-localhost}:4533"
+      - "homepage.description=Music Streaming"
+      - "homepage.widget.type=navidrome"
+      - "homepage.widget.url=http://navidrome:4533"
+      - "homepage.widget.user=${NAVIDROME_USER:-admin}"
+      - "homepage.widget.token=${NAVIDROME_TOKEN:-}"
+    profiles:
+      - navidrome

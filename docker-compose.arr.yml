@@ -7,6 +7,8 @@ services:
     container_name: radarr
     restart: unless-stopped
     network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -20,6 +22,7 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+      start_period: 30s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -27,12 +30,32 @@ services:
         condition: service_healthy
       qbittorrent:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Radarr"
+      - "homepage.icon=radarr"
+      - "homepage.description=Movie Management"
 
   sonarr:
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
     restart: unless-stopped
     network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -46,6 +69,7 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+      start_period: 30s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -53,12 +77,32 @@ services:
         condition: service_healthy
       qbittorrent:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Sonarr"
+      - "homepage.icon=sonarr"
+      - "homepage.description=TV Show Management"
 
   lidarr:
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
-    network_mode: "service:gluetun"
     restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -66,23 +110,95 @@ services:
     user: "${PUID}:${PGID}"
     volumes:
       - ${DOCKER_BASE_DIR}/lidarr:/config
-      - ${DOCKER_MEDIA_DIR}/Songs:/music_library # Lidarr sees the main "Songs" folder
+      - ${DOCKER_MEDIA_DIR}/Songs:/music_library
       - ${DOCKER_BASE_DIR}/downloads:/downloads
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
       interval: 1m
       timeout: 10s
       retries: 3
+      start_period: 30s
     depends_on:
-      gluetun: { condition: service_healthy }
-      qbittorrent: { condition: service_healthy }
-      prowlarr: { condition: service_healthy }
+      gluetun:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Lidarr"
+      - "homepage.icon=lidarr"
+      - "homepage.description=Music Management"
+
+  readarr:
+    image: lscr.io/linuxserver/readarr:develop
+    container_name: readarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+    user: "${PUID}:${PGID}"
+    volumes:
+      - ${DOCKER_BASE_DIR}/readarr:/config
+      - ${DOCKER_MEDIA_DIR}/Books:/books
+      - ${DOCKER_BASE_DIR}/downloads:/downloads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787/ping"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      qbittorrent:
+        condition: service_healthy
+      prowlarr:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Readarr"
+      - "homepage.icon=readarr"
+      - "homepage.description=Book Management"
 
   bazarr:
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
     restart: unless-stopped
     network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -96,6 +212,7 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+      start_period: 30s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -103,12 +220,32 @@ services:
         condition: service_healthy
       sonarr:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Bazarr"
+      - "homepage.icon=bazarr"
+      - "homepage.description=Subtitle Management"
 
   whisparr:
     image: ghcr.io/hotio/whisparr:latest
     container_name: whisparr
     restart: unless-stopped
     network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
@@ -121,6 +258,7 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+      start_period: 30s
     depends_on:
       gluetun:
         condition: service_healthy
@@ -128,3 +266,66 @@ services:
         condition: service_healthy
       qbittorrent:
         condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Whisparr"
+      - "homepage.icon=whisparr"
+      - "homepage.description=Adult Content Management"
+
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    restart: unless-stopped
+    network_mode: "service:gluetun"
+    security_opt:
+      - no-new-privileges:true
+    user: "${PUID}:${PGID}"
+    volumes:
+      - ${DOCKER_BASE_DIR}/recyclarr:/config
+    environment:
+      TZ: ${TZ}
+      RECYCLARR_CREATE_CONFIG: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /config/recyclarr.yml || exit 1"]
+      interval: 5m
+      timeout: 10s
+      retries: 1
+      start_period: 30s
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          memory: 64M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Media Management"
+      - "homepage.name=Recyclarr"
+      - "homepage.icon=recyclarr"
+      - "homepage.description=TRaSH Guide Sync"

@@ -1,0 +1,104 @@
+# Vector Configuration
+# https://vector.dev/docs/reference/configuration/
+
+# Data directory for Vector
+data_dir: /var/lib/vector
+
+# API for health checks and metrics
+api:
+  enabled: true
+  address: 0.0.0.0:8686
+  playground: false
+
+# Sources - where logs come from
+sources:
+  # Docker container logs
+  docker_logs:
+    type: docker_logs
+    docker_host: unix:///var/run/docker.sock
+    include_containers:
+      - "*"
+    exclude_containers:
+      - "vector"  # Don't log ourselves
+
+  # System syslog
+  syslog:
+    type: file
+    include:
+      - /var/log/syslog
+      - /var/log/messages
+    read_from: beginning
+
+  # Auth logs
+  auth_logs:
+    type: file
+    include:
+      - /var/log/auth.log
+      - /var/log/secure
+    read_from: beginning
+
+# Transforms - process and enrich logs
+transforms:
+  # Parse Docker logs and add metadata
+  docker_parsed:
+    type: remap
+    inputs:
+      - docker_logs
+    source: |
+      .source = "docker"
+      .container_name = .container_name
+      .container_id = .container_id
+      .host = get_hostname!()
+      
+      # Try to parse JSON logs
+      parsed, err = parse_json(.message)
+      if err == null {
+        . = merge(., parsed)
+      }
+
+  # Add common fields
+  enriched:
+    type: remap
+    inputs:
+      - docker_parsed
+      - syslog
+      - auth_logs
+    source: |
+      .timestamp = now()
+      .environment = "homelab"
+
+  # Filter out noise
+  filtered:
+    type: filter
+    inputs:
+      - enriched
+    condition:
+      type: vrl
+      source: |
+        # Filter out health check noise
+        !contains(string!(.message), "health") ?? true
+
+# Sinks - where logs go
+sinks:
+  # Send to Loki
+  loki:
+    type: loki
+    inputs:
+      - filtered
+    endpoint: http://loki:3100
+    encoding:
+      codec: json
+    labels:
+      source: "{{ source }}"
+      container: "{{ container_name }}"
+      host: "{{ host }}"
+    remove_label_fields: true
+    remove_timestamp: false
+
+  # Console output for debugging (disable in production)
+  # console:
+  #   type: console
+  #   inputs:
+  #     - filtered
+  #   encoding:
+  #     codec: json

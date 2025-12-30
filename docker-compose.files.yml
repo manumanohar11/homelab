@@ -6,11 +6,13 @@ services:
     image: lscr.io/linuxserver/nextcloud:latest
     container_name: nextcloud
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}
-      NEXTCLOUD_TRUSTED_DOMAINS: "cloud.manoharsolleti.com"
+      NEXTCLOUD_TRUSTED_DOMAINS: cloud.${DOMAIN_NAME:-localhost}
     volumes:
       - ${DOCKER_BASE_DIR}/nextcloud:/config
       - ${DOCKER_MEDIA_DIR}:/data
@@ -18,11 +20,28 @@ services:
       - media-stack
     ports:
       - "8443:443"
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "curl", "-f", "-k", "https://localhost/status.php"]
       interval: 1m
       timeout: 10s
       retries: 3
       start_period: 5m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 512M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Files"
+      - "homepage.name=Nextcloud"
+      - "homepage.icon=nextcloud"
+      - "homepage.href=https://cloud.${DOMAIN_NAME:-localhost}:8443"
+      - "homepage.description=File Sync & Share"
