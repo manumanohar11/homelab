@@ -12,6 +12,7 @@ services:
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}
+      SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY:-changeme}
     volumes:
       - ${DOCKER_BASE_DIR}/duplicati:/config
       # Backup sources - all critical data directories
@@ -198,6 +199,13 @@ services:
       - ${DOCKER_BASE_DIR}/uptime-kuma:/source/uptime-kuma:ro
       - ${DOCKER_BASE_DIR}/grafana/data:/source/grafana:ro
       - ${DOCKER_BASE_DIR}/db-backup:/backups
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'sleep' || exit 1"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
     logging:
       driver: json-file
       options:
