@@ -18,7 +18,18 @@
       "Bash(docker ps:*)",
       "WebFetch(domain:techhut.tv)",
       "Bash(grep:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(chmod:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(wc:*)",
+      "Bash(docker network ls:*)",
+      "Bash(docker network inspect:*)",
+      "Bash(docker network rm:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(xargs:*)"
     ],
     "deny": []
   }
