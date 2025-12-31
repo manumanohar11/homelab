@@ -57,11 +57,6 @@ services:
           memory: 128M
         reservations:
           memory: 32M
-    labels:
-      - "homepage.group=Infrastructure"
-      - "homepage.name=Docker Socket Proxy"
-      - "homepage.description=Secure Docker API"
-
   newt:
     image: fosrl/newt
     container_name: newt
@@ -97,9 +92,6 @@ services:
           memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Infrastructure"
-      - "homepage.name=Newt"
-      - "homepage.description=Pangolin Tunnel"
 
   gluetun:
     image: qmcgaw/gluetun:latest
@@ -159,6 +151,3 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Infrastructure"
-      - "homepage.name=Gluetun"
-      - "homepage.description=VPN Container"

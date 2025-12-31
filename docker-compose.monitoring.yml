@@ -43,11 +43,6 @@ services:
           memory: 512M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Prometheus"
-      - "homepage.icon=prometheus"
-      - "homepage.href=http://prometheus.${DOMAIN_NAME:-localhost}:9090"
-      - "homepage.description=Metrics Collection"
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -87,11 +82,6 @@ services:
           memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Alertmanager"
-      - "homepage.icon=alertmanager"
-      - "homepage.href=http://alertmanager.${DOMAIN_NAME:-localhost}:9093"
-      - "homepage.description=Alert Management"
 
   grafana:
     image: grafana/grafana:latest
@@ -134,11 +124,6 @@ services:
           memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Grafana"
-      - "homepage.icon=grafana"
-      - "homepage.href=http://grafana.${DOMAIN_NAME:-localhost}:3000"
-      - "homepage.description=Visualization"
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -176,11 +161,6 @@ services:
           memory: 256M
         reservations:
           memory: 64M
-    labels:
-      - "homepage.group=Monitoring"
-      - "homepage.name=Node Exporter"
-      - "homepage.description=System Metrics"
-
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
@@ -215,11 +195,6 @@ services:
           memory: 512M
         reservations:
           memory: 128M
-    labels:
-      - "homepage.group=Monitoring"
-      - "homepage.name=cAdvisor"
-      - "homepage.description=Container Metrics"
-
   uptime-kuma:
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
@@ -259,8 +234,3 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Uptime Kuma"
-      - "homepage.icon=uptime-kuma"
-      - "homepage.href=http://uptime.${DOMAIN_NAME:-localhost}:3001"
-      - "homepage.description=Uptime Monitoring"

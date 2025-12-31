@@ -38,11 +38,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Management"
-      - "homepage.name=Overseerr"
-      - "homepage.icon=overseerr"
-      - "homepage.href=http://requests.${DOMAIN_NAME:-localhost}:5055"
-      - "homepage.description=Media Requests (Plex)"
 
   # Alternative: Jellyseerr for Jellyfin users
   jellyseerr:
@@ -80,11 +75,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Management"
-      - "homepage.name=Jellyseerr"
-      - "homepage.icon=jellyseerr"
-      - "homepage.href=http://jellyrequests.${DOMAIN_NAME:-localhost}:5056"
-      - "homepage.description=Media Requests (Jellyfin)"
     profiles:
       - jellyfin
 
@@ -126,10 +116,5 @@ services:
           memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Management"
-      - "homepage.name=Notifiarr"
-      - "homepage.icon=notifiarr"
-      - "homepage.href=http://notifiarr.${DOMAIN_NAME:-localhost}:5454"
-      - "homepage.description=Unified Notifications"
     profiles:
       - notifiarr

@@ -39,14 +39,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Tautulli"
-      - "homepage.icon=tautulli"
-      - "homepage.href=http://tautulli.${DOMAIN_NAME:-localhost}:8181"
-      - "homepage.description=Plex Statistics"
-      - "homepage.widget.type=tautulli"
-      - "homepage.widget.url=http://tautulli:8181"
-      - "homepage.widget.key=${TAUTULLI_API_KEY:-}"
 
   # Maintainerr - Automated media cleanup based on rules
   maintainerr:
@@ -64,7 +56,7 @@ services:
     ports:
       - "6246:6246"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6246/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:6246"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -83,11 +75,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Management"
-      - "homepage.name=Maintainerr"
-      - "homepage.icon=maintainerr"
-      - "homepage.href=http://maintainerr.${DOMAIN_NAME:-localhost}:6246"
-      - "homepage.description=Media Cleanup Rules"
 
   # Kavita - Fast, feature-rich ebook/comic server
   kavita:
@@ -128,11 +115,6 @@ services:
           memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Kavita"
-      - "homepage.icon=kavita"
-      - "homepage.href=http://kavita.${DOMAIN_NAME:-localhost}:5000"
-      - "homepage.description=Ebook & Comic Server"
     profiles:
       - kavita
 
@@ -181,14 +163,5 @@ services:
           memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Navidrome"
-      - "homepage.icon=navidrome"
-      - "homepage.href=http://navidrome.${DOMAIN_NAME:-localhost}:4533"
-      - "homepage.description=Music Streaming"
-      - "homepage.widget.type=navidrome"
-      - "homepage.widget.url=http://navidrome:4533"
-      - "homepage.widget.user=${NAVIDROME_USER:-admin}"
-      - "homepage.widget.token=${NAVIDROME_TOKEN:-}"
     profiles:
       - navidrome

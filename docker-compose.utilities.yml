@@ -13,21 +13,31 @@ services:
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}
+      # Allow access from all hosts (required for newer versions)
+      HOMEPAGE_ALLOWED_HOSTS: "*"
       # Use Docker socket proxy instead of direct socket access
       DOCKER_HOST: tcp://docker-socket-proxy:2375
-      # API keys for service widgets (optional - set in .env file)
-      HOMEPAGE_VAR_PLEX_API_KEY: ${PLEX_API_KEY:-}
-      HOMEPAGE_VAR_TAUTULLI_API_KEY: ${TAUTULLI_API_KEY:-}
-      HOMEPAGE_VAR_OVERSEERR_API_KEY: ${OVERSEERR_API_KEY:-}
-      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY:-}
-      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY:-}
-      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
-      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
-      HOMEPAGE_VAR_QBITTORRENT_PASSWORD: ${QBITTORRENT_PASSWORD:-}
-      HOMEPAGE_VAR_IMMICH_API_KEY: ${IMMICH_API_KEY:-}
-      HOMEPAGE_VAR_PORTAINER_API_KEY: ${PORTAINER_API_KEY:-}
+      # ---- API keys for Homepage service widgets ----
+      # *Arr Suite
+      HOMEPAGE_VAR_RADARR_API_KEY: ${HOMEPAGE_VAR_RADARR_API_KEY:-}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${HOMEPAGE_VAR_SONARR_API_KEY:-}
+      HOMEPAGE_VAR_LIDARR_API_KEY: ${HOMEPAGE_VAR_LIDARR_API_KEY:-}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${HOMEPAGE_VAR_BAZARR_API_KEY:-}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${HOMEPAGE_VAR_PROWLARR_API_KEY:-}
+      # Download Clients
+      HOMEPAGE_VAR_QBITTORRENT_USER: ${HOMEPAGE_VAR_QBITTORRENT_USER:-admin}
+      HOMEPAGE_VAR_QBITTORRENT_PASS: ${HOMEPAGE_VAR_QBITTORRENT_PASS:-}
+      # Media Servers
+      HOMEPAGE_VAR_PLEX_API_KEY: ${HOMEPAGE_VAR_PLEX_API_KEY:-}
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${HOMEPAGE_VAR_JELLYFIN_API_KEY:-}
+      HOMEPAGE_VAR_TAUTULLI_API_KEY: ${HOMEPAGE_VAR_TAUTULLI_API_KEY:-}
+      HOMEPAGE_VAR_OVERSEERR_API_KEY: ${HOMEPAGE_VAR_OVERSEERR_API_KEY:-}
+      # Other Services
+      HOMEPAGE_VAR_IMMICH_API_KEY: ${HOMEPAGE_VAR_IMMICH_API_KEY:-}
+      HOMEPAGE_VAR_PORTAINER_API_KEY: ${HOMEPAGE_VAR_PORTAINER_API_KEY:-}
     volumes:
       - ${DOCKER_BASE_DIR}/homepage:/app/config
+      - /mnt/media:/mnt/media:ro
     networks:
       - media-stack
     ports:
@@ -55,11 +65,6 @@ services:
           memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Management"
-      - "homepage.name=Homepage"
-      - "homepage.icon=homepage"
-      - "homepage.href=http://homepage.${DOMAIN_NAME:-localhost}:3002"
-      - "homepage.description=Application Dashboard"
 
   # Speedtest Tracker - Track internet speed over time
   speedtest-tracker:
@@ -101,11 +106,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Speedtest Tracker"
-      - "homepage.icon=speedtest-tracker"
-      - "homepage.href=http://speedtest.${DOMAIN_NAME:-localhost}:8765"
-      - "homepage.description=Internet Speed History"
     profiles:
       - speedtest
 
@@ -154,11 +154,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Scrutiny"
-      - "homepage.icon=scrutiny"
-      - "homepage.href=http://scrutiny.${DOMAIN_NAME:-localhost}:8082"
-      - "homepage.description=Disk Health Monitoring"
     profiles:
       - scrutiny
 
@@ -202,11 +197,6 @@ services:
           memory: 32M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Management"
-      - "homepage.name=Dozzle"
-      - "homepage.icon=dozzle"
-      - "homepage.href=http://dozzle.${DOMAIN_NAME:-localhost}:8889"
-      - "homepage.description=Docker Log Viewer"
 
   # IT-Tools - Collection of handy online tools for developers
   it-tools:
@@ -239,11 +229,6 @@ services:
           memory: 32M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Utilities"
-      - "homepage.name=IT Tools"
-      - "homepage.icon=it-tools"
-      - "homepage.href=http://tools.${DOMAIN_NAME:-localhost}:8083"
-      - "homepage.description=Developer Tools"
 
   # Stirling PDF - PDF manipulation tools
   stirling-pdf:
@@ -284,8 +269,3 @@ services:
           memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Utilities"
-      - "homepage.name=Stirling PDF"
-      - "homepage.icon=stirling-pdf"
-      - "homepage.href=http://pdf.${DOMAIN_NAME:-localhost}:8084"
-      - "homepage.description=PDF Tools"

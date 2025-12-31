@@ -13,6 +13,7 @@ services:
       PGID: ${PGID}
       TZ: ${TZ}
       VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM:-}
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
     volumes:
@@ -42,11 +43,6 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Plex"
-      - "homepage.icon=plex"
-      - "homepage.href=http://plex.${DOMAIN_NAME:-localhost}:32400/web"
-      - "homepage.description=Media Server"
 
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
@@ -91,11 +87,6 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Jellyfin"
-      - "homepage.icon=jellyfin"
-      - "homepage.href=http://jellyfin.${DOMAIN_NAME:-localhost}:8096"
-      - "homepage.description=Media Server"
     profiles:
       - jellyfin
 
@@ -145,10 +136,6 @@ services:
         condition: service_healthy
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Stash"
-      - "homepage.icon=stash"
-      - "homepage.description=Adult Media Organizer"
     profiles:
       - stash
 
@@ -207,10 +194,5 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Media Servers"
-      - "homepage.name=Tdarr"
-      - "homepage.icon=tdarr"
-      - "homepage.href=http://tdarr.${DOMAIN_NAME:-localhost}:8265"
-      - "homepage.description=Media Transcoding"
     profiles:
       - tdarr

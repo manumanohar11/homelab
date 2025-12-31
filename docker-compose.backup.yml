@@ -12,7 +12,7 @@ services:
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}
-      SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY:-changeme}
+      SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
     volumes:
       - ${DOCKER_BASE_DIR}/duplicati:/config
       # Backup sources - all critical data directories
@@ -48,11 +48,6 @@ services:
           memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Management"
-      - "homepage.name=Duplicati"
-      - "homepage.icon=duplicati"
-      - "homepage.href=http://duplicati.${DOMAIN_NAME:-localhost}:8200"
-      - "homepage.description=Backup Solution"
 
   # Alternative: Restic with REST server for more advanced backup scenarios
   restic-rest-server:
@@ -88,11 +83,6 @@ services:
           memory: 512M
         reservations:
           memory: 128M
-    labels:
-      - "homepage.group=Management"
-      - "homepage.name=Restic Server"
-      - "homepage.icon=restic"
-      - "homepage.description=Backup Repository"
     profiles:
       - restic
 
@@ -152,12 +142,6 @@ services:
           memory: 512M
         reservations:
           memory: 128M
-    labels:
-      - "homepage.group=Management"
-      - "homepage.name=DB Backup"
-      - "homepage.icon=database"
-      - "homepage.description=Database Backups"
-
   # SQLite backup for *Arr apps and other SQLite-based services
   # Runs daily to copy SQLite databases safely
   sqlite-backup:
@@ -218,7 +202,3 @@ services:
           memory: 64M
         reservations:
           memory: 16M
-    labels:
-      - "homepage.group=Management"
-      - "homepage.name=SQLite Backup"
-      - "homepage.description=SQLite Database Backups"

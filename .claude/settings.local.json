@@ -29,7 +29,10 @@
       "Bash(gh pr list:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(docker pull:*)",
+      "Bash(docker images:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

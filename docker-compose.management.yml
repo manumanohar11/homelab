@@ -37,11 +37,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Management"
-      - "homepage.name=Portainer"
-      - "homepage.icon=portainer"
-      - "homepage.href=https://portainer.${DOMAIN_NAME:-localhost}:9443"
-      - "homepage.description=Container Management"
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -81,12 +76,6 @@ services:
           memory: 256M
         reservations:
           memory: 64M
-    labels:
-      - "homepage.group=Management"
-      - "homepage.name=Watchtower"
-      - "homepage.icon=watchtower"
-      - "homepage.description=Auto Container Updates"
-
   glances:
     image: nicolargo/glances:latest-full
     container_name: glances
@@ -127,11 +116,6 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Glances"
-      - "homepage.icon=glances"
-      - "homepage.href=http://glances.${DOMAIN_NAME:-localhost}:61208"
-      - "homepage.description=System Monitor"
     profiles:
       - monitoring
 
@@ -176,10 +160,5 @@ services:
           memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Management"
-      - "homepage.name=Glance Homepage"
-      - "homepage.icon=homepage"
-      - "homepage.href=http://homepage.${DOMAIN_NAME:-localhost}:8088"
-      - "homepage.description=Dashboard"
     profiles:
       - dashboard

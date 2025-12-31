@@ -53,11 +53,6 @@ services:
     labels:
       # Immich recommends manual updates - disable Watchtower
       - "com.centurylinklabs.watchtower.enable=false"
-      - "homepage.group=Photos"
-      - "homepage.name=Immich"
-      - "homepage.icon=immich"
-      - "homepage.href=http://immich.${DOMAIN_NAME:-localhost}:2283"
-      - "homepage.description=Photo Management"
 
   immich-machine-learning:
     container_name: immich_machine_learning
@@ -93,9 +88,6 @@ services:
     labels:
       # Immich recommends manual updates - disable Watchtower
       - "com.centurylinklabs.watchtower.enable=false"
-      - "homepage.group=Photos"
-      - "homepage.name=Immich ML"
-      - "homepage.description=Machine Learning"
 
   redis:
     container_name: immich_redis
@@ -120,11 +112,6 @@ services:
           memory: 256M
         reservations:
           memory: 64M
-    labels:
-      - "homepage.group=Photos"
-      - "homepage.name=Immich Redis"
-      - "homepage.description=Cache"
-
   database:
     container_name: immich_postgres
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
@@ -157,10 +144,5 @@ services:
           memory: 2G
         reservations:
           memory: 512M
-    labels:
-      - "homepage.group=Photos"
-      - "homepage.name=Immich Database"
-      - "homepage.description=PostgreSQL"
-
 volumes:
   model-cache:
