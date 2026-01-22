@@ -1,56 +1,253 @@
 # Promtail Configuration
+# Enhanced with pipeline stages for better log parsing and labeling
 # https://grafana.com/docs/loki/latest/clients/promtail/configuration/
 
 server:
   http_listen_port: 9080
   grpc_listen_port: 0
+  log_level: info
 
 positions:
   filename: /tmp/positions.yaml
 
 clients:
   - url: http://loki:3100/loki/api/v1/push
+    # Batch settings for performance
+    batchwait: 1s
+    batchsize: 1048576  # 1MB
+    # Retry on failure
+    backoff_config:
+      min_period: 500ms
+      max_period: 5m
+      max_retries: 10
 
 scrape_configs:
-  # Docker container logs via Docker socket
+  # ============================================
+  # Docker Container Logs
+  # ============================================
   - job_name: docker
     docker_sd_configs:
       - host: unix:///var/run/docker.sock
         refresh_interval: 5s
     relabel_configs:
-      # Only keep containers with specific label
+      # Extract container name
       - source_labels: ['__meta_docker_container_name']
         regex: '/(.*)'
         target_label: 'container'
+      # Extract container ID
       - source_labels: ['__meta_docker_container_id']
         target_label: 'container_id'
+      # Extract log stream (stdout/stderr)
       - source_labels: ['__meta_docker_container_log_stream']
         target_label: 'stream'
-      # Add compose project and service labels
+      # Extract compose project
       - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
         target_label: 'compose_project'
+      # Extract compose service
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: 'compose_service'
+      # Extract image name
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+      # Add service category based on container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '.*(radarr|sonarr|lidarr|readarr|whisparr|bazarr|prowlarr).*'
+        target_label: 'service_type'
+        replacement: 'arr'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '.*(plex|jellyfin|emby|tdarr).*'
+        target_label: 'service_type'
+        replacement: 'media-server'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '.*(qbittorrent|transmission|deluge|nzbget|sabnzbd).*'
+        target_label: 'service_type'
+        replacement: 'downloader'
+      - source_labels: ['__meta_docker_container_name']
+        regex: '.*(prometheus|grafana|loki|alertmanager).*'
+        target_label: 'service_type'
+        replacement: 'monitoring'
+    pipeline_stages:
+      # Parse Docker JSON logs
+      - docker: {}
+      
+      # Try to parse JSON formatted logs (many apps use JSON logging)
+      - match:
+          selector: '{job="docker"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  msg: msg
+                  message: message
+                  error: error
+                  time: time
+                  timestamp: timestamp
+            - labels:
+                level:
+            # Normalize log levels
+            - template:
+                source: level
+                template: '{{ ToLower .Value }}'
+            - labeldrop:
+                - level
+            - labels:
+                level:
 
-  # System logs
+      # Extract log level from common patterns
+      - match:
+          selector: '{job="docker"} |~ "(?i)(error|err|fatal|panic|critical)"'
+          stages:
+            - static_labels:
+                detected_level: error
+      - match:
+          selector: '{job="docker"} |~ "(?i)(warn|warning)"'
+          stages:
+            - static_labels:
+                detected_level: warn
+      - match:
+          selector: '{job="docker"} |~ "(?i)\\binfo\\b"'
+          stages:
+            - static_labels:
+                detected_level: info
+      - match:
+          selector: '{job="docker"} |~ "(?i)(debug|trace)"'
+          stages:
+            - static_labels:
+                detected_level: debug
+
+      # Filter out noisy health check logs (optional - comment out if you want health checks)
+      - match:
+          selector: '{job="docker"} |~ "(?i)health.?check|/health|/ping|/ready|/live"'
+          action: drop
+          drop_counter_reason: healthcheck_noise
+
+      # Add timestamp extraction for common formats
+      - match:
+          selector: '{job="docker"}'
+          stages:
+            - regex:
+                expression: '(?P<timestamp>\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})'
+            - timestamp:
+                source: timestamp
+                format: '2006-01-02T15:04:05'
+                fallback_formats:
+                  - '2006-01-02 15:04:05'
+
+  # ============================================
+  # System Logs
+  # ============================================
   - job_name: system
     static_configs:
       - targets:
           - localhost
         labels:
           job: system
+          host: '${HOSTNAME:-homelab}'
           __path__: /var/log/syslog
+    pipeline_stages:
+      # Parse syslog format
+      - regex:
+          expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+(?P<process>[^\[]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)$'
+      - labels:
+          process:
+      - timestamp:
+          source: timestamp
+          format: 'Jan _2 15:04:05'
+          location: Local
 
-  # Auth logs
+      # Detect error levels in system logs
+      - match:
+          selector: '{job="system"} |~ "(?i)(error|fail|critical)"'
+          stages:
+            - static_labels:
+                level: error
+      - match:
+          selector: '{job="system"} |~ "(?i)(warn)"'
+          stages:
+            - static_labels:
+                level: warn
+
+  # ============================================
+  # Auth Logs (Security)
+  # ============================================
   - job_name: auth
     static_configs:
       - targets:
           - localhost
         labels:
           job: auth
+          host: '${HOSTNAME:-homelab}'
           __path__: /var/log/auth.log
+    pipeline_stages:
+      # Parse auth log format
+      - regex:
+          expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+(?P<process>[^\[]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)$'
+      - labels:
+          process:
+      - timestamp:
+          source: timestamp
+          format: 'Jan _2 15:04:05'
+          location: Local
 
-  # Journal logs (if using systemd)
+      # Extract SSH login attempts
+      - match:
+          selector: '{job="auth"} |~ "sshd"'
+          stages:
+            - regex:
+                expression: 'Failed password for (?:invalid user )?(?P<username>\S+) from (?P<src_ip>\d+\.\d+\.\d+\.\d+)'
+            - labels:
+                username:
+                src_ip:
+                auth_result: failed
+            - static_labels:
+                auth_type: ssh
+
+      - match:
+          selector: '{job="auth"} |~ "Accepted"'
+          stages:
+            - regex:
+                expression: 'Accepted (?P<auth_method>\S+) for (?P<username>\S+) from (?P<src_ip>\d+\.\d+\.\d+\.\d+)'
+            - labels:
+                username:
+                src_ip:
+                auth_method:
+                auth_result: success
+            - static_labels:
+                auth_type: ssh
+
+      # Extract sudo commands
+      - match:
+          selector: '{job="auth"} |~ "sudo"'
+          stages:
+            - regex:
+                expression: '(?P<username>\S+)\s+:\s+.*COMMAND=(?P<command>.*)'
+            - labels:
+                username:
+            - static_labels:
+                auth_type: sudo
+
+  # ============================================
+  # Kernel/dmesg Logs
+  # ============================================
+  - job_name: kernel
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: kernel
+          host: '${HOSTNAME:-homelab}'
+          __path__: /var/log/kern.log
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?P<host>\S+)\s+kernel:\s+\[\s*(?P<uptime>[\d.]+)\]\s+(?P<message>.*)$'
+      - timestamp:
+          source: timestamp
+          format: 'Jan _2 15:04:05'
+          location: Local
+
+  # ============================================
+  # Journal Logs (systemd)
+  # ============================================
   - job_name: journal
     journal:
       max_age: 12h
@@ -61,3 +258,15 @@ scrape_configs:
         target_label: 'unit'
       - source_labels: ['__journal__hostname']
         target_label: 'hostname'
+      - source_labels: ['__journal_priority_keyword']
+        target_label: 'priority'
+    pipeline_stages:
+      # Map journal priority to log level
+      - match:
+          selector: '{job="systemd-journal"}'
+          stages:
+            - template:
+                source: priority
+                template: '{{ if eq .Value "emerg" }}critical{{ else if eq .Value "alert" }}critical{{ else if eq .Value "crit" }}critical{{ else if eq .Value "err" }}error{{ else if eq .Value "warning" }}warn{{ else if eq .Value "notice" }}info{{ else if eq .Value "info" }}info{{ else }}debug{{ end }}'
+            - labels:
+                level:

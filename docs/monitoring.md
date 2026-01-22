@@ -13,6 +13,7 @@ Complete guide to the monitoring stack: Prometheus, Grafana, alerting, and obser
 - [Prometheus](#prometheus)
 - [Grafana](#grafana)
 - [AlertManager](#alertmanager)
+- [Logging Stack](#logging-stack)
 - [Additional Monitoring](#additional-monitoring)
 - [Custom Dashboards](#custom-dashboards)
 - [Alerting Rules](#alerting-rules)
@@ -420,6 +421,97 @@ receivers:
 
 > [!TIP]
 > Use silences during maintenance windows to prevent alert spam.
+
+---
+
+## Logging Stack
+
+Centralized log aggregation using Loki and Promtail.
+
+> **Full documentation:** See the [Logging Guide](logging.md) for complete setup and usage.
+
+### Quick Overview
+
+```mermaid
+flowchart LR
+    subgraph SOURCES["Sources"]
+        Docker["Docker Containers"]
+        System["System Logs"]
+        Auth["Auth Logs"]
+    end
+
+    subgraph PIPELINE["Pipeline"]
+        Promtail["Promtail"]
+        Loki["Loki"]
+    end
+
+    subgraph OUTPUT["Output"]
+        Grafana["Grafana Dashboards"]
+        Alerts["AlertManager"]
+    end
+
+    Docker --> Promtail
+    System --> Promtail
+    Auth --> Promtail
+    Promtail --> Loki
+    Loki --> Grafana
+    Loki --> Alerts
+
+    style Loki fill:#f46800,color:#fff
+    style Promtail fill:#f46800,color:#fff
+```
+
+### Components
+
+| Service | Port | Purpose |
+|:--------|:----:|:--------|
+| **Loki** | 3100 | Log aggregation & storage |
+| **Promtail** | - | Log collection agent |
+
+### Enable Logging
+
+```bash
+# 1. Run setup script
+./scripts/setup-logging.sh
+
+# 2. Start services
+docker compose up -d loki promtail
+
+# 3. Restart Grafana to load dashboards
+docker compose restart grafana
+```
+
+### Pre-configured Dashboards
+
+| Dashboard | Description |
+|:----------|:------------|
+| **Logs Overview** | Error rates, log volumes, live errors |
+| **Container Logs** | Per-container log viewer with search |
+| **Media Stack Logs** | *Arr, VPN, Plex/Jellyfin logs |
+| **Security & Auth** | SSH attempts, sudo, auth failures |
+
+### Quick LogQL Examples
+
+```logql
+# All errors
+{job="docker"} |~ "(?i)error"
+
+# Specific container
+{container="plex"}
+
+# Failed SSH logins
+{job="auth"} |~ "Failed password"
+```
+
+### Pre-configured Alerts
+
+- High error rates per container
+- VPN disconnection
+- SSH brute force detection
+- Container restart loops
+- Out of memory events
+
+> **Learn more:** [Complete Logging Guide](logging.md)
 
 ---
 

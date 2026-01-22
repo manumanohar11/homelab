@@ -520,6 +520,127 @@ curl http://localhost:9090/api/v1/targets
 
 </details>
 
+### Loki / Logging
+
+<details>
+<summary><strong>No data in log dashboards</strong></summary>
+
+**Check Loki is receiving logs:**
+```bash
+curl http://localhost:3100/loki/api/v1/label/container/values
+```
+
+If empty, check Promtail:
+```bash
+docker compose logs promtail | tail -20
+```
+
+**Verify datasource UID:**
+- The Loki datasource UID must be `loki` (lowercase)
+- Check: Settings → Data Sources → Loki → look at URL, should show `uid=loki`
+
+**Fix datasource UID:**
+```bash
+# Edit datasources config
+nano ${DOCKER_BASE_DIR}/grafana/provisioning/datasources/datasources.yml
+
+# Ensure it has:
+#   uid: loki
+
+# Restart Grafana
+docker compose restart grafana
+```
+
+**Check time range:**
+- Set dashboard time range to "Last 15 minutes" or "Last 1 hour"
+- Click refresh button
+
+</details>
+
+<details>
+<summary><strong>Loki not starting</strong></summary>
+
+**Check logs:**
+```bash
+docker compose logs loki
+```
+
+**Common issues:**
+
+1. **Permission denied:**
+   ```bash
+   # Loki runs as user 10001
+   sudo chown -R 10001:10001 ${DOCKER_BASE_DIR}/loki
+   ```
+
+2. **Config syntax error:**
+   ```bash
+   # Validate config
+   docker run --rm -v ${DOCKER_BASE_DIR}/loki/config:/etc/loki grafana/loki:latest \
+     -config.file=/etc/loki/local-config.yaml -verify-config
+   ```
+
+3. **Port already in use:**
+   ```bash
+   sudo lsof -i :3100
+   ```
+
+</details>
+
+<details>
+<summary><strong>Promtail not collecting Docker logs</strong></summary>
+
+**Check Docker socket access:**
+```bash
+docker exec promtail ls -la /var/run/docker.sock
+```
+
+**Verify targets:**
+```bash
+docker compose logs promtail | grep "added Docker target"
+```
+
+**Check Promtail config:**
+```bash
+cat ${DOCKER_BASE_DIR}/promtail/config/config.yml | grep docker_sd
+```
+
+Should have:
+```yaml
+docker_sd_configs:
+  - host: unix:///var/run/docker.sock
+```
+
+</details>
+
+<details>
+<summary><strong>High Loki disk usage</strong></summary>
+
+**Check storage:**
+```bash
+du -sh ${DOCKER_BASE_DIR}/loki/data
+```
+
+**Reduce retention:**
+```bash
+# Edit config
+nano ${DOCKER_BASE_DIR}/loki/config/local-config.yaml
+
+# Change retention_period (default 744h = 31 days)
+limits_config:
+  retention_period: 168h  # 7 days
+
+# Restart
+docker compose restart loki
+```
+
+**Force compaction:**
+```bash
+docker compose restart loki
+```
+
+</details>
+
 ---
 
 ## Debugging Commands
@@ -850,9 +971,16 @@ docker compose up -d [service]
 - [r/selfhosted](https://reddit.com/r/selfhosted)
 - [r/homelab](https://reddit.com/r/homelab)
 
+### Use Centralized Logging
+
+For advanced log analysis, use the Loki/Grafana logging stack:
+- See [Logging Guide](logging.md) for setup
+- Access Grafana dashboards at `http://your-server:3000`
+- Pre-built dashboards for error tracking, security monitoring, and more
+
 ### Use Dozzle for Real-Time Logs
 
-Access `http://your-server:8889` for a web-based log viewer.
+Access `http://your-server:8889` for a simple web-based log viewer.
 
 ---
 

@@ -1,0 +1,198 @@
+# Prometheus Alert Rules for Logging Stack Health
+# Monitor Loki, Promtail, and Vector services
+# https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+
+groups:
+  # ============================================
+  # Loki Health Alerts
+  # ============================================
+  - name: loki-health
+    interval: 30s
+    rules:
+      - alert: LokiDown
+        expr: up{job="loki"} == 0 or absent(up{job="loki"})
+        for: 2m
+        labels:
+          severity: critical
+          service: loki
+        annotations:
+          summary: "Loki is down"
+          description: "Loki log aggregation service is not responding. Logs are not being stored!"
+
+      - alert: LokiHighLatency
+        expr: histogram_quantile(0.99, sum(rate(loki_request_duration_seconds_bucket{route=~"/loki/api/v1/push|/api/prom/push"}[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "Loki high ingestion latency"
+          description: "Loki is taking more than 1s to ingest logs. Consider scaling or optimizing."
+
+      - alert: LokiIngestionErrors
+        expr: rate(loki_distributor_lines_received_total{status="error"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "Loki ingestion errors"
+          description: "Loki is experiencing errors ingesting logs. Some logs may be lost."
+
+      - alert: LokiStorageFull
+        expr: (loki_chunk_store_index_bytes_total / (1024*1024*1024)) > 50
+        for: 10m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "Loki storage exceeds 50GB"
+          description: "Loki storage is growing large. Consider adjusting retention or adding storage."
+
+      - alert: LokiRingUnhealthy
+        expr: sum(loki_ring_members{state="Unhealthy"}) > 0
+        for: 2m
+        labels:
+          severity: warning
+          service: loki
+        annotations:
+          summary: "Loki ring has unhealthy members"
+          description: "One or more Loki ring members are unhealthy."
+
+  # ============================================
+  # Promtail Health Alerts
+  # ============================================
+  - name: promtail-health
+    interval: 30s
+    rules:
+      - alert: PromtailDown
+        expr: up{job="promtail"} == 0 or absent(up{job="promtail"})
+        for: 2m
+        labels:
+          severity: critical
+          service: promtail
+        annotations:
+          summary: "Promtail is down"
+          description: "Promtail log collector is not running. Container logs are not being collected!"
+
+      - alert: PromtailNotSendingLogs
+        expr: rate(promtail_sent_entries_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: promtail
+        annotations:
+          summary: "Promtail not sending logs"
+          description: "Promtail has not sent any logs in the last 10 minutes. Check if containers are running."
+
+      - alert: PromtailHighDropRate
+        expr: rate(promtail_dropped_entries_total[5m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: promtail
+        annotations:
+          summary: "Promtail dropping logs"
+          description: "Promtail is dropping more than 100 log entries per second. Logs are being lost!"
+
+      - alert: PromtailConnectionErrors
+        expr: rate(promtail_request_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: promtail
+        annotations:
+          summary: "Promtail connection errors"
+          description: "Promtail is having trouble connecting to Loki. Check network connectivity."
+
+      - alert: PromtailFileLag
+        expr: promtail_file_bytes_total - promtail_read_bytes_total > 104857600
+        for: 10m
+        labels:
+          severity: warning
+          service: promtail
+        annotations:
+          summary: "Promtail falling behind on log files"
+          description: "Promtail has more than 100MB of unread log data. It may be unable to keep up."
+
+  # ============================================
+  # Vector Health Alerts (if using Vector)
+  # ============================================
+  - name: vector-health
+    interval: 30s
+    rules:
+      - alert: VectorDown
+        expr: up{job="vector"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: vector
+        annotations:
+          summary: "Vector is down"
+          description: "Vector log pipeline is not running. Logs are not being processed!"
+
+      - alert: VectorHighErrorRate
+        expr: rate(vector_component_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          service: vector
+        annotations:
+          summary: "Vector experiencing high error rate"
+          description: "Vector is logging more than 10 errors per second."
+
+      - alert: VectorSinkErrors
+        expr: rate(vector_component_sent_events_total{status="error"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: vector
+        annotations:
+          summary: "Vector sink errors"
+          description: "Vector is unable to send events to its sink (likely Loki)."
+
+  # ============================================
+  # Container Health Alerts
+  # ============================================
+  - name: container-health
+    interval: 1m
+    rules:
+      - alert: ContainerHighCPU
+        expr: sum(rate(container_cpu_usage_seconds_total{name=~".+"}[5m])) by (name) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          category: container
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU usage"
+          description: "Container {{ $labels.name }} is using more than 80% CPU for over 10 minutes."
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name=~".+"} / container_spec_memory_limit_bytes{name=~".+"}) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: container
+        annotations:
+          summary: "Container {{ $labels.name }} high memory usage"
+          description: "Container {{ $labels.name }} is using more than 90% of its memory limit."
+
+      - alert: ContainerRestarting
+        expr: increase(container_restart_count{name=~".+"}[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          category: container
+        annotations:
+          summary: "Container {{ $labels.name }} restarting frequently"
+          description: "Container {{ $labels.name }} has restarted more than 3 times in the last hour."
+
+      - alert: ContainerDown
+        expr: absent(container_last_seen{name=~"(loki|promtail|grafana|prometheus)"}) 
+        for: 5m
+        labels:
+          severity: critical
+          category: monitoring
+        annotations:
+          summary: "Critical monitoring container down"
+          description: "A critical monitoring container is not running."

@@ -33,7 +33,7 @@ include:
   # Management & monitoring
   - docker-compose.management.yml
   - docker-compose.monitoring.yml
-  # - docker-compose.logging.yml  # Loki/Promtail stack (optional)
+  - docker-compose.logging.yml  # Loki/Promtail stack
 
   # Productivity
   # - docker-compose.files.yml

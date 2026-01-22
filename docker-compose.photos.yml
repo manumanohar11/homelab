@@ -93,6 +93,8 @@ services:
     container_name: immich_redis
     image: docker.io/valkey/valkey:8-alpine@sha256:3c3ccc8571d4866ec5ac5ffb2519b6b6a1fdbf6b5ff5fdab075413026fbff273
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - media-stack
     healthcheck:
@@ -116,6 +118,8 @@ services:
     container_name: immich_postgres
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     networks:
       - media-stack
     environment:

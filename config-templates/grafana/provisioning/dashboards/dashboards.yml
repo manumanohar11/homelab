@@ -1,0 +1,18 @@
+# Grafana Dashboard Provisioning
+# Auto-loads dashboards from the specified folder on startup
+# https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+
+apiVersion: 1
+
+providers:
+  - name: 'Homelab Dashboards'
+    orgId: 1
+    folder: 'Homelab'
+    folderUid: 'homelab'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

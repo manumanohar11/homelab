@@ -58,7 +58,7 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
     volumes:
       - ${DOCKER_BASE_DIR}/jellyfin:/config
-      - ${DOCKER_MEDIA_DIR}:/data
+      - ${JELLYFIN_MEDIA_DIR}:/data
     networks:
       - media-stack
     ports:
@@ -87,8 +87,6 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-    profiles:
-      - jellyfin
 
   stash:
     image: stashapp/stash:latest
@@ -122,8 +120,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-file: "10"
-        max-size: "2m"
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
