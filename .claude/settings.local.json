@@ -34,7 +34,19 @@
       "Bash(docker images:*)",
       "Bash(python3:*)",
       "Bash(nvidia-smi:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(lsb_release:*)",
+      "Bash(echo:*)",
+      "Bash(apt list:*)",
+      "Bash(snap list:*)",
+      "Bash(flatpak list:*)",
+      "Bash(docker:*)",
+      "Bash(gnome-extensions list:*)",
+      "Bash(lscpu:*)",
+      "Bash(lspci:*)",
+      "Bash(source ~/.zshrc)",
+      "Bash(node --version)",
+      "Bash(npm --version)"
     ],
     "deny": []
   }

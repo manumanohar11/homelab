@@ -200,3 +200,48 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+
+  scrutiny:
+    image: ghcr.io/analogj/scrutiny:master-omnibus
+    container_name: scrutiny
+    restart: unless-stopped
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
+    networks:
+      - media-stack
+    ports:
+      - "8082:8080"
+    volumes:
+      - ${DOCKER_BASE_DIR}/scrutiny/config:/opt/scrutiny/config
+      - ${DOCKER_BASE_DIR}/scrutiny/influxdb:/opt/scrutiny/influxdb
+      - /run/udev:/run/udev:ro
+    devices:
+      - /dev/sda:/dev/sda   # Samsung SSD 750 EVO 250GB
+      - /dev/sdb:/dev/sdb   # ST4000VN008 4TB
+      - /dev/sdc:/dev/sdc   # ST1000DM010 1TB
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          memory: 128M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Monitoring"
+      - "homepage.name=Scrutiny"
+      - "homepage.icon=scrutiny"
+      - "homepage.href=http://${SERVER_IP:-localhost}:8082"
+      - "homepage.description=Hard Drive Health"
