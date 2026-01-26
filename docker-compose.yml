@@ -45,18 +45,19 @@ include:
   # Utilities (Homepage, Speedtest, Scrutiny, Dozzle, IT-Tools, Stirling PDF)
   - docker-compose.utilities.yml
 
-  # Media extras (Tautulli, Plex Meta Manager, Maintainerr, Kavita, Navidrome)
+  # Media utilities (Tautulli, Maintainerr, Tdarr)
   - docker-compose.media-extras.yml
 
 # --- Available Profiles ---
 # monitoring    - Glances system monitor
 # dashboard     - Glance Homepage alternative dashboard
-# jellyfin      - Jellyfin + Jellyseerr (alternative to Plex)
 # stash         - Stash media organizer
 # tdarr         - Tdarr media transcoding
 # notifiarr     - Notifiarr unified notifications
 # restic        - Restic backup server
 # scrutiny      - Scrutiny disk S.M.A.R.T monitoring
 # speedtest     - Speedtest Tracker internet speed history
-# kavita        - Kavita ebook/comic reader
 # navidrome     - Navidrome music streaming
+# requests      - Overseerr/Jellyseerr (requires *arr stack)
+# maintainerr   - Maintainerr media cleanup (requires *arr stack)
+# vector        - Vector log shipper (alternative to Promtail)

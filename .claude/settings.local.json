@@ -32,7 +32,9 @@
       "Bash(xargs:*)",
       "Bash(docker pull:*)",
       "Bash(docker images:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(nvidia-smi:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

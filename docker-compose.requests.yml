@@ -1,7 +1,9 @@
 # ~/media-stack/docker-compose.requests.yml
-# Contains media request services (Overseerr, Jellyseerr, Ombi).
+# Contains media request services (Overseerr, Jellyseerr).
+# Note: These require *arr stack to be useful. Enable when docker-compose.arr.yml is active.
 
 services:
+  # Overseerr - Plex request platform (requires *arr stack)
   overseerr:
     image: lscr.io/linuxserver/overseerr:latest
     container_name: overseerr
@@ -38,8 +40,10 @@ services:
           memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+    profiles:
+      - requests
 
-  # Alternative: Jellyseerr for Jellyfin users
+  # Jellyseerr - Jellyfin request platform (requires *arr stack)
   jellyseerr:
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
@@ -76,7 +80,7 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
-      - jellyfin
+      - requests
 
   # Notifiarr for unified notifications across *Arr apps
   notifiarr:

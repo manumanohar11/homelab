@@ -1,5 +1,5 @@
 # ~/media-stack/docker-compose.media-servers.yml
-# Contains media servers like Plex, Jellyfin, and Stash.
+# Contains media servers: Plex, Jellyfin, Stash, Kavita, Navidrome
 
 services:
   plex:
@@ -137,9 +137,10 @@ services:
     profiles:
       - stash
 
-  tdarr:
-    image: ghcr.io/haveagitgat/tdarr:latest
-    container_name: tdarr
+  # Kavita - Fast, feature-rich ebook/comic server
+  kavita:
+    image: lscr.io/linuxserver/kavita:latest
+    container_name: kavita
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -147,33 +148,20 @@ services:
       PUID: ${PUID}
       PGID: ${PGID}
       TZ: ${TZ}
-      UMASK_SET: 002
-      serverIP: 0.0.0.0
-      serverPort: 8266
-      webUIPort: 8265
-      internalNode: "true"
-      inContainer: "true"
-      ffmpegVersion: 6
-      nodeName: MainNode
-      NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: all
     volumes:
-      - ${DOCKER_BASE_DIR}/tdarr/server:/app/server
-      - ${DOCKER_BASE_DIR}/tdarr/configs:/app/configs
-      - ${DOCKER_BASE_DIR}/tdarr/logs:/app/logs
-      - ${DOCKER_MEDIA_DIR}:/media
-      - ${DOCKER_BASE_DIR}/tdarr/transcode_cache:/temp
+      - ${DOCKER_BASE_DIR}/kavita:/config
+      - ${DOCKER_MEDIA_DIR}/Audio Books:/audiobooks:ro
+      - ${DOCKER_MEDIA_DIR}/Comics:/comics:ro
     networks:
       - media-stack
     ports:
-      - "8265:8265"  # WebUI
-      - "8266:8266"  # Server
+      - "5000:5000"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8265"]
-      interval: 1m
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 30s
     logging:
       driver: json-file
       options:
@@ -182,15 +170,57 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
-          memory: 8G
-        reservations:
+          cpus: '2'
           memory: 1G
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+        reservations:
+          memory: 256M
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Navidrome - Modern music server and streamer
+  navidrome:
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    restart: unless-stopped
+    user: "${PUID}:${PGID}"
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: ""
+      ND_ENABLETRANSCODINGCONFIG: "true"
+      ND_ENABLESHARING: "true"
+      ND_ENABLEFAVOURITES: "true"
+      ND_ENABLESTARRATING: "true"
+      ND_DEFAULTTHEME: "Dark"
+    volumes:
+      - ${DOCKER_BASE_DIR}/navidrome:/data
+      - ${DOCKER_MEDIA_DIR}/Songs:/music:ro
+    networks:
+      - media-stack
+    ports:
+      - "4533:4533"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4533/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
-      - tdarr
+      - navidrome
