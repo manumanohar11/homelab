@@ -19,6 +19,16 @@ Solutions to common issues, debugging tips, and frequently asked questions.
 
 ## Quick Diagnostics
 
+### Network Diagnostics
+
+If services can't reach external APIs or downloads are slow, run the network testing tool:
+
+```bash
+python3 ~/docker/scripts/nettest.py --expected-speed 100
+```
+
+This will identify if the problem is with your local network, ISP, internet backbone, or specific targets. See [Network Testing Tool](scripts.md#network-testing-tool) for details.
+
 ### Health Check Script
 
 Run this to quickly diagnose issues:
@@ -754,12 +764,18 @@ free -h
 ### Slow Network
 
 ```bash
+# Run comprehensive network diagnostics
+python3 ~/docker/scripts/nettest.py --expected-speed 100
+
 # Test from container
 docker exec [container] curl -o /dev/null -s -w "%{time_total}\n" http://google.com
 
 # Check for packet loss
 docker exec [container] ping -c 10 google.com
 ```
+
+> [!TIP]
+> Use the [Network Testing Tool](scripts.md#network-testing-tool) for comprehensive diagnostics that identify whether issues are with your local network, ISP, internet backbone, or specific targets.
 
 **Solutions:**
 - Check VPN server load

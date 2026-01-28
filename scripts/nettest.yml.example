@@ -1,0 +1,88 @@
+# Network Testing Tool Configuration
+# Copy this file to one of these locations:
+#   - ./nettest.yml (current directory - highest priority)
+#   - ~/.config/nettest/config.yml (user config)
+#
+# All settings are optional - defaults will be used for any missing values.
+
+# Target servers to test
+# Format: "Display Name": "hostname_or_ip"
+targets:
+  Google DNS: "8.8.8.8"
+  Cloudflare DNS: "1.1.1.1"
+  Quad9 DNS: "9.9.9.9"
+  # Add your own targets:
+  # My Router: "192.168.1.1"
+  # Work VPN: "vpn.company.com"
+
+# Test parameters
+tests:
+  # Number of ping packets to send per target
+  ping_count: 10
+
+  # Number of MTR packets for route analysis
+  mtr_count: 10
+
+  # Your expected download speed in Mbps (for percentage calculation)
+  expected_speed: 100
+
+# Thresholds for status indicators (green/yellow/red)
+thresholds:
+  # Latency thresholds in milliseconds
+  latency:
+    good: 50      # <= 50ms = green
+    warning: 100  # <= 100ms = yellow, > 100ms = red
+
+  # Jitter thresholds in milliseconds
+  jitter:
+    good: 15      # <= 15ms = green
+    warning: 30   # <= 30ms = yellow, > 30ms = red
+
+  # Packet loss thresholds in percent
+  packet_loss:
+    good: 0       # 0% = green
+    warning: 2    # <= 2% = yellow, > 2% = red
+
+  # Download speed as percentage of expected
+  download_pct:
+    good: 80      # >= 80% = green
+    warning: 50   # >= 50% = yellow, < 50% = red
+
+# Output settings
+output:
+  # Directory for HTML reports
+  directory: "/tmp"
+
+  # Automatically open HTML report in browser
+  open_browser: true
+
+# Structured JSON logging for Promtail/Loki
+logging:
+  # Enable logging (can also use --log-file CLI flag)
+  enabled: false
+
+  # Log file path
+  file: "/tmp/nettest.log"
+
+# Example usage:
+#
+# Basic run with config:
+#   python3 nettest.py --config nettest.yml
+#
+# Quick check:
+#   python3 nettest.py --profile quick
+#
+# Full diagnostic with custom speed:
+#   python3 nettest.py --profile full --expected-speed 500
+#
+# JSON output for scripting:
+#   python3 nettest.py --format json --quiet
+#
+# With port and HTTP testing:
+#   python3 nettest.py --check-ports "80,443" --check-http "google.com"
+#
+# Interactive mode:
+#   python3 nettest.py --interactive
+#
+# Continuous monitoring:
+#   python3 nettest.py --monitor --interval 60

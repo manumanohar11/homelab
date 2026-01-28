@@ -125,6 +125,7 @@ docker compose up -d
 | [📋 Logging](docs/logging.md) | Loki, Promtail, centralized log management |
 | [💾 Backup & Recovery](docs/backup.md) | Backup strategy, schedules, restore procedures |
 | [🔧 Troubleshooting](docs/troubleshooting.md) | Common issues, FAQ, debugging commands |
+| [🛠️ Utility Scripts](docs/scripts.md) | Network testing, diagnostics, automation tools |
 
 ---
 
