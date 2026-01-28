@@ -1132,7 +1132,7 @@ def display_terminal(
         speed_table.add_row(
             "Download",
             f"{speedtest_result.download_mbps:.1f} Mbps",
-            Text(f"[{dl_color}]●[/{dl_color}] {dl_pct:.0f}% of expected")
+            f"[{dl_color}]●[/{dl_color}] {dl_pct:.0f}% of expected"
         )
         speed_table.add_row(
             "Upload",
@@ -1144,7 +1144,7 @@ def display_terminal(
         speed_table.add_row(
             "Ping",
             f"{speedtest_result.ping_ms:.1f} ms",
-            Text(f"[{ping_color}]●[/{ping_color}]")
+            f"[{ping_color}]●[/{ping_color}]"
         )
         speed_table.add_row("Server", speedtest_result.server, "")
 
@@ -1172,10 +1172,10 @@ def display_terminal(
             latency_table.add_row(
                 pr.target_name,
                 f"{pr.min_ms:.1f} ms",
-                Text(f"[{avg_color}]{pr.avg_ms:.1f} ms[/{avg_color}]"),
+                f"[{avg_color}]{pr.avg_ms:.1f} ms[/{avg_color}]",
                 f"{pr.max_ms:.1f} ms",
-                Text(f"[{jitter_color}]{pr.jitter_ms:.1f} ms[/{jitter_color}]"),
-                Text(f"[{loss_color}]{pr.packet_loss:.1f}%[/{loss_color}]"),
+                f"[{jitter_color}]{pr.jitter_ms:.1f} ms[/{jitter_color}]",
+                f"[{loss_color}]{pr.packet_loss:.1f}%[/{loss_color}]",
             )
         else:
             latency_table.add_row(
@@ -1203,7 +1203,7 @@ def display_terminal(
             dns_table.add_row(
                 dr.target,
                 dr.resolved_ip or "-",
-                Text(f"[{time_color}]{dr.resolution_time_ms:.0f} ms[/{time_color}]") if dr.resolution_time_ms > 0 else "N/A (IP)"
+                f"[{time_color}]{dr.resolution_time_ms:.0f} ms[/{time_color}]" if dr.resolution_time_ms > 0 else "N/A (IP)"
             )
         else:
             dns_table.add_row(dr.target, "[red]Failed[/red]", dr.error)
@@ -1230,8 +1230,8 @@ def display_terminal(
                 mtr_table.add_row(
                     str(hop.hop_number),
                     hop.host,
-                    Text(f"[{loss_color}]{hop.loss_pct:.1f}%[/{loss_color}]"),
-                    Text(f"[{avg_color}]{hop.avg_ms:.1f} ms[/{avg_color}]"),
+                    f"[{loss_color}]{hop.loss_pct:.1f}%[/{loss_color}]",
+                    f"[{avg_color}]{hop.avg_ms:.1f} ms[/{avg_color}]",
                     f"{hop.best_ms:.1f} ms",
                     f"{hop.worst_ms:.1f} ms",
                 )
