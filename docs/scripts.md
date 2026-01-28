@@ -33,6 +33,8 @@ A comprehensive network diagnostic tool that tests connectivity, identifies wher
 - **Interactive Mode** - Menu-driven interface for easy use
 - **Parallel Execution** - Faster testing with concurrent operations
 - **Continuous Monitoring** - Live dashboard for ongoing network health tracking
+- **IPv4/IPv6 Support** - Force specific IP protocol for testing
+- **Historical Comparison** - Track performance over time and compare with previous runs
 
 ### Quick Start
 
@@ -74,6 +76,9 @@ python3 ~/docker/scripts/nettest.py --format json --quiet
 | `--check-http` | - | Test HTTP URLs (comma-separated) |
 | `--monitor` | false | Run in continuous monitoring mode |
 | `--interval` | 30 | Monitoring interval in seconds |
+| `--ipv4`, `-4` | false | Force IPv4 only |
+| `--ipv6`, `-6` | false | Force IPv6 only |
+| `--history` | - | Save results to file and compare with previous run |
 
 ### Test Profiles
 
@@ -233,6 +238,40 @@ The monitoring dashboard shows:
 - **Min/Max** - Range of observed latencies
 
 Press `Ctrl+C` to stop monitoring.
+
+### IPv4/IPv6 Testing
+
+Force a specific IP protocol for testing:
+
+```bash
+# Force IPv4 only
+python3 nettest.py -4
+
+# Force IPv6 only
+python3 nettest.py -6
+
+# Test IPv6 connectivity to specific targets
+python3 nettest.py --ipv6 --targets "Google:ipv6.google.com,CF:2606:4700:4700::1111"
+```
+
+### Historical Comparison
+
+Track network performance over time by saving results to a history file:
+
+```bash
+# First run - saves baseline
+python3 nettest.py --history ~/nettest_history.json
+
+# Subsequent runs - shows comparison with previous run
+python3 nettest.py --history ~/nettest_history.json
+```
+
+The comparison table shows:
+- **Current vs Previous** values for latency, packet loss, and speed
+- **Change indicators**: `→ stable` (<5% change), `↓ improved` (green), `↑ degraded` (red)
+- **Percentage change** for significant differences
+
+History file keeps the last 100 test results in JSON format.
 
 ### Problem Diagnosis
 

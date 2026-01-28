@@ -273,6 +273,201 @@ class JsonLogger:
 json_logger = JsonLogger()
 
 
+# ============================================================================
+# HISTORY MANAGEMENT
+# ============================================================================
+
+def save_history(history_file: str, ping_results: list, speedtest_result, dns_results: list) -> None:
+    """Save test results to history file for comparison."""
+    entry = {
+        "timestamp": datetime.now().isoformat(),
+        "ping": [
+            {
+                "target": r.target,
+                "target_name": r.target_name,
+                "avg_ms": r.avg_ms,
+                "jitter_ms": r.jitter_ms,
+                "packet_loss": r.packet_loss,
+                "success": r.success,
+            }
+            for r in ping_results
+        ],
+        "speedtest": {
+            "download_mbps": speedtest_result.download_mbps if speedtest_result else 0,
+            "upload_mbps": speedtest_result.upload_mbps if speedtest_result else 0,
+            "ping_ms": speedtest_result.ping_ms if speedtest_result else 0,
+            "success": speedtest_result.success if speedtest_result else False,
+        } if speedtest_result else None,
+        "dns": [
+            {
+                "target": r.target,
+                "resolution_time_ms": r.resolution_time_ms,
+                "success": r.success,
+            }
+            for r in dns_results
+        ],
+    }
+
+    # Load existing history or create new
+    history = []
+    if os.path.exists(history_file):
+        try:
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            history = []
+
+    # Append new entry and keep last 100 entries
+    history.append(entry)
+    history = history[-100:]
+
+    # Save
+    try:
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=2)
+    except IOError as e:
+        console.print(f"[yellow]Warning: Could not save history: {e}[/yellow]")
+
+
+def load_history(history_file: str) -> Optional[dict]:
+    """Load the most recent history entry for comparison."""
+    if not os.path.exists(history_file):
+        return None
+
+    try:
+        with open(history_file, 'r') as f:
+            history = json.load(f)
+            if history and len(history) > 0:
+                return history[-1]  # Return most recent
+    except (json.JSONDecodeError, IOError):
+        pass
+    return None
+
+
+def format_change(current: float, previous: float, unit: str = "ms", lower_is_better: bool = True) -> str:
+    """Format a metric change with color coding."""
+    if previous == 0:
+        return f"{current:.1f}{unit}"
+
+    diff = current - previous
+    pct = (diff / previous) * 100 if previous != 0 else 0
+
+    if abs(pct) < 5:
+        # Negligible change
+        return f"{current:.1f}{unit} [dim](→ stable)[/dim]"
+    elif (diff < 0 and lower_is_better) or (diff > 0 and not lower_is_better):
+        # Improved
+        return f"{current:.1f}{unit} [green](↓ {abs(diff):.1f}{unit}, {abs(pct):.0f}% better)[/green]"
+    else:
+        # Degraded
+        return f"{current:.1f}{unit} [red](↑ {abs(diff):.1f}{unit}, {abs(pct):.0f}% worse)[/red]"
+
+
+def show_history_comparison(ping_results: list, speedtest_result, previous: dict) -> None:
+    """Display comparison table between current and previous results."""
+    console.print()
+    console.print("[bold]Comparison with Previous Run[/bold]")
+    console.print(f"[dim]Previous: {previous['timestamp']}[/dim]")
+
+    table = Table(box=box.ROUNDED)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Current", justify="right")
+    table.add_column("Previous", justify="right")
+    table.add_column("Change", justify="right")
+
+    # Build lookup for previous ping results
+    prev_ping = {p["target_name"]: p for p in previous.get("ping", [])}
+
+    for result in ping_results:
+        if result.success:
+            prev = prev_ping.get(result.target_name, {})
+            prev_avg = prev.get("avg_ms", 0)
+            prev_loss = prev.get("packet_loss", 0)
+
+            # Latency row
+            if prev_avg > 0:
+                diff = result.avg_ms - prev_avg
+                pct = (diff / prev_avg) * 100
+                if abs(pct) < 5:
+                    change = "[dim]→ stable[/dim]"
+                elif diff < 0:
+                    change = f"[green]↓ {abs(diff):.1f}ms ({abs(pct):.0f}%)[/green]"
+                else:
+                    change = f"[red]↑ {diff:.1f}ms ({pct:.0f}%)[/red]"
+            else:
+                change = "[dim]new[/dim]"
+
+            table.add_row(
+                f"{result.target_name} latency",
+                f"{result.avg_ms:.1f}ms",
+                f"{prev_avg:.1f}ms" if prev_avg > 0 else "-",
+                change
+            )
+
+            # Packet loss row (only if there was loss)
+            if result.packet_loss > 0 or prev_loss > 0:
+                if prev_loss > 0:
+                    diff = result.packet_loss - prev_loss
+                    if abs(diff) < 0.1:
+                        change = "[dim]→ stable[/dim]"
+                    elif diff < 0:
+                        change = f"[green]↓ {abs(diff):.1f}%[/green]"
+                    else:
+                        change = f"[red]↑ {diff:.1f}%[/red]"
+                else:
+                    change = "[red]new loss[/red]" if result.packet_loss > 0 else "[dim]new[/dim]"
+
+                table.add_row(
+                    f"{result.target_name} loss",
+                    f"{result.packet_loss:.1f}%",
+                    f"{prev_loss:.1f}%" if prev_loss > 0 else "0%",
+                    change
+                )
+
+    # Speedtest comparison
+    prev_speed = previous.get("speedtest", {})
+    if speedtest_result and speedtest_result.success and prev_speed and prev_speed.get("success"):
+        prev_dl = prev_speed.get("download_mbps", 0)
+        prev_ul = prev_speed.get("upload_mbps", 0)
+
+        if prev_dl > 0:
+            diff = speedtest_result.download_mbps - prev_dl
+            pct = (diff / prev_dl) * 100
+            if abs(pct) < 5:
+                change = "[dim]→ stable[/dim]"
+            elif diff > 0:
+                change = f"[green]↑ {diff:.1f}Mbps ({pct:.0f}%)[/green]"
+            else:
+                change = f"[red]↓ {abs(diff):.1f}Mbps ({abs(pct):.0f}%)[/red]"
+
+            table.add_row(
+                "Download speed",
+                f"{speedtest_result.download_mbps:.1f}Mbps",
+                f"{prev_dl:.1f}Mbps",
+                change
+            )
+
+        if prev_ul > 0:
+            diff = speedtest_result.upload_mbps - prev_ul
+            pct = (diff / prev_ul) * 100
+            if abs(pct) < 5:
+                change = "[dim]→ stable[/dim]"
+            elif diff > 0:
+                change = f"[green]↑ {diff:.1f}Mbps ({pct:.0f}%)[/green]"
+            else:
+                change = f"[red]↓ {abs(diff):.1f}Mbps ({abs(pct):.0f}%)[/red]"
+
+            table.add_row(
+                "Upload speed",
+                f"{speedtest_result.upload_mbps:.1f}Mbps",
+                f"{prev_ul:.1f}Mbps",
+                change
+            )
+
+    console.print(table)
+    console.print()
+
+
 # Legacy compatibility - these will be set from config in main()
 TARGET_SERVERS = DEFAULT_CONFIG["targets"]
 PING_COUNT = DEFAULT_CONFIG["tests"]["ping_count"]
@@ -531,11 +726,23 @@ def run_command(cmd: list, timeout: int = 60) -> tuple[int, str, str]:
         return -1, "", str(e)
 
 
-def run_ping_test(target: str, target_name: str, count: int = PING_COUNT) -> PingResult:
-    """Run ping test and parse results."""
+def run_ping_test(target: str, target_name: str, count: int = PING_COUNT, ip_version: Optional[int] = None) -> PingResult:
+    """Run ping test and parse results.
+
+    Args:
+        target: Hostname or IP to ping
+        target_name: Display name for the target
+        count: Number of ping packets to send
+        ip_version: Force IPv4 (4) or IPv6 (6), or None for auto
+    """
     result = PingResult(target=target, target_name=target_name)
 
-    cmd = ["ping", "-c", str(count), "-W", "2", target]
+    cmd = ["ping", "-c", str(count), "-W", "2"]
+    if ip_version == 4:
+        cmd.append("-4")
+    elif ip_version == 6:
+        cmd.append("-6")
+    cmd.append(target)
     exit_code, stdout, stderr = run_command(cmd, timeout=count * 3 + 10)
 
     if exit_code != 0 and not stdout:
@@ -1915,6 +2122,7 @@ def run_tests_with_progress(
     skip_dns: bool = False,
     skip_mtr: bool = False,
     parallel: bool = False,
+    ip_version: Optional[int] = None,
 ) -> tuple[list[PingResult], SpeedTestResult, list[DnsResult], list[MtrResult]]:
     """Run network tests with progress indicators.
 
@@ -1927,6 +2135,7 @@ def run_tests_with_progress(
         skip_dns: Skip DNS tests
         skip_mtr: Skip MTR route analysis
         parallel: Run ping and DNS tests in parallel (faster but less orderly output)
+        ip_version: Force IPv4 (4) or IPv6 (6), or None for auto
     """
     ping_results = []
     dns_results = []
@@ -1962,7 +2171,7 @@ def run_tests_with_progress(
             # Run ping tests in parallel
             with ThreadPoolExecutor(max_workers=min(len(targets), 5)) as executor:
                 ping_futures = {
-                    executor.submit(run_ping_test, target, name, ping_count): name
+                    executor.submit(run_ping_test, target, name, ping_count, ip_version): name
                     for name, target in targets.items()
                 }
                 for future in as_completed(ping_futures):
@@ -2005,7 +2214,7 @@ def run_tests_with_progress(
             # Run ping tests
             for name, target in targets.items():
                 progress.update(overall_task, description=f"[cyan]Pinging {name}...")
-                result = run_ping_test(target, name, count=ping_count)
+                result = run_ping_test(target, name, count=ping_count, ip_version=ip_version)
                 ping_results.append(result)
                 json_logger.log_ping_result(result)
                 progress.advance(overall_task)
@@ -2445,6 +2654,22 @@ def main():
         default=30,
         help="Monitoring interval in seconds (default: 30)"
     )
+    parser.add_argument(
+        "--ipv4", "-4",
+        action="store_true",
+        help="Force IPv4 only"
+    )
+    parser.add_argument(
+        "--ipv6", "-6",
+        action="store_true",
+        help="Force IPv6 only"
+    )
+    parser.add_argument(
+        "--history",
+        type=str,
+        metavar="FILE",
+        help="Save results to history file and show comparison with previous run"
+    )
 
     args = parser.parse_args()
 
@@ -2573,6 +2798,26 @@ def main():
             console.print("[dim]Install the missing tools and try again, or use --skip-check to proceed anyway.[/dim]")
             sys.exit(1)
 
+    # Determine IP version from flags
+    ip_version = None
+    if args.ipv4 and args.ipv6:
+        console.print("[yellow]Warning: Both --ipv4 and --ipv6 specified, using auto-detect[/yellow]")
+    elif args.ipv4:
+        ip_version = 4
+        if not suppress_output:
+            console.print("[dim]Forcing IPv4[/dim]")
+    elif args.ipv6:
+        ip_version = 6
+        if not suppress_output:
+            console.print("[dim]Forcing IPv6[/dim]")
+
+    # Load previous history for comparison (if enabled)
+    previous_history = None
+    if args.history:
+        previous_history = load_history(args.history)
+        if previous_history and not suppress_output:
+            console.print(f"[dim]Loaded previous results from {args.history}[/dim]")
+
     # Run all tests with progress indicators
     ping_results, speedtest_result, dns_results, mtr_results = run_tests_with_progress(
         targets,
@@ -2583,6 +2828,7 @@ def main():
         skip_dns=skip_dns,
         skip_mtr=skip_mtr,
         parallel=args.parallel,
+        ip_version=ip_version,
     )
 
     # Run optional TCP port tests
@@ -2703,6 +2949,16 @@ def main():
         # For html-only format, just print the path
         if output_format == "html":
             print(html_path)
+
+    # Show history comparison if enabled
+    if args.history and previous_history and not suppress_output:
+        show_history_comparison(ping_results, speedtest_result, previous_history)
+
+    # Save current results to history file
+    if args.history:
+        save_history(args.history, ping_results, speedtest_result, dns_results)
+        if not suppress_output:
+            console.print(f"[dim]Results saved to history: {args.history}[/dim]")
 
     # Log session end
     json_logger.log_end(success=True)
