@@ -1,7 +1,7 @@
 """Connection stability and health scoring."""
 
 from typing import List
-from ..models import PingResult, SpeedTestResult, ConnectionScore
+from ..models import PingResult, SpeedTestResult, ConnectionScore, VoIPQuality
 
 
 def calculate_connection_score(
@@ -80,6 +80,72 @@ def calculate_connection_score(
         latency_score=latency_score,
         stability_score=stability_score,
         summary=summary,
+    )
+
+
+def calculate_mos_score(
+    latency_ms: float,
+    jitter_ms: float,
+    packet_loss_pct: float,
+) -> VoIPQuality:
+    """
+    Calculate Mean Opinion Score using simplified ITU-T E-model.
+
+    MOS Scale:
+    - 4.3-5.0: Excellent (HD voice capable)
+    - 4.0-4.3: Good (standard voice)
+    - 3.6-4.0: Fair (acceptable)
+    - 3.1-3.6: Poor (degraded)
+    - 1.0-3.1: Bad (unusable)
+    """
+    # Effective latency (one-way + jitter buffer + codec delay)
+    effective_latency = latency_ms + (jitter_ms * 2) + 10
+
+    # Delay impairment
+    if effective_latency < 160:
+        delay_factor = effective_latency / 40
+    else:
+        delay_factor = (effective_latency - 120) / 10
+
+    # Loss impairment
+    loss_factor = packet_loss_pct * 2.5
+
+    # R-factor
+    r_factor = 93.2 - delay_factor - loss_factor
+    r_factor = max(0, min(100, r_factor))
+
+    # Convert to MOS
+    if r_factor < 0:
+        mos = 1.0
+    elif r_factor > 100:
+        mos = 4.5
+    else:
+        mos = 1 + 0.035 * r_factor + r_factor * (r_factor - 60) * (100 - r_factor) * 7e-6
+
+    mos = round(max(1.0, min(5.0, mos)), 2)
+
+    # Determine quality and suitability
+    if mos >= 4.3:
+        quality = "Excellent"
+        suitable = ["HD Voice", "Video Conferencing", "VoIP"]
+    elif mos >= 4.0:
+        quality = "Good"
+        suitable = ["Video Conferencing", "VoIP"]
+    elif mos >= 3.6:
+        quality = "Fair"
+        suitable = ["VoIP", "Voice Calls"]
+    elif mos >= 3.1:
+        quality = "Poor"
+        suitable = ["Basic Voice"]
+    else:
+        quality = "Bad"
+        suitable = []
+
+    return VoIPQuality(
+        mos_score=mos,
+        r_factor=round(r_factor, 1),
+        quality=quality,
+        suitable_for=suitable,
     )
 
 

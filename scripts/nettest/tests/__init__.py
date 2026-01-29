@@ -7,7 +7,7 @@ from .mtr import run_mtr
 from .tcp import check_tcp_port, check_tcp_ports
 from .http import measure_http_latency
 from .runner import run_tests_with_progress
-from .stability import calculate_connection_score
+from .stability import calculate_connection_score, calculate_mos_score
 
 __all__ = [
     "run_ping_test",
@@ -19,4 +19,5 @@ __all__ = [
     "measure_http_latency",
     "run_tests_with_progress",
     "calculate_connection_score",
+    "calculate_mos_score",
 ]
