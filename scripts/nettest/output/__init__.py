@@ -3,6 +3,7 @@
 from .terminal import display_terminal
 from .html import generate_html
 from .json_output import output_json
+from .evidence import generate_isp_evidence
 
 # Prometheus is optional
 try:
@@ -15,4 +16,5 @@ __all__ = [
     "display_terminal",
     "generate_html",
     "output_json",
+    "generate_isp_evidence",
 ]
