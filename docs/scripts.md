@@ -14,7 +14,7 @@ Collection of utility scripts for managing and monitoring your homelab.
 
 ## Network Testing Tool
 
-**Location:** `scripts/nettest.py`
+**Location:** `scripts/nettest/` (Python package)
 
 A comprehensive network diagnostic tool that tests connectivity, identifies where problems originate, and generates detailed reports.
 
@@ -39,20 +39,23 @@ A comprehensive network diagnostic tool that tests connectivity, identifies wher
 ### Quick Start
 
 ```bash
+# Navigate to scripts directory first
+cd ~/docker/scripts
+
 # Run with default settings
-python3 ~/docker/scripts/nettest.py
+python3 -m nettest
 
 # Quick check (ping only, fast)
-python3 ~/docker/scripts/nettest.py --profile quick
+python3 -m nettest --profile quick
 
 # Full diagnostic with your plan speed
-python3 ~/docker/scripts/nettest.py --profile full --expected-speed 500
+python3 -m nettest --profile full --expected-speed 500
 
 # Interactive mode
-python3 ~/docker/scripts/nettest.py --interactive
+python3 -m nettest --interactive
 
 # JSON output for scripting
-python3 ~/docker/scripts/nettest.py --format json --quiet
+python3 -m nettest --format json --quiet
 ```
 
 ### Command-Line Arguments
@@ -79,6 +82,10 @@ python3 ~/docker/scripts/nettest.py --format json --quiet
 | `--ipv4`, `-4` | false | Force IPv4 only |
 | `--ipv6`, `-6` | false | Force IPv6 only |
 | `--history` | - | Save results to file and compare with previous run |
+| `--interface`, `-I` | - | Network interface to use (e.g., eth0, wlan0) |
+| `--list-interfaces` | false | List available network interfaces |
+| `--wizard` | false | Run configuration wizard |
+| `--prometheus-port` | - | Enable Prometheus metrics on specified port |
 
 ### Test Profiles
 
@@ -86,6 +93,25 @@ python3 ~/docker/scripts/nettest.py --format json --quiet
 |---------|-----------|---------|----------|
 | `quick` | Ping only | 3 | Fast connectivity check |
 | `full` | All tests | 10 | Comprehensive diagnosis |
+| `gaming` | Ping + MTR | 20 | Low-latency gaming check |
+
+Custom profiles can be defined in the YAML config:
+
+```yaml
+profiles:
+  gaming:
+    description: "Gaming-optimized low-latency check"
+    ping_count: 20
+    skip_speedtest: true
+    skip_mtr: false
+    targets:
+      "Google DNS": "8.8.8.8"
+      "Cloudflare DNS": "1.1.1.1"
+    thresholds:
+      latency:
+        good: 20
+        warning: 50
+```
 
 ### Configuration File
 
@@ -144,10 +170,10 @@ Machine-readable JSON for scripting and automation:
 
 ```bash
 # Get JSON output
-python3 nettest.py --format json --quiet > results.json
+python3 -m nettest --format json --quiet > results.json
 
 # Parse with jq
-python3 nettest.py --format json --quiet | jq '.diagnostic.category'
+python3 -m nettest --format json --quiet | jq '.diagnostic.category'
 ```
 
 ### TCP Port Testing
@@ -156,10 +182,10 @@ Test if specific ports are open:
 
 ```bash
 # Test common ports on default targets
-python3 nettest.py --check-ports "80,443,22"
+python3 -m nettest --check-ports "80,443,22"
 
 # Test specific host:port combinations
-python3 nettest.py --check-ports "8.8.8.8:53,1.1.1.1:443"
+python3 -m nettest --check-ports "8.8.8.8:53,1.1.1.1:443"
 ```
 
 ### HTTP Latency Testing
@@ -168,7 +194,7 @@ Measure application-layer response times:
 
 ```bash
 # Test HTTP latency to popular sites
-python3 nettest.py --check-http "google.com,github.com,cloudflare.com"
+python3 -m nettest --check-http "google.com,github.com,cloudflare.com"
 ```
 
 ### Structured Logging (Promtail/Loki)
@@ -177,7 +203,7 @@ Enable JSON logging for log aggregation:
 
 ```bash
 # Enable via CLI
-python3 nettest.py --log-file /var/log/nettest.log
+python3 -m nettest --log-file /var/log/nettest.log
 
 # Enable via config
 logging:
@@ -195,7 +221,7 @@ Log format (one JSON object per line):
 Run with a menu-driven interface:
 
 ```bash
-python3 nettest.py --interactive
+python3 -m nettest --interactive
 ```
 
 Options:
@@ -211,7 +237,7 @@ q. Quit
 Speed up testing by running ping and DNS tests concurrently:
 
 ```bash
-python3 nettest.py --parallel
+python3 -m nettest --parallel
 ```
 
 ### Continuous Monitoring
@@ -220,13 +246,13 @@ Run a live dashboard that continuously monitors network connectivity:
 
 ```bash
 # Monitor with default 30-second interval
-python3 nettest.py --monitor
+python3 -m nettest --monitor
 
 # Monitor with custom 60-second interval
-python3 nettest.py --monitor --interval 60
+python3 -m nettest --monitor --interval 60
 
 # Monitor specific targets
-python3 nettest.py --monitor --targets "Router:192.168.1.1,Google:8.8.8.8"
+python3 -m nettest --monitor --targets "Router:192.168.1.1,Google:8.8.8.8"
 ```
 
 The monitoring dashboard shows:
@@ -245,13 +271,13 @@ Force a specific IP protocol for testing:
 
 ```bash
 # Force IPv4 only
-python3 nettest.py -4
+python3 -m nettest -4
 
 # Force IPv6 only
-python3 nettest.py -6
+python3 -m nettest -6
 
 # Test IPv6 connectivity to specific targets
-python3 nettest.py --ipv6 --targets "Google:ipv6.google.com,CF:2606:4700:4700::1111"
+python3 -m nettest --ipv6 --targets "Google:ipv6.google.com,CF:2606:4700:4700::1111"
 ```
 
 ### Historical Comparison
@@ -260,10 +286,10 @@ Track network performance over time by saving results to a history file:
 
 ```bash
 # First run - saves baseline
-python3 nettest.py --history ~/nettest_history.json
+python3 -m nettest --history ~/nettest_history.json
 
 # Subsequent runs - shows comparison with previous run
-python3 nettest.py --history ~/nettest_history.json
+python3 -m nettest --history ~/nettest_history.json
 ```
 
 The comparison table shows:
@@ -338,7 +364,7 @@ The tool will show which dependencies are missing at startup:
 ```bash
 # Add to crontab (crontab -e)
 # Run every 6 hours, save reports
-0 */6 * * * /usr/bin/python3 /home/user/docker/scripts/nettest.py \
+0 */6 * * * cd /home/user/docker/scripts && /usr/bin/python3 -m nettest \
   --profile quick --quiet --no-browser \
   --output /home/user/network-reports \
   --log-file /var/log/nettest.log
@@ -353,7 +379,8 @@ Description=Network Testing Tool
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /home/user/docker/scripts/nettest.py \
+WorkingDirectory=/home/user/docker/scripts
+ExecStart=/usr/bin/python3 -m nettest \
   --profile quick --quiet --no-browser \
   --log-file /var/log/nettest.log
 User=user
@@ -410,7 +437,7 @@ sudo dnf install mtr
 mtr requires root for some operations:
 ```bash
 # Option 1: Run script with sudo
-sudo python3 ~/docker/scripts/nettest.py
+cd ~/docker/scripts && sudo python3 -m nettest
 
 # Option 2: Give mtr capabilities
 sudo setcap cap_net_raw+ep /usr/sbin/mtr
@@ -423,7 +450,7 @@ sudo setcap cap_net_raw+ep /usr/sbin/mtr
 
 ```bash
 # Run without browser
-python3 ~/docker/scripts/nettest.py --no-browser
+cd ~/docker/scripts && python3 -m nettest --no-browser
 
 # Manually open the report
 xdg-open /tmp/nettest_report_*.html
@@ -442,6 +469,83 @@ pip install pyyaml
 Without it, the tool uses built-in defaults.
 
 </details>
+
+### Docker Usage
+
+Run network tests in a container for isolation and portability:
+
+```bash
+# Start monitoring mode with Prometheus metrics
+docker compose -f docker-compose.nettest.yml up -d
+
+# Run one-shot test
+docker compose -f docker-compose.nettest.yml run --rm nettest --profile full
+
+# View logs
+docker compose -f docker-compose.nettest.yml logs -f
+
+# Check Prometheus metrics
+curl http://localhost:9101/metrics
+```
+
+The Docker configuration includes:
+- **Port 9101**: Prometheus metrics endpoint
+- **Volumes**: `/config` (YAML config), `/output` (HTML reports), `/data` (logs, history)
+- **Capability**: `NET_RAW` for ping and mtr
+
+Configuration file: `nettest/config/nettest.yml`
+
+### Network Interface Selection
+
+Test from a specific network interface (useful for multi-homed systems, VPNs):
+
+```bash
+# List available interfaces
+python3 -m nettest --list-interfaces
+
+# Test using specific interface
+python3 -m nettest --interface eth0 --profile quick
+python3 -m nettest -I wlan0 --profile full
+```
+
+### Configuration Wizard
+
+Run the interactive wizard to generate a config file:
+
+```bash
+python3 -m nettest --wizard
+```
+
+The wizard guides you through:
+1. Test targets configuration
+2. Test parameters (ping count, MTR count)
+3. Threshold settings
+4. Output preferences
+5. Logging options
+6. Alert configuration
+7. Save to YAML file
+
+### Prometheus Metrics
+
+Expose metrics for Prometheus scraping:
+
+```bash
+# Enable metrics on port 9101
+python3 -m nettest --monitor --prometheus-port 9101
+```
+
+Available metrics:
+| Metric | Type | Description |
+|--------|------|-------------|
+| `nettest_ping_latency_ms` | Gauge | Latency (min/avg/max) per target |
+| `nettest_ping_jitter_ms` | Gauge | Jitter per target |
+| `nettest_ping_packet_loss_percent` | Gauge | Packet loss per target |
+| `nettest_speedtest_download_mbps` | Gauge | Download speed |
+| `nettest_speedtest_upload_mbps` | Gauge | Upload speed |
+| `nettest_dns_resolution_time_ms` | Gauge | DNS lookup time per target |
+| `nettest_test_runs_total` | Counter | Total test runs (success/failure) |
+
+Grafana dashboard example: Import dashboard ID or use the metrics directly.
 
 ### Integration with Troubleshooting
 

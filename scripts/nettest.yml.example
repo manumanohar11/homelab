@@ -67,22 +67,22 @@ logging:
 # Example usage:
 #
 # Basic run with config:
-#   python3 nettest.py --config nettest.yml
+#   python3 -m nettest --config nettest.yml
 #
 # Quick check:
-#   python3 nettest.py --profile quick
+#   python3 -m nettest --profile quick
 #
 # Full diagnostic with custom speed:
-#   python3 nettest.py --profile full --expected-speed 500
+#   python3 -m nettest --profile full --expected-speed 500
 #
 # JSON output for scripting:
-#   python3 nettest.py --format json --quiet
+#   python3 -m nettest --format json --quiet
 #
 # With port and HTTP testing:
-#   python3 nettest.py --check-ports "80,443" --check-http "google.com"
+#   python3 -m nettest --check-ports "80,443" --check-http "google.com"
 #
 # Interactive mode:
-#   python3 nettest.py --interactive
+#   python3 -m nettest --interactive
 #
 # Continuous monitoring:
-#   python3 nettest.py --monitor --interval 60
+#   python3 -m nettest --monitor --interval 60

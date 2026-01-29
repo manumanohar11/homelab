@@ -24,7 +24,7 @@ Solutions to common issues, debugging tips, and frequently asked questions.
 If services can't reach external APIs or downloads are slow, run the network testing tool:
 
 ```bash
-python3 ~/docker/scripts/nettest.py --expected-speed 100
+cd ~/docker/scripts && python3 -m nettest --expected-speed 100
 ```
 
 This will identify if the problem is with your local network, ISP, internet backbone, or specific targets. See [Network Testing Tool](scripts.md#network-testing-tool) for details.
@@ -765,7 +765,7 @@ free -h
 
 ```bash
 # Run comprehensive network diagnostics
-python3 ~/docker/scripts/nettest.py --expected-speed 100
+cd ~/docker/scripts && python3 -m nettest --expected-speed 100
 
 # Test from container
 docker exec [container] curl -o /dev/null -s -w "%{time_total}\n" http://google.com

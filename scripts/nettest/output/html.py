@@ -1,0 +1,968 @@
+"""HTML report generator with charts and styling."""
+
+import json
+import os
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+
+from ..models import (
+    PingResult, SpeedTestResult, DnsResult,
+    MtrResult, DiagnosticResult
+)
+
+
+def get_status_class(value: float, metric: str, thresholds: Dict, reverse: bool = False) -> str:
+    """Get CSS class based on threshold."""
+    metric_thresholds = thresholds.get(metric, {"good": 50, "warning": 100})
+
+    if reverse:
+        if value >= metric_thresholds["good"]:
+            return "good"
+        elif value >= metric_thresholds["warning"]:
+            return "warning"
+        else:
+            return "bad"
+    else:
+        if value <= metric_thresholds["good"]:
+            return "good"
+        elif value <= metric_thresholds["warning"]:
+            return "warning"
+        else:
+            return "bad"
+
+
+def generate_html(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    dns_results: List[DnsResult],
+    mtr_results: List[MtrResult],
+    expected_speed: float,
+    output_dir: str,
+    diagnostic: DiagnosticResult,
+    thresholds: Dict[str, Any],
+    historical_data: Optional[Dict] = None,
+) -> str:
+    """
+    Generate HTML report with charts.
+
+    Args:
+        ping_results: Ping test results
+        speedtest_result: Speed test result
+        dns_results: DNS test results
+        mtr_results: MTR results
+        expected_speed: Expected download speed in Mbps
+        output_dir: Directory to save HTML file
+        diagnostic: Diagnostic analysis result
+        thresholds: Threshold configuration
+        historical_data: Previous test results for comparison (optional)
+
+    Returns:
+        Path to generated HTML file
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Prepare data for charts
+    ping_labels = json.dumps([pr.target_name for pr in ping_results if pr.success])
+    ping_avg = json.dumps([pr.avg_ms for pr in ping_results if pr.success])
+    ping_min = json.dumps([pr.min_ms for pr in ping_results if pr.success])
+    ping_max = json.dumps([pr.max_ms for pr in ping_results if pr.success])
+    ping_jitter = json.dumps([pr.jitter_ms for pr in ping_results if pr.success])
+    ping_loss = json.dumps([pr.packet_loss for pr in ping_results if pr.success])
+
+    # MTR data for first target
+    mtr_hops_labels = "[]"
+    mtr_hops_latency = "[]"
+    mtr_hops_loss = "[]"
+    if mtr_results and mtr_results[0].success:
+        mtr_hops_labels = json.dumps([f"Hop {h.hop_number}" for h in mtr_results[0].hops])
+        mtr_hops_latency = json.dumps([h.avg_ms for h in mtr_results[0].hops])
+        mtr_hops_loss = json.dumps([h.loss_pct for h in mtr_results[0].hops])
+
+    # Calculate download percentage
+    dl_pct = (speedtest_result.download_mbps / expected_speed) * 100 if expected_speed > 0 and speedtest_result.success else 0
+
+    # Build latency table rows
+    latency_rows = _build_latency_rows(ping_results, thresholds)
+
+    # Build DNS table rows
+    dns_rows = _build_dns_rows(dns_results, thresholds)
+
+    # Build MTR sections
+    mtr_sections = _build_mtr_sections(mtr_results, thresholds)
+
+    # Build diagnostic section
+    diagnostic_section = _build_diagnostic_section(diagnostic)
+
+    # Build speed test section
+    speed_section = _build_speed_section(speedtest_result, expected_speed, dl_pct, thresholds)
+
+    # Build historical comparison if available
+    historical_section = ""
+    if historical_data:
+        historical_section = _build_historical_section(ping_results, speedtest_result, historical_data)
+
+    html = _generate_html_template(
+        timestamp=timestamp,
+        diagnostic_section=diagnostic_section,
+        speed_section=speed_section,
+        latency_rows=latency_rows,
+        dns_rows=dns_rows,
+        mtr_sections=mtr_sections,
+        historical_section=historical_section,
+        ping_labels=ping_labels,
+        ping_min=ping_min,
+        ping_avg=ping_avg,
+        ping_max=ping_max,
+        ping_jitter=ping_jitter,
+        ping_loss=ping_loss,
+        mtr_hops_labels=mtr_hops_labels,
+        mtr_hops_latency=mtr_hops_latency,
+        mtr_hops_loss=mtr_hops_loss,
+    )
+
+    # Write HTML file
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f"nettest_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+    filepath = os.path.join(output_dir, filename)
+
+    with open(filepath, 'w') as f:
+        f.write(html)
+
+    return filepath
+
+
+def _build_latency_rows(ping_results: List[PingResult], thresholds: Dict) -> str:
+    """Build HTML rows for latency table."""
+    rows = ""
+    for pr in ping_results:
+        if pr.success:
+            avg_class = get_status_class(pr.avg_ms, "latency", thresholds)
+            jitter_class = get_status_class(pr.jitter_ms, "jitter", thresholds)
+            loss_class = get_status_class(pr.packet_loss, "packet_loss", thresholds)
+            rows += f"""
+                <tr>
+                    <td>{pr.target_name}</td>
+                    <td>{pr.min_ms:.1f} ms</td>
+                    <td class="{avg_class}">{pr.avg_ms:.1f} ms</td>
+                    <td>{pr.max_ms:.1f} ms</td>
+                    <td class="{jitter_class}">{pr.jitter_ms:.1f} ms</td>
+                    <td class="{loss_class}">{pr.packet_loss:.1f}%</td>
+                </tr>
+            """
+        else:
+            rows += f"""
+                <tr>
+                    <td>{pr.target_name}</td>
+                    <td colspan="5" class="bad">Error: {pr.error}</td>
+                </tr>
+            """
+    return rows
+
+
+def _build_dns_rows(dns_results: List[DnsResult], thresholds: Dict) -> str:
+    """Build HTML rows for DNS table."""
+    rows = ""
+    for dr in dns_results:
+        if dr.success:
+            time_class = get_status_class(dr.resolution_time_ms, "latency", thresholds) if dr.resolution_time_ms > 0 else ""
+            time_str = f"{dr.resolution_time_ms:.0f} ms" if dr.resolution_time_ms > 0 else "N/A (IP)"
+            rows += f"""
+                <tr>
+                    <td>{dr.target}</td>
+                    <td>{dr.resolved_ip or '-'}</td>
+                    <td class="{time_class}">{time_str}</td>
+                </tr>
+            """
+        else:
+            rows += f"""
+                <tr>
+                    <td>{dr.target}</td>
+                    <td colspan="2" class="bad">{dr.error}</td>
+                </tr>
+            """
+    return rows
+
+
+def _build_mtr_sections(mtr_results: List[MtrResult], thresholds: Dict) -> str:
+    """Build HTML sections for MTR results."""
+    sections = ""
+    for mtr in mtr_results:
+        if mtr.success and mtr.hops:
+            hop_rows = ""
+            for hop in mtr.hops:
+                loss_class = get_status_class(hop.loss_pct, "packet_loss", thresholds)
+                avg_class = get_status_class(hop.avg_ms, "latency", thresholds)
+                hop_rows += f"""
+                    <tr>
+                        <td>{hop.hop_number}</td>
+                        <td>{hop.host}</td>
+                        <td class="{loss_class}">{hop.loss_pct:.1f}%</td>
+                        <td class="{avg_class}">{hop.avg_ms:.1f} ms</td>
+                        <td>{hop.best_ms:.1f} ms</td>
+                        <td>{hop.worst_ms:.1f} ms</td>
+                    </tr>
+                """
+            sections += f"""
+                <div class="section">
+                    <h2>Route to {mtr.target_name}</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Hop</th>
+                                <th>Host</th>
+                                <th>Loss</th>
+                                <th>Avg</th>
+                                <th>Best</th>
+                                <th>Worst</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {hop_rows}
+                        </tbody>
+                    </table>
+                </div>
+            """
+        else:
+            sections += f"""
+                <div class="section">
+                    <h2>Route to {mtr.target_name}</h2>
+                    <p class="bad">{mtr.error}</p>
+                </div>
+            """
+    return sections
+
+
+def _build_diagnostic_section(diagnostic: DiagnosticResult) -> str:
+    """Build HTML section for diagnostic summary."""
+    diag_colors = {
+        "none": "#22c55e",
+        "local": "#ef4444",
+        "isp": "#ef4444",
+        "internet": "#eab308",
+        "target": "#eab308",
+    }
+    diag_labels = {
+        "none": "No Issues",
+        "local": "Local Network Issue",
+        "isp": "ISP Issue",
+        "internet": "Internet Backbone Issue",
+        "target": "Target-Specific Issue",
+    }
+    diag_color = diag_colors.get(diagnostic.category, "#94a3b8")
+    diag_label = diag_labels.get(diagnostic.category, "Unknown")
+
+    details_html = ""
+    if diagnostic.details:
+        details_html = "<ul>" + "".join(f"<li>{d}</li>" for d in diagnostic.details) + "</ul>"
+
+    recommendations_html = ""
+    if diagnostic.recommendations:
+        recommendations_html = "<h4>Recommendations</h4><ul>" + "".join(f"<li>{r}</li>" for r in diagnostic.recommendations) + "</ul>"
+
+    return f"""
+        <div class="section diagnostic" style="border-left: 4px solid {diag_color};">
+            <div class="diag-header">
+                <span class="diag-badge" style="background: {diag_color};">{diag_label}</span>
+                <span class="diag-confidence">Confidence: {diagnostic.confidence}</span>
+            </div>
+            <h2 style="color: {diag_color};">{diagnostic.summary}</h2>
+            {details_html}
+            {recommendations_html}
+        </div>
+    """
+
+
+def _build_speed_section(
+    speedtest_result: SpeedTestResult,
+    expected_speed: float,
+    dl_pct: float,
+    thresholds: Dict
+) -> str:
+    """Build HTML section for speed test results."""
+    if speedtest_result.success:
+        dl_class = get_status_class(dl_pct, "download_pct", thresholds, reverse=True)
+        ping_class = get_status_class(speedtest_result.ping_ms, "latency", thresholds)
+        return f"""
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">Download</div>
+                    <div class="card-value {dl_class}">{speedtest_result.download_mbps:.1f} Mbps</div>
+                    <div class="card-subtitle">{dl_pct:.0f}% of {expected_speed} Mbps expected</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Upload</div>
+                    <div class="card-value">{speedtest_result.upload_mbps:.1f} Mbps</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Ping</div>
+                    <div class="card-value {ping_class}">{speedtest_result.ping_ms:.1f} ms</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Server</div>
+                    <div class="card-value small">{speedtest_result.server}</div>
+                </div>
+            </div>
+        """
+    else:
+        return f'<p class="bad">{speedtest_result.error}</p>'
+
+
+def _build_historical_section(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    historical: Dict
+) -> str:
+    """Build HTML section for historical comparison."""
+    prev_ping = {p["target_name"]: p for p in historical.get("ping", [])}
+    prev_speed = historical.get("speedtest", {})
+
+    rows = ""
+    for result in ping_results:
+        if result.success:
+            prev = prev_ping.get(result.target_name, {})
+            prev_avg = prev.get("avg_ms", 0)
+            if prev_avg > 0:
+                diff = result.avg_ms - prev_avg
+                pct = (diff / prev_avg) * 100
+                if abs(pct) < 5:
+                    change_class = ""
+                    change_text = "stable"
+                elif diff < 0:
+                    change_class = "good"
+                    change_text = f"↓ {abs(diff):.1f}ms ({abs(pct):.0f}%)"
+                else:
+                    change_class = "bad"
+                    change_text = f"↑ {diff:.1f}ms ({pct:.0f}%)"
+
+                rows += f"""
+                    <tr>
+                        <td>{result.target_name}</td>
+                        <td>{result.avg_ms:.1f}ms</td>
+                        <td>{prev_avg:.1f}ms</td>
+                        <td class="{change_class}">{change_text}</td>
+                    </tr>
+                """
+
+    if speedtest_result.success and prev_speed.get("success"):
+        prev_dl = prev_speed.get("download_mbps", 0)
+        if prev_dl > 0:
+            diff = speedtest_result.download_mbps - prev_dl
+            pct = (diff / prev_dl) * 100
+            if abs(pct) < 5:
+                change_class = ""
+                change_text = "stable"
+            elif diff > 0:
+                change_class = "good"
+                change_text = f"↑ {diff:.1f}Mbps ({pct:.0f}%)"
+            else:
+                change_class = "bad"
+                change_text = f"↓ {abs(diff):.1f}Mbps ({abs(pct):.0f}%)"
+
+            rows += f"""
+                <tr>
+                    <td>Download Speed</td>
+                    <td>{speedtest_result.download_mbps:.1f}Mbps</td>
+                    <td>{prev_dl:.1f}Mbps</td>
+                    <td class="{change_class}">{change_text}</td>
+                </tr>
+            """
+
+    if not rows:
+        return ""
+
+    return f"""
+        <div class="section">
+            <h2>Comparison with Previous Run</h2>
+            <p class="dim">Previous: {historical.get('timestamp', 'Unknown')}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Current</th>
+                        <th>Previous</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows}
+                </tbody>
+            </table>
+        </div>
+    """
+
+
+def _generate_html_template(**kwargs) -> str:
+    """Generate the full HTML template with all sections."""
+    return f"""<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Test Report - {kwargs['timestamp']}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        :root {{
+            --good: #22c55e;
+            --warning: #eab308;
+            --bad: #ef4444;
+            --bg: #0f172a;
+            --bg-card: #1e293b;
+            --text: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border: #334155;
+        }}
+
+        [data-theme="light"] {{
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #0f172a;
+            --text-dim: #64748b;
+            --border: #e2e8f0;
+        }}
+
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 2rem;
+            transition: background-color 0.3s, color 0.3s;
+        }}
+
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }}
+
+        h1 {{
+            color: var(--text);
+        }}
+
+        .timestamp {{
+            color: var(--text-dim);
+        }}
+
+        .theme-toggle {{
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.875rem;
+        }}
+
+        .theme-toggle:hover {{
+            border-color: var(--text-dim);
+        }}
+
+        .section {{
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }}
+
+        .section h2 {{
+            margin-bottom: 1rem;
+            color: var(--text);
+            font-size: 1.25rem;
+        }}
+
+        .cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }}
+
+        .card {{
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid var(--border);
+        }}
+
+        .card-title {{
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+
+        .card-value {{
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }}
+
+        .card-value.small {{
+            font-size: 1rem;
+        }}
+
+        .card-subtitle {{
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+        }}
+
+        th, td {{
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }}
+
+        th {{
+            color: var(--text-dim);
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }}
+
+        .good {{ color: var(--good); }}
+        .warning {{ color: var(--warning); }}
+        .bad {{ color: var(--bad); }}
+        .dim {{ color: var(--text-dim); }}
+
+        .chart-container {{
+            position: relative;
+            height: 300px;
+            margin-top: 1rem;
+        }}
+
+        .charts-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 1.5rem;
+        }}
+
+        .diagnostic {{
+            margin-bottom: 2rem;
+        }}
+
+        .diag-header {{
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }}
+
+        .diag-badge {{
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--bg);
+        }}
+
+        .diag-confidence {{
+            color: var(--text-dim);
+            font-size: 0.875rem;
+        }}
+
+        .diagnostic ul {{
+            list-style: none;
+            padding: 0;
+            margin: 0.5rem 0;
+        }}
+
+        .diagnostic li {{
+            padding: 0.25rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }}
+
+        .diagnostic li::before {{
+            content: "-";
+            position: absolute;
+            left: 0.5rem;
+            color: var(--text-dim);
+        }}
+
+        .diagnostic h4 {{
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }}
+
+        .export-buttons {{
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }}
+
+        .export-btn {{
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.75rem;
+        }}
+
+        .export-btn:hover {{
+            border-color: var(--text-dim);
+        }}
+
+        @media (max-width: 600px) {{
+            .charts-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            body {{
+                padding: 1rem;
+            }}
+
+            .header {{
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }}
+        }}
+
+        @media print {{
+            body {{
+                background: white;
+                color: black;
+            }}
+            .theme-toggle, .export-buttons {{
+                display: none;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>Network Test Report</h1>
+                <p class="timestamp">{kwargs['timestamp']}</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
+        </div>
+
+        {kwargs['diagnostic_section']}
+
+        <div class="section">
+            <h2>Speed Test</h2>
+            {kwargs['speed_section']}
+        </div>
+
+        <div class="section">
+            <h2>Latency Tests</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Min</th>
+                        <th>Avg</th>
+                        <th>Max</th>
+                        <th>Jitter</th>
+                        <th>Loss</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {kwargs['latency_rows']}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>DNS Resolution</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Resolved IP</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {kwargs['dns_rows']}
+                </tbody>
+            </table>
+        </div>
+
+        {kwargs['mtr_sections']}
+
+        {kwargs['historical_section']}
+
+        <div class="charts-grid">
+            <div class="section">
+                <h2>Latency Comparison</h2>
+                <div class="chart-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Jitter & Packet Loss</h2>
+                <div class="chart-container">
+                    <canvas id="jitterChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Route Latency (First Target)</h2>
+                <div class="chart-container">
+                    <canvas id="mtrChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="export-buttons">
+            <button class="export-btn" onclick="copyJSON()">Copy as JSON</button>
+            <button class="export-btn" onclick="window.print()">Print Report</button>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle
+        function toggleTheme() {{
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }}
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {{
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }}
+
+        // Copy results as JSON
+        function copyJSON() {{
+            const data = {{
+                timestamp: '{kwargs['timestamp']}',
+                ping: {kwargs['ping_avg']},
+                labels: {kwargs['ping_labels']}
+            }};
+            navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+                .then(() => alert('Copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        }}
+
+        const chartColors = {{
+            good: '#22c55e',
+            warning: '#eab308',
+            bad: '#ef4444',
+            blue: '#3b82f6',
+            purple: '#8b5cf6',
+            cyan: '#06b6d4',
+        }};
+
+        const zoomOptions = {{
+            zoom: {{
+                wheel: {{ enabled: true }},
+                pinch: {{ enabled: true }},
+                mode: 'xy',
+            }},
+            pan: {{
+                enabled: true,
+                mode: 'xy',
+            }}
+        }};
+
+        // Latency Chart
+        new Chart(document.getElementById('latencyChart'), {{
+            type: 'bar',
+            data: {{
+                labels: {kwargs['ping_labels']},
+                datasets: [
+                    {{
+                        label: 'Min',
+                        data: {kwargs['ping_min']},
+                        backgroundColor: chartColors.good,
+                    }},
+                    {{
+                        label: 'Avg',
+                        data: {kwargs['ping_avg']},
+                        backgroundColor: chartColors.blue,
+                    }},
+                    {{
+                        label: 'Max',
+                        data: {kwargs['ping_max']},
+                        backgroundColor: chartColors.warning,
+                    }},
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{
+                        labels: {{ color: '#f1f5f9' }}
+                    }},
+                    zoom: zoomOptions
+                }},
+                scales: {{
+                    x: {{
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }}
+                    }},
+                    y: {{
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }},
+                        title: {{
+                            display: true,
+                            text: 'Latency (ms)',
+                            color: '#94a3b8'
+                        }}
+                    }}
+                }}
+            }}
+        }});
+
+        // Jitter & Loss Chart
+        new Chart(document.getElementById('jitterChart'), {{
+            type: 'bar',
+            data: {{
+                labels: {kwargs['ping_labels']},
+                datasets: [
+                    {{
+                        label: 'Jitter (ms)',
+                        data: {kwargs['ping_jitter']},
+                        backgroundColor: chartColors.purple,
+                        yAxisID: 'y',
+                    }},
+                    {{
+                        label: 'Packet Loss (%)',
+                        data: {kwargs['ping_loss']},
+                        backgroundColor: chartColors.bad,
+                        yAxisID: 'y1',
+                    }},
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{
+                        labels: {{ color: '#f1f5f9' }}
+                    }},
+                    zoom: zoomOptions
+                }},
+                scales: {{
+                    x: {{
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }}
+                    }},
+                    y: {{
+                        type: 'linear',
+                        position: 'left',
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }},
+                        title: {{
+                            display: true,
+                            text: 'Jitter (ms)',
+                            color: '#94a3b8'
+                        }}
+                    }},
+                    y1: {{
+                        type: 'linear',
+                        position: 'right',
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ drawOnChartArea: false }},
+                        title: {{
+                            display: true,
+                            text: 'Packet Loss (%)',
+                            color: '#94a3b8'
+                        }}
+                    }}
+                }}
+            }}
+        }});
+
+        // MTR Chart
+        new Chart(document.getElementById('mtrChart'), {{
+            type: 'line',
+            data: {{
+                labels: {kwargs['mtr_hops_labels']},
+                datasets: [
+                    {{
+                        label: 'Latency (ms)',
+                        data: {kwargs['mtr_hops_latency']},
+                        borderColor: chartColors.cyan,
+                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y',
+                    }},
+                    {{
+                        label: 'Packet Loss (%)',
+                        data: {kwargs['mtr_hops_loss']},
+                        borderColor: chartColors.bad,
+                        backgroundColor: 'transparent',
+                        borderDash: [5, 5],
+                        yAxisID: 'y1',
+                    }},
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{
+                        labels: {{ color: '#f1f5f9' }}
+                    }},
+                    zoom: zoomOptions
+                }},
+                scales: {{
+                    x: {{
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }}
+                    }},
+                    y: {{
+                        type: 'linear',
+                        position: 'left',
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ color: '#334155' }},
+                        title: {{
+                            display: true,
+                            text: 'Latency (ms)',
+                            color: '#94a3b8'
+                        }}
+                    }},
+                    y1: {{
+                        type: 'linear',
+                        position: 'right',
+                        ticks: {{ color: '#94a3b8' }},
+                        grid: {{ drawOnChartArea: false }},
+                        title: {{
+                            display: true,
+                            text: 'Packet Loss (%)',
+                            color: '#94a3b8'
+                        }}
+                    }}
+                }}
+            }}
+        }});
+    </script>
+</body>
+</html>
+"""
