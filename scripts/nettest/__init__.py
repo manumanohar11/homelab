@@ -15,6 +15,7 @@ from .models import (
     MtrHop,
     MtrResult,
     DiagnosticResult,
+    ConnectionScore,
     PortResult,
     HttpResult,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "MtrHop",
     "MtrResult",
     "DiagnosticResult",
+    "ConnectionScore",
     "PortResult",
     "HttpResult",
     "__version__",

@@ -77,6 +77,17 @@ class DiagnosticResult:
 
 
 @dataclass
+class ConnectionScore:
+    """Overall connection health score."""
+    overall: int              # 0-100
+    grade: str                # A+, A, B+, B, C, D, F
+    speed_score: int          # 0-100
+    latency_score: int        # 0-100
+    stability_score: int      # 0-100
+    summary: str              # "Fair - ISP issues detected"
+
+
+@dataclass
 class PortResult:
     """Result of a TCP port connectivity test."""
     host: str
