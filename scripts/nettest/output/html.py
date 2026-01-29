@@ -648,6 +648,38 @@ def _generate_html_template(**kwargs) -> str:
             border-color: var(--text-dim);
         }}
 
+        .tab-container {{
+            margin-bottom: 1rem;
+        }}
+
+        .tab-buttons {{
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }}
+
+        .tab-btn {{
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }}
+
+        .tab-btn:hover {{
+            border-color: var(--text-dim);
+        }}
+
+        .tab-btn.active {{
+            background: var(--good);
+            color: var(--bg);
+            border-color: var(--good);
+        }}
+
         @media (max-width: 600px) {{
             .charts-grid {{
                 grid-template-columns: 1fr;
@@ -747,9 +779,14 @@ def _generate_html_template(**kwargs) -> str:
             </div>
 
             <div class="section">
-                <h2>Route Latency (First Target)</h2>
-                <div class="chart-container">
-                    <canvas id="mtrChart"></canvas>
+                <h2>Route Analysis</h2>
+                <div class="tab-container">
+                    <div class="tab-buttons" id="mtrTabs"></div>
+                    <div id="mtrChartContainer">
+                        <div class="chart-container">
+                            <canvas id="mtrChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -919,70 +956,123 @@ def _generate_html_template(**kwargs) -> str:
             }}
         }});
 
-        // MTR Chart
-        new Chart(document.getElementById('mtrChart'), {{
-            type: 'line',
-            data: {{
-                labels: {kwargs['mtr_hops_labels']},
-                datasets: [
-                    {{
-                        label: 'Latency (ms)',
-                        data: {kwargs['mtr_hops_latency']},
-                        borderColor: chartColors.cyan,
-                        backgroundColor: 'rgba(6, 182, 212, 0.1)',
-                        fill: true,
-                        tension: 0.3,
-                        yAxisID: 'y',
-                    }},
-                    {{
-                        label: 'Packet Loss (%)',
-                        data: {kwargs['mtr_hops_loss']},
-                        borderColor: chartColors.bad,
-                        backgroundColor: 'transparent',
-                        borderDash: [5, 5],
-                        yAxisID: 'y1',
-                    }},
-                ]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{
-                    legend: {{
-                        labels: {{ color: '#f1f5f9' }}
-                    }},
-                    zoom: zoomOptions
+        // MTR Chart with route selector
+        const mtrData = {kwargs['mtr_all_routes']};
+        let currentMtrChart = null;
+
+        function createMtrTabs() {{
+            const tabContainer = document.getElementById('mtrTabs');
+            if (!mtrData.target_names || mtrData.target_names.length === 0) {{
+                tabContainer.textContent = 'No route data available';
+                tabContainer.className = 'dim';
+                return;
+            }}
+
+            mtrData.target_names.forEach((name, index) => {{
+                const btn = document.createElement('button');
+                btn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+                btn.textContent = name;
+                btn.onclick = () => selectMtrRoute(index);
+                tabContainer.appendChild(btn);
+            }});
+
+            if (mtrData.routes.length > 0) {{
+                renderMtrChart(0);
+            }}
+        }}
+
+        function selectMtrRoute(index) {{
+            document.querySelectorAll('#mtrTabs .tab-btn').forEach((btn, i) => {{
+                btn.classList.toggle('active', i === index);
+            }});
+            renderMtrChart(index);
+        }}
+
+        function renderMtrChart(routeIndex) {{
+            const route = mtrData.routes[routeIndex];
+            if (!route) return;
+
+            if (currentMtrChart) {{
+                currentMtrChart.destroy();
+            }}
+
+            const ctx = document.getElementById('mtrChart').getContext('2d');
+            currentMtrChart = new Chart(ctx, {{
+                type: 'line',
+                data: {{
+                    labels: route.labels,
+                    datasets: [
+                        {{
+                            label: 'Latency (ms)',
+                            data: route.latency,
+                            borderColor: chartColors.cyan,
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                        }},
+                        {{
+                            label: 'Packet Loss (%)',
+                            data: route.loss,
+                            borderColor: chartColors.bad,
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            yAxisID: 'y1',
+                        }},
+                    ]
                 }},
-                scales: {{
-                    x: {{
-                        ticks: {{ color: '#94a3b8' }},
-                        grid: {{ color: '#334155' }}
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            labels: {{ color: '#f1f5f9' }}
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                afterLabel: function(context) {{
+                                    const hopIndex = context.dataIndex;
+                                    return 'Host: ' + route.hosts[hopIndex];
+                                }}
+                            }}
+                        }},
+                        zoom: zoomOptions
                     }},
-                    y: {{
-                        type: 'linear',
-                        position: 'left',
-                        ticks: {{ color: '#94a3b8' }},
-                        grid: {{ color: '#334155' }},
-                        title: {{
-                            display: true,
-                            text: 'Latency (ms)',
-                            color: '#94a3b8'
-                        }}
-                    }},
-                    y1: {{
-                        type: 'linear',
-                        position: 'right',
-                        ticks: {{ color: '#94a3b8' }},
-                        grid: {{ drawOnChartArea: false }},
-                        title: {{
-                            display: true,
-                            text: 'Packet Loss (%)',
-                            color: '#94a3b8'
+                    scales: {{
+                        x: {{
+                            ticks: {{ color: '#94a3b8' }},
+                            grid: {{ color: '#334155' }}
+                        }},
+                        y: {{
+                            type: 'linear',
+                            position: 'left',
+                            ticks: {{ color: '#94a3b8' }},
+                            grid: {{ color: '#334155' }},
+                            title: {{
+                                display: true,
+                                text: 'Latency (ms)',
+                                color: '#94a3b8'
+                            }}
+                        }},
+                        y1: {{
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            ticks: {{ color: '#94a3b8' }},
+                            grid: {{ drawOnChartArea: false }},
+                            title: {{
+                                display: true,
+                                text: 'Packet Loss (%)',
+                                color: '#94a3b8'
+                            }}
                         }}
                     }}
                 }}
-            }}
-        }});
+            }});
+        }}
+
+        createMtrTabs();
     </script>
 </body>
 </html>
