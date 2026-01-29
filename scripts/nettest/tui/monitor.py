@@ -10,8 +10,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import box
 
-from ..models import PingResult
+from ..models import PingResult, SpeedTestResult
 from ..tests.ping import run_ping_test
+from ..tests.stability import calculate_mos_score
 from ..output.terminal import evaluate_metric
 
 
@@ -59,10 +60,57 @@ def run_monitor_mode(
         """Generate the monitoring dashboard table."""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+        # Calculate aggregate metrics for summary
+        successful_results = [r for r in results if r.success]
+        if successful_results:
+            avg_latency = sum(r.avg_ms for r in successful_results) / len(successful_results)
+            avg_jitter = sum(r.jitter_ms for r in successful_results) / len(successful_results)
+            avg_loss = sum(r.packet_loss for r in successful_results) / len(successful_results)
+
+            # Calculate VoIP quality
+            voip = calculate_mos_score(avg_latency, avg_jitter, avg_loss)
+
+            # Determine overall health
+            if avg_loss == 0 and avg_latency < 50:
+                health_status = "[green]● HEALTHY[/green]"
+            elif avg_loss < 5 and avg_latency < 100:
+                health_status = "[yellow]● FAIR[/yellow]"
+            else:
+                health_status = "[red]● DEGRADED[/red]"
+
+            # Add VoIP quality color
+            if voip.mos_score >= 4.0:
+                mos_color = "green"
+            elif voip.mos_score >= 3.6:
+                mos_color = "yellow"
+            else:
+                mos_color = "red"
+        else:
+            health_status = "[red]● NO DATA[/red]"
+            voip = None
+            mos_color = "red"
+
+        # Change the table title to include summary
+        if successful_results and voip:
+            title = (
+                f"[bold blue]Network Monitor[/bold blue] - Round {round_num}  |  "
+                f"{health_status}  |  "
+                f"VoIP: [{mos_color}]{voip.mos_score:.1f} ({voip.quality})[/{mos_color}]"
+            )
+        else:
+            title = f"[bold blue]Network Monitor[/bold blue] - Round {round_num}"
+
+        # Build caption with additional info
+        caption_parts = [f"Last update: {now}", f"Interval: {interval}s", "Ctrl+C to stop"]
+        if successful_results and voip:
+            caption_parts.insert(1, f"Avg latency: {avg_latency:.0f}ms")
+            if voip.suitable_for:
+                caption_parts.insert(2, f"Suitable: {', '.join(voip.suitable_for[:2])}")
+
         # Main table
         table = Table(
-            title=f"[bold blue]Network Monitor[/bold blue] - Round {round_num}",
-            caption=f"Last update: {now} | Interval: {interval}s | Ctrl+C to stop",
+            title=title,
+            caption=" | ".join(caption_parts),
             box=box.ROUNDED,
             header_style="bold cyan",
             show_lines=True
