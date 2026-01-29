@@ -18,6 +18,7 @@ from .models import (
     ConnectionScore,
     BufferbloatResult,
     VoIPQuality,
+    ISPEvidence,
     PortResult,
     HttpResult,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "ConnectionScore",
     "BufferbloatResult",
     "VoIPQuality",
+    "ISPEvidence",
     "PortResult",
     "HttpResult",
     "__version__",

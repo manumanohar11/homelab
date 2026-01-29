@@ -108,6 +108,18 @@ class VoIPQuality:
 
 
 @dataclass
+class ISPEvidence:
+    """Documentation-ready evidence for ISP complaints."""
+    timestamp: str = ""
+    summary: str = ""
+    speed_complaint: str = ""  # "Download 53 Mbps vs 100 Mbps expected (47% deficit)"
+    packet_loss_complaint: str = ""  # "10% packet loss to Cloudflare DNS"
+    latency_complaint: str = ""  # "Average latency 115ms (expected <50ms)"
+    problem_hops: List[str] = field(default_factory=list)  # ["Hop 5: 103.77.108.118 - 90% loss"]
+    recommendations: List[str] = field(default_factory=list)
+
+
+@dataclass
 class PortResult:
     """Result of a TCP port connectivity test."""
     host: str
