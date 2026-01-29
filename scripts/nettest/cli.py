@@ -17,6 +17,7 @@ from .tests import (
     check_tcp_port,
     measure_http_latency,
     calculate_connection_score,
+    calculate_mos_score,
 )
 from .tests.ping import run_ping_test
 from .output import display_terminal, generate_html, output_json
@@ -432,6 +433,16 @@ def main() -> None:
         expected_speed=expected_speed,
     )
 
+    # Calculate VoIP quality from ping results
+    voip_quality = None
+    if ping_results:
+        successful_pings = [p for p in ping_results if p.success]
+        if successful_pings:
+            avg_latency = sum(p.avg_ms for p in successful_pings) / len(successful_pings)
+            avg_jitter = sum(p.jitter_ms for p in successful_pings) / len(successful_pings)
+            avg_loss = sum(p.packet_loss for p in successful_pings) / len(successful_pings)
+            voip_quality = calculate_mos_score(avg_latency, avg_jitter, avg_loss)
+
     # Update Prometheus metrics if enabled
     if args.prometheus_port:
         try:
@@ -473,6 +484,7 @@ def main() -> None:
             thresholds,
             historical_data=previous_history,
             connection_score=connection_score,
+            voip_quality=voip_quality,
         )
         if not suppress_output:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")
