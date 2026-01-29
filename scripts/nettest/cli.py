@@ -18,9 +18,10 @@ from .tests import (
     measure_http_latency,
     calculate_connection_score,
     calculate_mos_score,
+    detect_bufferbloat,
 )
 from .tests.ping import run_ping_test
-from .output import display_terminal, generate_html, output_json
+from .output import display_terminal, generate_html, output_json, generate_isp_evidence, export_csv
 from .tui import run_interactive_mode, run_monitor_mode
 from .utils import check_dependencies, REQUIRED_TOOLS, JsonLogger
 from .utils.history import save_history, load_history, show_history_comparison
@@ -97,6 +98,16 @@ Examples:
         type=str,
         default=None,
         help="Directory for HTML report"
+    )
+    parser.add_argument(
+        "--bufferbloat",
+        action="store_true",
+        help="Run bufferbloat detection test"
+    )
+    parser.add_argument(
+        "--export-csv",
+        action="store_true",
+        help="Export results to CSV files"
     )
     parser.add_argument(
         "--no-browser",
@@ -443,6 +454,21 @@ def main() -> None:
             avg_loss = sum(p.packet_loss for p in successful_pings) / len(successful_pings)
             voip_quality = calculate_mos_score(avg_latency, avg_jitter, avg_loss)
 
+    # Generate ISP evidence
+    isp_evidence = generate_isp_evidence(
+        ping_results, speedtest_result, mtr_results, diagnostic, expected_speed
+    )
+
+    # Run bufferbloat test if requested
+    if args.bufferbloat:
+        if not suppress_output:
+            console.print("[dim]Running bufferbloat test...[/dim]")
+        bufferbloat_result = detect_bufferbloat(interface=args.interface)
+        if bufferbloat_result.success:
+            console.print(f"[green]Bufferbloat: Grade {bufferbloat_result.bloat_grade} ({bufferbloat_result.idle_latency_ms:.1f}ms baseline)[/green]")
+        else:
+            console.print(f"[yellow]Bufferbloat test failed: {bufferbloat_result.error}[/yellow]")
+
     # Update Prometheus metrics if enabled
     if args.prometheus_port:
         try:
@@ -485,9 +511,19 @@ def main() -> None:
             historical_data=previous_history,
             connection_score=connection_score,
             voip_quality=voip_quality,
+            isp_evidence=isp_evidence,
         )
         if not suppress_output:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")
+
+        # Export CSV if requested
+        if args.export_csv:
+            csv_dir = export_csv(
+                ping_results, speedtest_result, dns_results, mtr_results,
+                output_dir=output_dir
+            )
+            if not suppress_output:
+                console.print(f"[green]CSV files saved to: {csv_dir}[/green]")
 
         # Open in browser
         if open_browser and args.format != "html":
