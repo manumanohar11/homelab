@@ -73,17 +73,33 @@ def run_wizard(config: Dict[str, Any], console: Console) -> Optional[str]:
 
         config = _configure_logging(config, console)
 
-        # Step 6: Profiles
+        # Step 6: Quality Tests
         console.print()
-        console.print("[bold cyan]Step 6: Test Profiles[/bold cyan]")
+        console.print("[bold cyan]Step 6: Quality Tests[/bold cyan]")
+        console.print("[dim]Configure bufferbloat and VoIP quality testing.[/dim]")
+        console.print()
+
+        config = _configure_quality_tests(config, console)
+
+        # Step 7: Export Options
+        console.print()
+        console.print("[bold cyan]Step 7: Export Options[/bold cyan]")
+        console.print("[dim]Configure default export formats.[/dim]")
+        console.print()
+
+        config = _configure_exports(config, console)
+
+        # Step 8: Profiles
+        console.print()
+        console.print("[bold cyan]Step 8: Test Profiles[/bold cyan]")
         console.print("[dim]Create named configurations for different scenarios.[/dim]")
         console.print()
 
         config = _configure_profiles(config, console)
 
-        # Step 7: Review and save
+        # Step 9: Review and save
         console.print()
-        console.print("[bold cyan]Step 7: Review & Save[/bold cyan]")
+        console.print("[bold cyan]Step 9: Review & Save[/bold cyan]")
         console.print()
 
         _display_summary(config, console)
@@ -264,6 +280,48 @@ def _configure_logging(config: Dict[str, Any], console: Console) -> Dict[str, An
     return config
 
 
+def _configure_quality_tests(config: Dict[str, Any], console: Console) -> Dict[str, Any]:
+    """Configure quality test settings."""
+    quality = config.get("quality_tests", {})
+
+    console.print(f"Bufferbloat detection: {quality.get('bufferbloat', False)}")
+    console.print(f"VoIP quality (MOS): {quality.get('voip_quality', True)}")
+
+    if Confirm.ask("\nConfigure quality tests?", default=False):
+        quality["bufferbloat"] = Confirm.ask(
+            "Enable bufferbloat detection?",
+            default=quality.get("bufferbloat", False)
+        )
+        quality["voip_quality"] = Confirm.ask(
+            "Enable VoIP quality calculation (MOS score)?",
+            default=quality.get("voip_quality", True)
+        )
+        config["quality_tests"] = quality
+
+    return config
+
+
+def _configure_exports(config: Dict[str, Any], console: Console) -> Dict[str, Any]:
+    """Configure export options."""
+    exports = config.get("exports", {})
+
+    console.print(f"CSV export enabled: {exports.get('csv', False)}")
+    console.print(f"Auto-generate ISP evidence: {exports.get('isp_evidence', True)}")
+
+    if Confirm.ask("\nConfigure export options?", default=False):
+        exports["csv"] = Confirm.ask(
+            "Enable CSV export by default?",
+            default=exports.get("csv", False)
+        )
+        exports["isp_evidence"] = Confirm.ask(
+            "Auto-generate ISP evidence when issues detected?",
+            default=exports.get("isp_evidence", True)
+        )
+        config["exports"] = exports
+
+    return config
+
+
 def _configure_profiles(config: Dict[str, Any], console: Console) -> Dict[str, Any]:
     """Configure test profiles."""
     profiles = config.get("profiles", {})
@@ -338,6 +396,18 @@ def _display_summary(config: Dict[str, Any], console: Console) -> None:
     console.print(f"  Enabled: {logging.get('enabled', False)}")
     if logging.get("enabled"):
         console.print(f"  File: {logging.get('file')}")
+
+    # Quality Tests
+    quality = config.get("quality_tests", {})
+    console.print("\n[bold]Quality Tests:[/bold]")
+    console.print(f"  Bufferbloat detection: {quality.get('bufferbloat', False)}")
+    console.print(f"  VoIP quality (MOS): {quality.get('voip_quality', True)}")
+
+    # Exports
+    exports = config.get("exports", {})
+    console.print("\n[bold]Exports:[/bold]")
+    console.print(f"  CSV export: {exports.get('csv', False)}")
+    console.print(f"  ISP evidence: {exports.get('isp_evidence', True)}")
 
     # Profiles
     profiles = config.get("profiles", {})
