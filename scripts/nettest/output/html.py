@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult
+    MtrResult, DiagnosticResult, ConnectionScore
 )
 
 
@@ -120,6 +120,7 @@ def generate_html(
     diagnostic: DiagnosticResult,
     thresholds: Dict[str, Any],
     historical_data: Optional[Dict] = None,
+    connection_score: Optional[ConnectionScore] = None,
 ) -> str:
     """
     Generate HTML report with charts.
@@ -178,8 +179,14 @@ def generate_html(
     if historical_data:
         historical_section = _build_historical_section(ping_results, speedtest_result, historical_data)
 
+    # Build executive summary
+    executive_summary = _build_executive_summary(
+        connection_score, speedtest_result, ping_results, expected_speed
+    )
+
     html = _generate_html_template(
         timestamp=timestamp,
+        executive_summary=executive_summary,
         diagnostic_section=diagnostic_section,
         speed_section=speed_section,
         latency_rows=latency_rows,
@@ -467,6 +474,88 @@ def _build_historical_section(
     """
 
 
+def _build_executive_summary(
+    connection_score: Optional[ConnectionScore],
+    speedtest_result: SpeedTestResult,
+    ping_results: List[PingResult],
+    expected_speed: float,
+) -> str:
+    """Build the executive summary section with health gauge."""
+    if connection_score is None:
+        return ""
+
+    # Determine gauge color
+    if connection_score.overall >= 80:
+        gauge_color = "var(--good)"
+    elif connection_score.overall >= 60:
+        gauge_color = "var(--warning)"
+    else:
+        gauge_color = "var(--bad)"
+
+    # Calculate metrics
+    speed_pct = int((speedtest_result.download_mbps / expected_speed) * 100) if expected_speed > 0 and speedtest_result.success else 0
+
+    avg_latency = 0
+    avg_loss = 0
+    successful_pings = [p for p in ping_results if p.success]
+    if successful_pings:
+        avg_latency = sum(p.avg_ms for p in successful_pings) / len(successful_pings)
+        avg_loss = sum(p.packet_loss for p in successful_pings) / len(successful_pings)
+
+    # Color classes
+    speed_class = "good" if speed_pct >= 80 else ("warning" if speed_pct >= 50 else "bad")
+    latency_class = "good" if avg_latency < 50 else ("warning" if avg_latency < 100 else "bad")
+    loss_class = "good" if avg_loss == 0 else ("warning" if avg_loss < 5 else "bad")
+
+    return f"""
+        <div class="section executive-summary">
+            <div class="summary-grid">
+                <div class="health-gauge" style="--gauge-value: {connection_score.overall}; --gauge-color: {gauge_color};">
+                    <div class="gauge-circle">
+                        <div class="gauge-inner">
+                            <span class="gauge-score" style="color: {gauge_color};">{connection_score.overall}</span>
+                            <span class="gauge-label">Health</span>
+                            <span class="gauge-grade" style="color: {gauge_color};">{connection_score.grade}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-details">
+                    <div>
+                        <div class="summary-title">Connection Health</div>
+                        <div class="summary-subtitle">{connection_score.summary}</div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-pill">
+                            <span class="metric-value {speed_class}">{speed_pct}%</span>
+                            <span class="metric-label">Speed</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value {latency_class}">{avg_latency:.0f}ms</span>
+                            <span class="metric-label">Latency</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value {loss_class}">{avg_loss:.1f}%</span>
+                            <span class="metric-label">Loss</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{connection_score.speed_score}</span>
+                            <span class="metric-label">Speed Score</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{connection_score.latency_score}</span>
+                            <span class="metric-label">Latency Score</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{connection_score.stability_score}</span>
+                            <span class="metric-label">Stability</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    """
+
+
 def _generate_html_template(**kwargs) -> str:
     """Generate the full HTML template with all sections."""
     return f"""<!DOCTYPE html>
@@ -735,6 +824,109 @@ def _generate_html_template(**kwargs) -> str:
             border-color: var(--good);
         }}
 
+        .executive-summary {{
+            margin-bottom: 2rem;
+        }}
+
+        .summary-grid {{
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 2rem;
+            align-items: center;
+        }}
+
+        .health-gauge {{
+            position: relative;
+            width: 180px;
+            height: 180px;
+        }}
+
+        .gauge-circle {{
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(
+                var(--gauge-color) calc(var(--gauge-value) * 3.6deg),
+                var(--border) calc(var(--gauge-value) * 3.6deg)
+            );
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+
+        .gauge-inner {{
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }}
+
+        .gauge-score {{
+            font-size: 3rem;
+            font-weight: bold;
+            line-height: 1;
+        }}
+
+        .gauge-label {{
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }}
+
+        .gauge-grade {{
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-top: 0.25rem;
+        }}
+
+        .summary-details {{
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }}
+
+        .summary-title {{
+            font-size: 1.5rem;
+            font-weight: 600;
+        }}
+
+        .summary-subtitle {{
+            color: var(--text-dim);
+            font-size: 1rem;
+        }}
+
+        .metric-row {{
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }}
+
+        .metric-pill {{
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }}
+
+        .metric-value {{
+            font-size: 1.25rem;
+            font-weight: 600;
+        }}
+
+        .metric-label {{
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }}
+
         @media (max-width: 600px) {{
             .charts-grid {{
                 grid-template-columns: 1fr;
@@ -747,6 +939,12 @@ def _generate_html_template(**kwargs) -> str:
             .header {{
                 flex-direction: column;
                 gap: 1rem;
+                text-align: center;
+            }}
+
+            .summary-grid {{
+                grid-template-columns: 1fr;
+                justify-items: center;
                 text-align: center;
             }}
         }}
@@ -771,6 +969,8 @@ def _generate_html_template(**kwargs) -> str:
             </div>
             <button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
         </div>
+
+        {kwargs.get('executive_summary', '')}
 
         {kwargs['diagnostic_section']}
 
