@@ -59,6 +59,57 @@ def _prepare_mtr_chart_data(mtr_results: List[MtrResult]) -> Dict[str, Any]:
     return chart_data
 
 
+def _build_route_heatmap(mtr_results: List[MtrResult], thresholds: Dict) -> str:
+    """Build HTML for route health heatmap grid."""
+    import html as html_module
+
+    if not mtr_results or not any(m.success for m in mtr_results):
+        return ""
+
+    # Find max hops across all routes
+    max_hops = max(len(m.hops) for m in mtr_results if m.success)
+
+    # Build header row
+    header_cells = "<th>Route</th>"
+    for i in range(1, max_hops + 1):
+        header_cells += f"<th>Hop {i}</th>"
+
+    # Build data rows
+    rows = ""
+    for mtr in mtr_results:
+        if not mtr.success:
+            continue
+
+        cells = f"<td><strong>{html_module.escape(mtr.target_name)}</strong></td>"
+        for i in range(max_hops):
+            if i < len(mtr.hops):
+                hop = mtr.hops[i]
+                if hop.loss_pct == 0:
+                    color = "good"
+                elif hop.loss_pct < 10:
+                    color = "warning"
+                else:
+                    color = "bad"
+                host_escaped = html_module.escape(hop.host)
+                title = f"{host_escaped}: {hop.loss_pct:.0f}% loss, {hop.avg_ms:.1f}ms"
+                cells += f'<td class="{color}" title="{title}" style="text-align:center;font-size:1.2em;cursor:help;">●</td>'
+            else:
+                cells += '<td style="text-align:center;">-</td>'
+
+        rows += f"<tr>{cells}</tr>"
+
+    return f"""
+        <div class="section">
+            <h2>Route Health Overview</h2>
+            <p class="dim">● Green = 0% loss | ● Yellow = &lt;10% loss | ● Red = ≥10% loss (hover for details)</p>
+            <table>
+                <thead><tr>{header_cells}</tr></thead>
+                <tbody>{rows}</tbody>
+            </table>
+        </div>
+    """
+
+
 def generate_html(
     ping_results: List[PingResult],
     speedtest_result: SpeedTestResult,
@@ -113,6 +164,9 @@ def generate_html(
     # Build MTR sections
     mtr_sections = _build_mtr_sections(mtr_results, thresholds)
 
+    # Build route heatmap
+    route_heatmap = _build_route_heatmap(mtr_results, thresholds)
+
     # Build diagnostic section
     diagnostic_section = _build_diagnostic_section(diagnostic)
 
@@ -131,6 +185,7 @@ def generate_html(
         latency_rows=latency_rows,
         dns_rows=dns_rows,
         mtr_sections=mtr_sections,
+        route_heatmap=route_heatmap,
         historical_section=historical_section,
         ping_labels=ping_labels,
         ping_min=ping_min,
@@ -760,6 +815,8 @@ def _generate_html_template(**kwargs) -> str:
         </div>
 
         {kwargs['mtr_sections']}
+
+        {kwargs.get('route_heatmap', '')}
 
         {kwargs['historical_section']}
 
