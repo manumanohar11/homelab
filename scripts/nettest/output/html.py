@@ -31,6 +31,34 @@ def get_status_class(value: float, metric: str, thresholds: Dict, reverse: bool 
             return "bad"
 
 
+def _prepare_mtr_chart_data(mtr_results: List[MtrResult]) -> Dict[str, Any]:
+    """
+    Prepare MTR data for all routes for charting.
+
+    Returns dict with:
+        - target_names: list of target names
+        - routes: list of dicts with labels, latency, loss for each route
+    """
+    chart_data = {
+        "target_names": [],
+        "routes": [],
+    }
+
+    for mtr in mtr_results:
+        if mtr.success and mtr.hops:
+            route_data = {
+                "name": mtr.target_name,
+                "labels": [f"Hop {h.hop_number}" for h in mtr.hops],
+                "latency": [h.avg_ms for h in mtr.hops],
+                "loss": [h.loss_pct for h in mtr.hops],
+                "hosts": [h.host for h in mtr.hops],
+            }
+            chart_data["target_names"].append(mtr.target_name)
+            chart_data["routes"].append(route_data)
+
+    return chart_data
+
+
 def generate_html(
     ping_results: List[PingResult],
     speedtest_result: SpeedTestResult,
