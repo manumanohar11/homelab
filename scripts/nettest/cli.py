@@ -16,6 +16,7 @@ from .tests import (
     run_tests_with_progress,
     check_tcp_port,
     measure_http_latency,
+    calculate_connection_score,
 )
 from .tests.ping import run_ping_test
 from .output import display_terminal, generate_html, output_json
@@ -424,6 +425,13 @@ def main() -> None:
     )
     json_logger.log_diagnostic(diagnostic)
 
+    # Calculate connection health score
+    connection_score = calculate_connection_score(
+        ping_results=ping_results,
+        speedtest_result=speedtest_result,
+        expected_speed=expected_speed,
+    )
+
     # Update Prometheus metrics if enabled
     if args.prometheus_port:
         try:
@@ -464,6 +472,7 @@ def main() -> None:
             diagnostic,
             thresholds,
             historical_data=previous_history,
+            connection_score=connection_score,
         )
         if not suppress_output:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")
