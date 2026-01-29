@@ -97,14 +97,9 @@ def generate_html(
     ping_jitter = json.dumps([pr.jitter_ms for pr in ping_results if pr.success])
     ping_loss = json.dumps([pr.packet_loss for pr in ping_results if pr.success])
 
-    # MTR data for first target
-    mtr_hops_labels = "[]"
-    mtr_hops_latency = "[]"
-    mtr_hops_loss = "[]"
-    if mtr_results and mtr_results[0].success:
-        mtr_hops_labels = json.dumps([f"Hop {h.hop_number}" for h in mtr_results[0].hops])
-        mtr_hops_latency = json.dumps([h.avg_ms for h in mtr_results[0].hops])
-        mtr_hops_loss = json.dumps([h.loss_pct for h in mtr_results[0].hops])
+    # MTR data for all targets (not just first)
+    mtr_chart_data = _prepare_mtr_chart_data(mtr_results)
+    mtr_all_routes_json = json.dumps(mtr_chart_data)
 
     # Calculate download percentage
     dl_pct = (speedtest_result.download_mbps / expected_speed) * 100 if expected_speed > 0 and speedtest_result.success else 0
@@ -143,9 +138,7 @@ def generate_html(
         ping_max=ping_max,
         ping_jitter=ping_jitter,
         ping_loss=ping_loss,
-        mtr_hops_labels=mtr_hops_labels,
-        mtr_hops_latency=mtr_hops_latency,
-        mtr_hops_loss=mtr_hops_loss,
+        mtr_all_routes=mtr_all_routes_json,
     )
 
     # Write HTML file
