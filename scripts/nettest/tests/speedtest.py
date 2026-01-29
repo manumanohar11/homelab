@@ -16,6 +16,7 @@ def run_speedtest() -> SpeedTestResult:
         SpeedTestResult with download/upload speeds and ping
     """
     result = SpeedTestResult()
+    last_error = ""
 
     # Try speedtest-cli first
     cmd = ["speedtest-cli", "--json"]
@@ -31,7 +32,9 @@ def run_speedtest() -> SpeedTestResult:
             result.success = True
             return result
         except json.JSONDecodeError:
-            pass
+            last_error = "Failed to parse speedtest-cli output"
+    elif stderr:
+        last_error = stderr.strip()
 
     # Try alternative: speedtest (ookla official)
     cmd = ["speedtest", "--format=json"]
@@ -47,13 +50,27 @@ def run_speedtest() -> SpeedTestResult:
             result.success = True
             return result
         except json.JSONDecodeError:
-            pass
+            last_error = "Failed to parse speedtest output"
+    elif stderr and not last_error:
+        last_error = stderr.strip()
 
-    # Provide actionable error message
-    result.error = (
-        "Speed test tools not found.\n"
-        "  Install (Debian/Ubuntu): sudo apt install speedtest-cli\n"
-        "  Install (Fedora/RHEL): pip install speedtest-cli\n"
-        "  Or use Ookla official: https://www.speedtest.net/apps/cli"
-    )
+    # Provide error message with actual error if available
+    if last_error:
+        if "403" in last_error or "Forbidden" in last_error:
+            result.error = (
+                "Speed test blocked by speedtest.net (HTTP 403).\n"
+                "  Try again later or use Ookla official CLI:\n"
+                "  https://www.speedtest.net/apps/cli"
+            )
+        elif "timeout" in last_error.lower():
+            result.error = f"Speed test timed out: {last_error}"
+        else:
+            result.error = f"Speed test failed: {last_error}"
+    else:
+        result.error = (
+            "Speed test tools not found.\n"
+            "  Install (Debian/Ubuntu): sudo apt install speedtest-cli\n"
+            "  Install (Fedora/RHEL): pip install speedtest-cli\n"
+            "  Or use Ookla official: https://www.speedtest.net/apps/cli"
+        )
     return result
