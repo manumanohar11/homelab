@@ -16,6 +16,8 @@ from .models import (
     MtrResult,
     DiagnosticResult,
     ConnectionScore,
+    BufferbloatResult,
+    VoIPQuality,
     PortResult,
     HttpResult,
 )
@@ -28,6 +30,8 @@ __all__ = [
     "MtrResult",
     "DiagnosticResult",
     "ConnectionScore",
+    "BufferbloatResult",
+    "VoIPQuality",
     "PortResult",
     "HttpResult",
     "__version__",

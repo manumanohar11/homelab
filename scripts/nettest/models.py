@@ -88,6 +88,26 @@ class ConnectionScore:
 
 
 @dataclass
+class BufferbloatResult:
+    """Result of bufferbloat detection test."""
+    idle_latency_ms: float = 0.0
+    loaded_latency_ms: float = 0.0
+    bloat_ms: float = 0.0
+    bloat_grade: str = ""  # A, B, C, D, F
+    success: bool = False
+    error: str = ""
+
+
+@dataclass
+class VoIPQuality:
+    """VoIP call quality assessment."""
+    mos_score: float = 0.0      # 1.0-5.0 Mean Opinion Score
+    r_factor: float = 0.0       # 0-100 E-model R-factor
+    quality: str = ""           # "Excellent", "Good", "Fair", "Poor", "Bad"
+    suitable_for: List[str] = field(default_factory=list)  # ["HD Voice", "Video"]
+
+
+@dataclass
 class PortResult:
     """Result of a TCP port connectivity test."""
     host: str
