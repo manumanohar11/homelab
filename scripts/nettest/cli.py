@@ -308,6 +308,10 @@ def main() -> None:
             console.print("[dim]Forcing IPv6[/dim]")
 
     # Handle interactive mode
+    run_bufferbloat = args.bufferbloat
+    run_export_csv = args.export_csv
+    generate_evidence_report = False
+
     if args.interactive:
         interactive_settings = run_interactive_mode(config, console)
         if interactive_settings is None:
@@ -320,6 +324,9 @@ def main() -> None:
         ping_count = interactive_settings["ping_count"]
         mtr_count = interactive_settings["mtr_count"]
         targets = interactive_settings["targets"]
+        run_bufferbloat = interactive_settings.get("bufferbloat", False)
+        run_export_csv = interactive_settings.get("export_csv", False)
+        generate_evidence_report = interactive_settings.get("generate_evidence", False)
     else:
         # Determine skip flags from profile
         profile_config = config.get("profiles", {}).get(args.profile, {}) if args.profile else {}
@@ -461,7 +468,7 @@ def main() -> None:
 
     # Run bufferbloat test if requested
     bufferbloat_result = None
-    if args.bufferbloat:
+    if run_bufferbloat:
         if not suppress_output:
             console.print("[dim]Running bufferbloat test...[/dim]")
         bufferbloat_result = detect_bufferbloat(interface=args.interface)
@@ -497,6 +504,33 @@ def main() -> None:
                 http_results=http_results,
             )
 
+            # Show VoIP quality if calculated
+            if voip_quality:
+                mos_color = "green" if voip_quality.mos_score >= 4.0 else (
+                    "yellow" if voip_quality.mos_score >= 3.6 else "red"
+                )
+                console.print(f"\n[bold]VoIP Quality:[/bold] [{mos_color}]MOS {voip_quality.mos_score:.1f}[/{mos_color}] ({voip_quality.quality})")
+                if voip_quality.suitable_for:
+                    console.print(f"[dim]Suitable for: {', '.join(voip_quality.suitable_for)}[/dim]")
+
+            # Show ISP evidence summary if requested or issues found
+            if generate_evidence_report and isp_evidence:
+                has_issues = (
+                    isp_evidence.speed_complaint or
+                    isp_evidence.packet_loss_complaint or
+                    isp_evidence.latency_complaint
+                )
+                if has_issues:
+                    console.print(f"\n[bold red]ISP Evidence Summary:[/bold red]")
+                    console.print(f"[bold]{isp_evidence.summary}[/bold]")
+                    if isp_evidence.speed_complaint:
+                        console.print(f"  [red]• {isp_evidence.speed_complaint}[/red]")
+                    if isp_evidence.packet_loss_complaint:
+                        console.print(f"  [red]• {isp_evidence.packet_loss_complaint}[/red]")
+                    if isp_evidence.latency_complaint:
+                        console.print(f"  [yellow]• {isp_evidence.latency_complaint}[/yellow]")
+                    console.print("[dim]Full evidence available in HTML report.[/dim]")
+
         # Generate HTML report
         if not suppress_output:
             console.print("[dim]Generating HTML report...[/dim]")
@@ -519,7 +553,7 @@ def main() -> None:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")
 
         # Export CSV if requested
-        if args.export_csv:
+        if run_export_csv:
             csv_dir = export_csv(
                 ping_results, speedtest_result, dns_results, mtr_results,
                 output_dir=output_dir
