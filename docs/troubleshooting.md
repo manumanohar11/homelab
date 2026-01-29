@@ -24,10 +24,16 @@ Solutions to common issues, debugging tips, and frequently asked questions.
 If services can't reach external APIs or downloads are slow, run the network testing tool:
 
 ```bash
-cd ~/docker/scripts && python3 -m nettest --expected-speed 100
+cd ~/docker/scripts && python3 -m nettest --profile full --bufferbloat
 ```
 
-This will identify if the problem is with your local network, ISP, internet backbone, or specific targets. See [Network Testing Tool](scripts.md#network-testing-tool) for details.
+This will:
+- Identify if the problem is with your local network, ISP, internet backbone, or specific targets
+- Generate a connection health score (0-100)
+- Calculate VoIP quality (MOS score)
+- Create ISP complaint evidence if issues detected
+
+See [Network Testing Tool](scripts.md#network-testing-tool) for details.
 
 ### Health Check Script
 
@@ -781,6 +787,105 @@ docker exec [container] ping -c 10 google.com
 - Check VPN server load
 - Try different VPN region
 - Check local network issues
+
+### Contacting Your ISP
+
+<details>
+<summary><strong>Using the ISP Evidence Report</strong></summary>
+
+When network tests detect ISP issues, use the evidence report to contact support:
+
+**Generate the report:**
+```bash
+cd ~/docker/scripts && python3 -m nettest --profile full --export-csv
+```
+
+**Open the HTML report** and find the "ISP Complaint Evidence" section.
+
+**For Non-Technical Support:**
+> "My internet speed is only [X] Mbps when I'm paying for [Y] Mbps.
+> I'm also experiencing [Z]% packet loss which causes video calls to drop.
+> My diagnostic tests show the problem is in your network equipment at [IP address].
+> I have technical documentation I can provide."
+
+**For Technical Support:**
+> "I'm experiencing packet loss starting at hop [N] in your infrastructure.
+> MTR trace shows [X]% loss at [IP address], affecting routes to [destinations].
+> This appears to be an issue with your peering or edge router.
+> Can you check interface health on [IP address]?"
+
+**Key metrics to mention:**
+- Speed vs expected (percentage)
+- Packet loss percentage
+- Problem hop IP addresses
+- Affected services (VoIP, video, gaming)
+
+</details>
+
+<details>
+<summary><strong>Escalation Tips</strong></summary>
+
+1. **Always get a ticket number** - Reference it in follow-ups
+2. **Ask for Tier 2/Network Operations** - If first-level support can't help
+3. **Provide timestamps** - "Issue occurs daily from 7-10 PM"
+4. **Document everything** - Run tests multiple times, save HTML reports
+5. **Know your SLA** - Check contract for uptime guarantees
+
+**Red flags that need escalation:**
+- Packet loss > 5% consistently
+- Speed below 50% of plan
+- Same problem hop appearing in multiple tests
+- Issues persisting > 24 hours
+
+</details>
+
+### VoIP and Video Call Issues
+
+<details>
+<summary><strong>Diagnosing Call Quality Problems</strong></summary>
+
+Run a VoIP-focused test:
+```bash
+cd ~/docker/scripts && python3 -m nettest --interactive
+# Choose option 6: VoIP quality test
+```
+
+**Check the MOS Score:**
+| MOS Score | Call Quality | Action |
+|-----------|--------------|--------|
+| 4.0+ | Good | No action needed |
+| 3.6-4.0 | Fair | May have occasional issues |
+| 3.1-3.6 | Poor | Noticeable quality degradation |
+| < 3.1 | Bad | Calls likely unusable |
+
+**Common causes and fixes:**
+
+| Issue | Indicator | Solution |
+|-------|-----------|----------|
+| High latency | MOS < 4.0, latency > 150ms | Use wired connection, closer server |
+| Jitter | Choppy audio | Enable QoS on router |
+| Packet loss | Audio drops | Check ISP, reduce network load |
+| Bufferbloat | Latency spikes under load | Enable SQM/fq_codel on router |
+
+</details>
+
+<details>
+<summary><strong>Minimum Requirements by Use Case</strong></summary>
+
+| Use Case | Min MOS | Max Latency | Max Jitter | Max Loss |
+|----------|---------|-------------|------------|----------|
+| HD Voice | 4.3 | 150ms | 30ms | 1% |
+| Video Conferencing | 4.0 | 200ms | 40ms | 2% |
+| Standard VoIP | 3.6 | 250ms | 50ms | 3% |
+| Basic Voice | 3.1 | 300ms | 70ms | 5% |
+
+If your test results don't meet these thresholds:
+1. Try wired instead of WiFi
+2. Close bandwidth-heavy applications
+3. Check for network congestion
+4. Contact ISP if issue persists
+
+</details>
 
 ---
 
