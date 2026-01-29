@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, ConnectionScore
+    MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality
 )
 
 
@@ -121,6 +121,7 @@ def generate_html(
     thresholds: Dict[str, Any],
     historical_data: Optional[Dict] = None,
     connection_score: Optional[ConnectionScore] = None,
+    voip_quality: Optional[VoIPQuality] = None,
 ) -> str:
     """
     Generate HTML report with charts.
@@ -184,9 +185,13 @@ def generate_html(
         connection_score, speedtest_result, ping_results, expected_speed
     )
 
+    # Build VoIP quality section
+    quality_section = _build_quality_section(voip_quality)
+
     html = _generate_html_template(
         timestamp=timestamp,
         executive_summary=executive_summary,
+        quality_section=quality_section,
         diagnostic_section=diagnostic_section,
         speed_section=speed_section,
         latency_rows=latency_rows,
@@ -550,6 +555,44 @@ def _build_executive_summary(
                             <span class="metric-label">Stability</span>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    """
+
+
+def _build_quality_section(voip_quality: Optional[VoIPQuality]) -> str:
+    """Build VoIP quality assessment section."""
+    if voip_quality is None:
+        return ""
+
+    mos_class = "good" if voip_quality.mos_score >= 4.0 else (
+        "warning" if voip_quality.mos_score >= 3.6 else "bad"
+    )
+
+    suitable_html = ", ".join(voip_quality.suitable_for) if voip_quality.suitable_for else "Not recommended"
+
+    return f"""
+        <div class="section">
+            <h2>VoIP Quality Assessment</h2>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">MOS Score</div>
+                    <div class="card-value {mos_class}">{voip_quality.mos_score:.1f}</div>
+                    <div class="card-subtitle">out of 5.0</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Quality</div>
+                    <div class="card-value {mos_class}">{voip_quality.quality}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">R-Factor</div>
+                    <div class="card-value">{voip_quality.r_factor:.0f}</div>
+                    <div class="card-subtitle">out of 100</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Suitable For</div>
+                    <div class="card-value small">{suitable_html}</div>
                 </div>
             </div>
         </div>
@@ -971,6 +1014,8 @@ def _generate_html_template(**kwargs) -> str:
         </div>
 
         {kwargs.get('executive_summary', '')}
+
+        {kwargs.get('quality_section', '')}
 
         {kwargs['diagnostic_section']}
 
