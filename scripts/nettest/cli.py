@@ -460,6 +460,7 @@ def main() -> None:
     )
 
     # Run bufferbloat test if requested
+    bufferbloat_result = None
     if args.bufferbloat:
         if not suppress_output:
             console.print("[dim]Running bufferbloat test...[/dim]")
@@ -512,6 +513,7 @@ def main() -> None:
             connection_score=connection_score,
             voip_quality=voip_quality,
             isp_evidence=isp_evidence,
+            bufferbloat_result=bufferbloat_result,
         )
         if not suppress_output:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")

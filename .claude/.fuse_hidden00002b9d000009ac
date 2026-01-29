@@ -58,8 +58,7 @@
       "Bash(PYTHONPATH=/mnt/local_disk_g/docker/scripts/nettest python:*)",
       "Bash(PYTHONPATH=/mnt/local_disk_g/docker/scripts/nettest python3:*)",
       "Bash(/mnt/local_disk_g/docker/scripts/nettest.py:*)",
-      "Bash(# Count lines of code wc -l /mnt/local_disk_g/docker/scripts/nettest/*.py /mnt/local_disk_g/docker/scripts/nettest/**/*.py)",
-      "Bash(__NEW_LINE_7ac3ced8371e8d50__ echo -e \"\\\\n=== All tests passed! ===\")"
+      "Bash(# Count lines of code wc -l /mnt/local_disk_g/docker/scripts/nettest/*.py /mnt/local_disk_g/docker/scripts/nettest/**/*.py)"
     ],
     "deny": []
   },

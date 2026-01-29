@@ -7,7 +7,8 @@ from typing import List, Dict, Any, Optional
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality, ISPEvidence
+    MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality, ISPEvidence,
+    BufferbloatResult
 )
 
 
@@ -123,6 +124,7 @@ def generate_html(
     connection_score: Optional[ConnectionScore] = None,
     voip_quality: Optional[VoIPQuality] = None,
     isp_evidence: Optional[ISPEvidence] = None,
+    bufferbloat_result: Optional[BufferbloatResult] = None,
 ) -> str:
     """
     Generate HTML report with charts.
@@ -192,11 +194,15 @@ def generate_html(
     # Build ISP evidence section
     evidence_section = _build_evidence_section(isp_evidence)
 
+    # Build bufferbloat section
+    bufferbloat_section = _build_bufferbloat_section(bufferbloat_result)
+
     html = _generate_html_template(
         timestamp=timestamp,
         executive_summary=executive_summary,
         quality_section=quality_section,
         evidence_section=evidence_section,
+        bufferbloat_section=bufferbloat_section,
         diagnostic_section=diagnostic_section,
         speed_section=speed_section,
         latency_rows=latency_rows,
@@ -650,6 +656,53 @@ def _build_evidence_section(evidence: Optional[ISPEvidence]) -> str:
     """
 
 
+def _build_bufferbloat_section(bufferbloat: Optional[BufferbloatResult]) -> str:
+    """Build bufferbloat test results section."""
+    if bufferbloat is None or not bufferbloat.success:
+        return ""
+
+    # Determine grade color
+    grade_colors = {
+        "A": "good",
+        "B": "good",
+        "C": "warning",
+        "D": "bad",
+        "F": "bad",
+    }
+    grade_class = grade_colors.get(bufferbloat.bloat_grade, "")
+
+    return f"""
+        <div class="section">
+            <h2>Bufferbloat Test</h2>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">Grade</div>
+                    <div class="card-value {grade_class}">{bufferbloat.bloat_grade}</div>
+                    <div class="card-subtitle">DSLReports scale</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Idle Latency</div>
+                    <div class="card-value">{bufferbloat.idle_latency_ms:.1f} ms</div>
+                    <div class="card-subtitle">baseline</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Loaded Latency</div>
+                    <div class="card-value">{bufferbloat.loaded_latency_ms:.1f} ms</div>
+                    <div class="card-subtitle">under load</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Bloat</div>
+                    <div class="card-value">{bufferbloat.bloat_ms:.1f} ms</div>
+                    <div class="card-subtitle">increase</div>
+                </div>
+            </div>
+            <p class="dim" style="margin-top: 1rem;">
+                Grade scale: A (&lt;5ms) | B (5-30ms) | C (30-60ms) | D (60-200ms) | F (&gt;200ms)
+            </p>
+        </div>
+    """
+
+
 def _generate_html_template(**kwargs) -> str:
     """Generate the full HTML template with all sections."""
     return f"""<!DOCTYPE html>
@@ -1069,6 +1122,8 @@ def _generate_html_template(**kwargs) -> str:
         {kwargs.get('quality_section', '')}
 
         {kwargs.get('evidence_section', '')}
+
+        {kwargs.get('bufferbloat_section', '')}
 
         {kwargs['diagnostic_section']}
 
