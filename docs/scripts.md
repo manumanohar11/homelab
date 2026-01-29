@@ -35,6 +35,11 @@ A comprehensive network diagnostic tool that tests connectivity, identifies wher
 - **Continuous Monitoring** - Live dashboard for ongoing network health tracking
 - **IPv4/IPv6 Support** - Force specific IP protocol for testing
 - **Historical Comparison** - Track performance over time and compare with previous runs
+- **Connection Health Scoring** - Overall 0-100 score with A+ to F grade
+- **VoIP Quality Assessment** - MOS score using ITU-T E-model
+- **ISP Complaint Evidence** - Auto-generated documentation for ISP issues
+- **Bufferbloat Detection** - Identify buffer bloat affecting latency
+- **CSV Export** - Export results to CSV files for spreadsheets
 
 ### Quick Start
 
@@ -86,6 +91,8 @@ python3 -m nettest --format json --quiet
 | `--list-interfaces` | false | List available network interfaces |
 | `--wizard` | false | Run configuration wizard |
 | `--prometheus-port` | - | Enable Prometheus metrics on specified port |
+| `--bufferbloat` | false | Run bufferbloat detection test |
+| `--export-csv` | false | Export results to CSV files |
 
 ### Test Profiles
 
@@ -158,11 +165,16 @@ Rich-formatted tables with color-coded status indicators:
 #### HTML Report
 
 Interactive HTML report with:
+- **Executive Summary** - Health gauge, key metrics, component scores
+- **VoIP Quality Section** - MOS score, R-factor, suitability
+- **ISP Evidence Section** - Complaint documentation (when issues detected)
+- **Route Heatmap** - Color-coded grid showing loss across all routes
 - Summary cards with key metrics
 - Latency comparison charts (Chart.js)
 - Jitter and packet loss graphs
-- Route visualization
+- Tabbed route visualization (switch between targets)
 - Problem diagnosis section
+- Copy evidence button for ISP complaints
 
 #### JSON Output
 
@@ -230,6 +242,8 @@ Options:
 3. Speed test only
 4. Route analysis
 5. Custom test
+6. VoIP quality test
+7. ISP evidence report
 q. Quit
 
 ### Parallel Execution
@@ -298,6 +312,110 @@ The comparison table shows:
 - **Percentage change** for significant differences
 
 History file keeps the last 100 test results in JSON format.
+
+### Connection Health Scoring
+
+The tool calculates an overall connection health score (0-100) based on:
+
+| Component | Weight | Factors |
+|-----------|--------|---------|
+| Speed | 35% | Download speed vs expected |
+| Latency | 30% | Average ping time across targets |
+| Stability | 35% | Packet loss and jitter |
+
+**Grade Scale:**
+| Score | Grade | Status |
+|-------|-------|--------|
+| 90-100 | A+ | Excellent |
+| 80-89 | A | Great |
+| 70-79 | B+ | Good |
+| 60-69 | B | Fair |
+| 50-59 | C | Acceptable |
+| 40-49 | D | Poor |
+| 0-39 | F | Failing |
+
+The health score appears in:
+- HTML report (circular gauge)
+- Terminal output summary
+- Monitor mode dashboard
+
+### VoIP Quality Assessment
+
+Calculates Mean Opinion Score (MOS) using the ITU-T E-model:
+
+```bash
+# Run VoIP-focused test
+python3 -m nettest --interactive  # Choose option 6
+```
+
+**MOS Score Scale:**
+| MOS | Quality | Suitable For |
+|-----|---------|--------------|
+| 4.3-5.0 | Excellent | HD Voice, Video Conferencing |
+| 4.0-4.3 | Good | Video Conferencing, VoIP |
+| 3.6-4.0 | Fair | VoIP, Voice Calls |
+| 3.1-3.6 | Poor | Basic Voice |
+| 1.0-3.1 | Bad | Not recommended |
+
+The VoIP assessment shows in the HTML report with:
+- MOS Score (1.0-5.0)
+- R-Factor (0-100)
+- Quality rating
+- Suitable use cases
+
+### ISP Complaint Evidence
+
+When network issues are detected, the tool generates documentation-ready evidence:
+
+```bash
+# Generate ISP evidence report
+python3 -m nettest --interactive  # Choose option 7
+
+# Or with full test
+python3 -m nettest --profile full --export-csv
+```
+
+The evidence section includes:
+- **Timestamp** - When the test was run
+- **Speed Deficit** - "72 Mbps vs 100 Mbps expected (28% deficit)"
+- **Packet Loss** - "10% loss to Cloudflare DNS"
+- **Problem Hops** - Specific ISP router IPs with loss percentages
+
+**Copy button** in HTML report allows easy copying for support tickets.
+
+Use this when contacting ISP support - it provides technical details for escalation.
+
+### Bufferbloat Detection
+
+Test for bufferbloat (latency increase under load):
+
+```bash
+python3 -m nettest --bufferbloat --profile quick
+```
+
+**Grade Scale (DSLReports):**
+| Grade | Latency Increase | Status |
+|-------|-----------------|--------|
+| A | < 5ms | Excellent |
+| B | 5-30ms | Good |
+| C | 30-60ms | Fair |
+| D | 60-200ms | Poor |
+| F | > 200ms | Bad |
+
+### CSV Export
+
+Export test results to CSV files for spreadsheets or analysis:
+
+```bash
+python3 -m nettest --profile full --export-csv
+```
+
+Creates three files in the output directory:
+- `nettest_ping_TIMESTAMP.csv` - Ping results per target
+- `nettest_speed_TIMESTAMP.csv` - Speed test results
+- `nettest_mtr_TIMESTAMP.csv` - MTR hop-by-hop data
+
+CSV files can be imported into Excel, Google Sheets, or data analysis tools.
 
 ### Problem Diagnosis
 
