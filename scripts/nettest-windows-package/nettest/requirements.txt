@@ -1,0 +1,14 @@
+# Core dependencies
+rich>=13.0.0
+
+# Optional: Configuration files
+pyyaml>=6.0
+
+# Optional: Prometheus metrics
+prometheus-client>=0.19.0
+
+# Optional: Webhook/API notifications
+requests>=2.31.0
+
+# Optional: Network interface detection
+netifaces>=0.11.0
