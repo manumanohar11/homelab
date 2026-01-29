@@ -34,6 +34,8 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
   [cyan]3[/cyan]  Speed test only  [dim]- Internet speed measurement[/dim]
   [cyan]4[/cyan]  Route analysis   [dim]- MTR traceroute to targets[/dim]
   [cyan]5[/cyan]  Custom test      [dim]- Configure your own test[/dim]
+  [cyan]6[/cyan]  VoIP quality     [dim]- Test call quality (MOS score)[/dim]
+  [cyan]7[/cyan]  ISP evidence     [dim]- Generate complaint documentation[/dim]
   [cyan]q[/cyan]  Quit
 
 """
@@ -41,7 +43,7 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
 
     choice = Prompt.ask(
         "Enter choice",
-        choices=["1", "2", "3", "4", "5", "q"],
+        choices=["1", "2", "3", "4", "5", "6", "7", "q"],
         default="2"
     )
 
@@ -57,6 +59,9 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
         "ping_count": config["tests"]["ping_count"],
         "mtr_count": config["tests"]["mtr_count"],
         "targets": config["targets"],
+        "bufferbloat": False,
+        "export_csv": False,
+        "generate_evidence": False,
     }
 
     if choice == "1":
@@ -94,6 +99,22 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
         if settings is None:
             return None
 
+    elif choice == "6":
+        # VoIP quality test - ping focused
+        settings["skip_speedtest"] = True
+        settings["skip_dns"] = True
+        settings["skip_mtr"] = True
+        settings["ping_count"] = 20  # More samples for accurate MOS
+        console.print("[dim]Running VoIP quality test (ping for MOS calculation)...[/dim]")
+
+    elif choice == "7":
+        # ISP evidence report - full test with evidence generation
+        settings["ping_count"] = 10
+        settings["mtr_count"] = 10
+        settings["generate_evidence"] = True
+        settings["export_csv"] = True
+        console.print("[dim]Running full test for ISP evidence report...[/dim]")
+
     console.print()
     return settings
 
@@ -109,6 +130,9 @@ def _configure_custom_test(config: Dict[str, Any], console: Console) -> Optional
         "ping_count": config["tests"]["ping_count"],
         "mtr_count": config["tests"]["mtr_count"],
         "targets": config["targets"],
+        "bufferbloat": False,
+        "export_csv": False,
+        "generate_evidence": False,
     }
 
     # Ask for ping count
@@ -129,6 +153,10 @@ def _configure_custom_test(config: Dict[str, Any], console: Console) -> Optional
             default="5"
         )
         settings["mtr_count"] = int(mtr_count_str) if mtr_count_str.isdigit() else 5
+
+    # Ask for bufferbloat and export options
+    settings["bufferbloat"] = Confirm.ask("Run bufferbloat test?", default=False)
+    settings["export_csv"] = Confirm.ask("Export results to CSV?", default=False)
 
     # Ask for custom targets
     if Confirm.ask("Use custom targets?", default=False):
