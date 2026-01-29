@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality
+    MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality, ISPEvidence
 )
 
 
@@ -122,6 +122,7 @@ def generate_html(
     historical_data: Optional[Dict] = None,
     connection_score: Optional[ConnectionScore] = None,
     voip_quality: Optional[VoIPQuality] = None,
+    isp_evidence: Optional[ISPEvidence] = None,
 ) -> str:
     """
     Generate HTML report with charts.
@@ -188,10 +189,14 @@ def generate_html(
     # Build VoIP quality section
     quality_section = _build_quality_section(voip_quality)
 
+    # Build ISP evidence section
+    evidence_section = _build_evidence_section(isp_evidence)
+
     html = _generate_html_template(
         timestamp=timestamp,
         executive_summary=executive_summary,
         quality_section=quality_section,
+        evidence_section=evidence_section,
         diagnostic_section=diagnostic_section,
         speed_section=speed_section,
         latency_rows=latency_rows,
@@ -594,6 +599,52 @@ def _build_quality_section(voip_quality: Optional[VoIPQuality]) -> str:
                     <div class="card-title">Suitable For</div>
                     <div class="card-value small">{suitable_html}</div>
                 </div>
+            </div>
+        </div>
+    """
+
+
+def _build_evidence_section(evidence: Optional[ISPEvidence]) -> str:
+    """Build ISP complaint evidence section."""
+    if evidence is None:
+        return ""
+
+    # Only show if there are actual complaints
+    has_issues = (
+        evidence.speed_complaint or
+        evidence.packet_loss_complaint or
+        evidence.latency_complaint or
+        evidence.problem_hops
+    )
+
+    if not has_issues:
+        return ""
+
+    complaints_html = ""
+    if evidence.speed_complaint:
+        complaints_html += f'<li class="bad">{evidence.speed_complaint}</li>'
+    if evidence.packet_loss_complaint:
+        complaints_html += f'<li class="bad">{evidence.packet_loss_complaint}</li>'
+    if evidence.latency_complaint:
+        complaints_html += f'<li class="warning">{evidence.latency_complaint}</li>'
+
+    hops_html = ""
+    if evidence.problem_hops:
+        hops_html = "<h4>Problem Hops (for ISP reference)</h4><ul>"
+        for hop in evidence.problem_hops:
+            hops_html += f"<li><code>{hop}</code></li>"
+        hops_html += "</ul>"
+
+    return f"""
+        <div class="section" style="border-left: 4px solid var(--bad);">
+            <h2>ISP Complaint Evidence</h2>
+            <p class="dim">Generated: {evidence.timestamp}</p>
+            <p><strong>{evidence.summary}</strong></p>
+            <h4>Issues Documented</h4>
+            <ul>{complaints_html}</ul>
+            {hops_html}
+            <div class="export-buttons" style="margin-top: 1rem;">
+                <button class="export-btn" onclick="copyEvidence()">Copy Evidence Text</button>
             </div>
         </div>
     """
@@ -1017,6 +1068,8 @@ def _generate_html_template(**kwargs) -> str:
 
         {kwargs.get('quality_section', '')}
 
+        {kwargs.get('evidence_section', '')}
+
         {kwargs['diagnostic_section']}
 
         <div class="section">
@@ -1125,6 +1178,16 @@ def _generate_html_template(**kwargs) -> str:
             navigator.clipboard.writeText(JSON.stringify(data, null, 2))
                 .then(() => alert('Copied to clipboard!'))
                 .catch(err => console.error('Failed to copy:', err));
+        }}
+
+        function copyEvidence() {{
+            const evidenceEl = document.querySelector('.section[style*="border-left: 4px solid var(--bad)"]');
+            if (evidenceEl) {{
+                const text = evidenceEl.innerText;
+                navigator.clipboard.writeText(text)
+                    .then(() => alert('Evidence copied to clipboard!'))
+                    .catch(err => console.error('Failed to copy:', err));
+            }}
         }}
 
         const chartColors = {{
