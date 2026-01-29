@@ -8,6 +8,7 @@ from .tcp import check_tcp_port, check_tcp_ports
 from .http import measure_http_latency
 from .runner import run_tests_with_progress
 from .stability import calculate_connection_score, calculate_mos_score
+from .bufferbloat import detect_bufferbloat, grade_bufferbloat
 
 __all__ = [
     "run_ping_test",
@@ -20,4 +21,6 @@ __all__ = [
     "run_tests_with_progress",
     "calculate_connection_score",
     "calculate_mos_score",
+    "detect_bufferbloat",
+    "grade_bufferbloat",
 ]
