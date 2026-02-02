@@ -515,6 +515,7 @@ def main() -> None:
                 console,
                 port_results=port_results,
                 http_results=http_results,
+                video_service_results=video_service_results,
             )
 
             # Show VoIP quality if calculated
