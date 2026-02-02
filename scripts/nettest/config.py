@@ -71,23 +71,24 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 }
 
 # Video Conferencing Service Endpoints
+# STUN servers: Use official servers where available, Cloudflare public STUN as fallback
 VIDEO_SERVICES = {
     "Microsoft Teams": {
         "domain": "teams.microsoft.com",
         "tcp_ports": [443, 3478],
-        "stun_server": "stun.teams.microsoft.com",
+        "stun_server": "worldaz.tr.teams.microsoft.com",
         "stun_port": 3478,
     },
     "Zoom": {
         "domain": "zoom.us",
         "tcp_ports": [443, 8801, 8802],
-        "stun_server": "stun.zoom.us",
+        "stun_server": "stun.cloudflare.com",  # Zoom uses internal STUN, test with public
         "stun_port": 3478,
     },
     "WhatsApp": {
         "domain": "web.whatsapp.com",
         "tcp_ports": [443, 5222],
-        "stun_server": "stun.whatsapp.net",
+        "stun_server": "stun.cloudflare.com",  # WhatsApp uses internal STUN, test with public
         "stun_port": 3478,
     },
     "Google Meet": {
@@ -99,7 +100,7 @@ VIDEO_SERVICES = {
     "Webex": {
         "domain": "webex.com",
         "tcp_ports": [443, 5004],
-        "stun_server": "stun.webex.com",
+        "stun_server": "stun.cloudflare.com",  # Webex uses internal STUN, test with public
         "stun_port": 3478,
     },
 }
