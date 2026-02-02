@@ -10,7 +10,7 @@ from rich import box
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, PortResult, HttpResult
+    MtrResult, DiagnosticResult, PortResult, HttpResult, VideoServiceResult
 )
 
 
@@ -64,6 +64,7 @@ def display_terminal(
     console: Console,
     port_results: List[PortResult] = None,
     http_results: List[HttpResult] = None,
+    video_service_results: List[VideoServiceResult] = None,
 ) -> None:
     """
     Display results in terminal using rich.
@@ -111,6 +112,10 @@ def display_terminal(
     # HTTP Results (if any)
     if http_results:
         _display_http(http_results, console)
+
+    # Video Service Results (if any)
+    if video_service_results:
+        _display_video_services(video_service_results, console)
 
 
 def _display_diagnostic(diagnostic: DiagnosticResult, console: Console) -> None:
@@ -334,4 +339,61 @@ def _display_http(http_results: List[HttpResult], console: Console) -> None:
         http_table.add_row(hr.url, status, time_str)
 
     console.print(http_table)
+    console.print()
+
+
+def _display_video_services(results: List[VideoServiceResult], console: Console) -> None:
+    """Display video conferencing service test results."""
+    console.print("[bold]Video Conferencing Services[/bold]")
+
+    table = Table(box=box.ROUNDED)
+    table.add_column("Service", style="cyan")
+    table.add_column("DNS", justify="center")
+    table.add_column("Ports", justify="left")
+    table.add_column("STUN", justify="center")
+    table.add_column("Status", justify="center")
+
+    for r in results:
+        # DNS column
+        dns_str = f"[green]{r.dns_latency_ms:.0f}ms[/green]" if r.dns_ok else "[red]fail[/red]"
+
+        # Ports column
+        port_strs = []
+        for port, ok in r.tcp_ports.items():
+            if ok:
+                port_strs.append(f"[green]{port}[/green]")
+            else:
+                port_strs.append(f"[red]{port}[/red]")
+        ports_str = " ".join(port_strs) if port_strs else "-"
+
+        # STUN column
+        if r.stun_ok:
+            stun_str = f"[green]{r.stun_latency_ms:.0f}ms[/green]"
+        else:
+            stun_str = "[red]fail[/red]"
+
+        # Status column
+        status_colors = {"ready": "green", "degraded": "yellow", "blocked": "red"}
+        status_icons = {"ready": "Ready", "degraded": "Degraded", "blocked": "Blocked"}
+        status_color = status_colors.get(r.status, "white")
+        status_text = status_icons.get(r.status, r.status)
+        status_str = f"[{status_color}]{status_text}[/{status_color}]"
+
+        table.add_row(r.name, dns_str, ports_str, stun_str, status_str)
+
+    console.print(table)
+
+    # Show issues if any
+    issues = []
+    for r in results:
+        if r.issues:
+            for issue in r.issues:
+                issues.append(f"{r.name}: {issue}")
+
+    if issues:
+        console.print()
+        console.print("[bold]Issues:[/bold]")
+        for issue in issues:
+            console.print(f"  [yellow]{issue}[/yellow]")
+
     console.print()
