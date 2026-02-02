@@ -316,6 +316,7 @@ def main() -> None:
     # Handle interactive mode
     run_bufferbloat = args.bufferbloat
     run_export_csv = args.export_csv
+    run_video_services = args.video_services
     generate_evidence_report = False
 
     if args.interactive:
@@ -332,6 +333,7 @@ def main() -> None:
         targets = interactive_settings["targets"]
         run_bufferbloat = interactive_settings.get("bufferbloat", False)
         run_export_csv = interactive_settings.get("export_csv", False)
+        run_video_services = interactive_settings.get("video_services", False)
         generate_evidence_report = interactive_settings.get("generate_evidence", False)
     else:
         # Determine skip flags from profile
@@ -442,7 +444,7 @@ def main() -> None:
 
     # Run video service tests if requested
     video_service_results = []
-    if args.video_services:
+    if run_video_services:
         if not suppress_output:
             console.print("[dim]Running video service connectivity tests...[/dim]")
         video_service_results = run_video_service_tests()

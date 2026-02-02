@@ -62,6 +62,7 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
         "bufferbloat": False,
         "export_csv": False,
         "generate_evidence": False,
+        "video_services": False,
     }
 
     if choice == "1":
@@ -73,10 +74,12 @@ def run_interactive_mode(config: Dict[str, Any], console: Console) -> Optional[D
         console.print("[dim]Running quick check (ping only)...[/dim]")
 
     elif choice == "2":
-        # Full diagnostic
+        # Full diagnostic - ALL tests enabled
         settings["ping_count"] = 10
         settings["mtr_count"] = 10
-        console.print("[dim]Running full diagnostic...[/dim]")
+        settings["bufferbloat"] = True
+        settings["video_services"] = True
+        console.print("[dim]Running full diagnostic (all tests)...[/dim]")
 
     elif choice == "3":
         # Speed test only
@@ -133,6 +136,7 @@ def _configure_custom_test(config: Dict[str, Any], console: Console) -> Optional
         "bufferbloat": False,
         "export_csv": False,
         "generate_evidence": False,
+        "video_services": False,
     }
 
     # Ask for ping count
@@ -154,8 +158,9 @@ def _configure_custom_test(config: Dict[str, Any], console: Console) -> Optional
         )
         settings["mtr_count"] = int(mtr_count_str) if mtr_count_str.isdigit() else 5
 
-    # Ask for bufferbloat and export options
+    # Ask for additional test options
     settings["bufferbloat"] = Confirm.ask("Run bufferbloat test?", default=False)
+    settings["video_services"] = Confirm.ask("Test video services (Teams, Zoom, etc.)?", default=False)
     settings["export_csv"] = Confirm.ask("Export results to CSV?", default=False)
 
     # Ask for custom targets
