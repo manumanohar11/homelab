@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, PortResult, HttpResult
+    MtrResult, DiagnosticResult, PortResult, HttpResult, VideoServiceResult
 )
 
 
@@ -19,6 +19,7 @@ def output_json(
     diagnostic: DiagnosticResult,
     port_results: Optional[List[PortResult]] = None,
     http_results: Optional[List[HttpResult]] = None,
+    video_service_results: Optional[List[VideoServiceResult]] = None,
 ) -> None:
     """
     Output all results as JSON to stdout.
@@ -55,6 +56,8 @@ def output_json(
         output["port_results"] = [asdict(r) for r in port_results]
     if http_results:
         output["http_results"] = [asdict(r) for r in http_results]
+    if video_service_results:
+        output["video_services"] = [asdict(r) for r in video_service_results]
 
     print(json.dumps(output, indent=2))
 
@@ -67,6 +70,7 @@ def results_to_dict(
     diagnostic: DiagnosticResult,
     port_results: Optional[List[PortResult]] = None,
     http_results: Optional[List[HttpResult]] = None,
+    video_service_results: Optional[List[VideoServiceResult]] = None,
 ) -> dict:
     """
     Convert all results to a dictionary (for API use).
@@ -96,5 +100,7 @@ def results_to_dict(
         output["port_results"] = [asdict(r) for r in port_results]
     if http_results:
         output["http_results"] = [asdict(r) for r in http_results]
+    if video_service_results:
+        output["video_services"] = [asdict(r) for r in video_service_results]
 
     return output

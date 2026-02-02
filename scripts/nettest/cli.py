@@ -503,7 +503,8 @@ def main() -> None:
     # Handle output
     if args.format == "json":
         output_json(ping_results, speedtest_result, dns_results, mtr_results, diagnostic,
-                    port_results=port_results, http_results=http_results)
+                    port_results=port_results, http_results=http_results,
+                    video_service_results=video_service_results)
     else:
         if not suppress_output:
             display_terminal(
