@@ -20,6 +20,7 @@ class PingResult:
     packet_loss: float = 0.0
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
     samples: List[float] = field(default_factory=list)
 
 
@@ -32,6 +33,7 @@ class SpeedTestResult:
     server: str = ""
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -42,6 +44,7 @@ class DnsResult:
     resolved_ip: str = ""
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -64,6 +67,7 @@ class MtrResult:
     hops: List[MtrHop] = field(default_factory=list)
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -96,6 +100,7 @@ class BufferbloatResult:
     bloat_grade: str = ""  # A, B, C, D, F
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -127,6 +132,7 @@ class PortResult:
     open: bool = False
     response_time_ms: float = 0.0
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -137,6 +143,7 @@ class HttpResult:
     response_time_ms: float = 0.0
     success: bool = False
     error: str = ""
+    error_simple: str = ""  # User-friendly error message
 
 
 @dataclass
@@ -152,3 +159,5 @@ class VideoServiceResult:
     stun_latency_ms: float = 0.0           # RTT to STUN server
     status: str = "blocked"                # "ready", "degraded", "blocked"
     issues: List[str] = field(default_factory=list)  # ["Port 8801 blocked"]
+    error: str = ""                        # Technical error message
+    error_simple: str = ""                 # User-friendly error message

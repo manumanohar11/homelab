@@ -38,6 +38,7 @@ def check_tcp_port(
                 sock.bind((source_interface, 0))
             except OSError as e:
                 result.error = f"Cannot bind to {source_interface}: {e}"
+                result.error_simple = "Network adapter issue. Try: check your network settings"
                 return result
 
         # Attempt connection
@@ -51,15 +52,19 @@ def check_tcp_port(
         else:
             result.open = False
             result.error = f"Connection refused (error code: {error_code})"
+            result.error_simple = "Port is closed or blocked. This service may not be available"
 
         sock.close()
 
     except socket.timeout:
         result.error = f"Connection timed out after {timeout}s"
+        result.error_simple = "Connection too slow. Try: restart your router"
     except socket.gaierror as e:
         result.error = f"DNS resolution failed: {e}"
+        result.error_simple = "Cannot find server. Try: check if the address is correct"
     except OSError as e:
         result.error = f"Connection error: {e}"
+        result.error_simple = "Connection failed. Try: check your internet connection"
 
     return result
 

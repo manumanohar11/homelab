@@ -38,6 +38,7 @@ def detect_bufferbloat(
 
         if proc.returncode != 0:
             result.error = "Ping failed"
+            result.error_simple = "Cannot test bufferbloat. Try: check your internet connection"
             return result
 
         # Parse average latency
@@ -50,11 +51,14 @@ def detect_bufferbloat(
             result.success = True
         else:
             result.error = "Could not parse ping output"
+            result.error_simple = "Test result unclear. Try: run the test again"
 
     except subprocess.TimeoutExpired:
         result.error = "Ping timeout"
+        result.error_simple = "Connection too slow. Try: restart your router"
     except Exception as e:
         result.error = str(e)
+        result.error_simple = "Bufferbloat test failed. Try: check your internet connection"
 
     return result
 

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Test Report - {{ timestamp }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+{{ styles_css }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>Network Test Report</h1>
+                <p class="timestamp">{{ timestamp }}</p>
+            </div>
+            <button class="theme-toggle" onclick="toggleTheme()">Toggle Theme</button>
+        </div>
+
+        {# Executive Summary Section #}
+        {% if connection_score %}
+        <div class="section executive-summary">
+            <div class="summary-grid">
+                <div class="health-gauge" style="--gauge-value: {{ connection_score.overall }}; --gauge-color: {{ executive_summary.gauge_color }};">
+                    <div class="gauge-circle">
+                        <div class="gauge-inner">
+                            <span class="gauge-score" style="color: {{ executive_summary.gauge_color }};">{{ connection_score.overall }}</span>
+                            <span class="gauge-label">Health</span>
+                            <span class="gauge-grade" style="color: {{ executive_summary.gauge_color }};">{{ connection_score.grade }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="summary-details">
+                    <div>
+                        <div class="summary-title">Connection Health</div>
+                        <div class="summary-subtitle">{{ connection_score.summary }}</div>
+                    </div>
+                    <div class="metric-row">
+                        <div class="metric-pill">
+                            <span class="metric-value {{ executive_summary.speed_class }}">{{ executive_summary.speed_pct }}%</span>
+                            <span class="metric-label">Speed</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value {{ executive_summary.latency_class }}">{{ executive_summary.avg_latency|round|int }}ms</span>
+                            <span class="metric-label">Latency</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value {{ executive_summary.loss_class }}">{{ "%.1f"|format(executive_summary.avg_loss) }}%</span>
+                            <span class="metric-label">Loss</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{{ connection_score.speed_score }}</span>
+                            <span class="metric-label">Speed Score</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{{ connection_score.latency_score }}</span>
+                            <span class="metric-label">Latency Score</span>
+                        </div>
+                        <div class="metric-pill">
+                            <span class="metric-value">{{ connection_score.stability_score }}</span>
+                            <span class="metric-label">Stability</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# VoIP Quality Section #}
+        {% if voip_quality %}
+        <div class="section">
+            <h2>VoIP Quality Assessment</h2>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">MOS Score</div>
+                    <div class="card-value {{ voip_quality.mos_class }}">{{ "%.1f"|format(voip_quality.mos_score) }}</div>
+                    <div class="card-subtitle">out of 5.0</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Quality</div>
+                    <div class="card-value {{ voip_quality.mos_class }}">{{ voip_quality.quality }}</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">R-Factor</div>
+                    <div class="card-value">{{ voip_quality.r_factor|round|int }}</div>
+                    <div class="card-subtitle">out of 100</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Suitable For</div>
+                    <div class="card-value small">{{ voip_quality.suitable_for|join(', ') if voip_quality.suitable_for else 'Not recommended' }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# ISP Evidence Section #}
+        {% if isp_evidence and isp_evidence.has_issues %}
+        <div class="section" style="border-left: 4px solid var(--bad);">
+            <h2>ISP Complaint Evidence</h2>
+            <p class="dim">Generated: {{ isp_evidence.timestamp }}</p>
+            <p><strong>{{ isp_evidence.summary }}</strong></p>
+            <h4>Issues Documented</h4>
+            <ul>
+                {% if isp_evidence.speed_complaint %}<li class="bad">{{ isp_evidence.speed_complaint }}</li>{% endif %}
+                {% if isp_evidence.packet_loss_complaint %}<li class="bad">{{ isp_evidence.packet_loss_complaint }}</li>{% endif %}
+                {% if isp_evidence.latency_complaint %}<li class="warning">{{ isp_evidence.latency_complaint }}</li>{% endif %}
+            </ul>
+            {% if isp_evidence.problem_hops %}
+            <h4>Problem Hops (for ISP reference)</h4>
+            <ul>
+                {% for hop in isp_evidence.problem_hops %}
+                <li><code>{{ hop }}</code></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            <div class="export-buttons" style="margin-top: 1rem;">
+                <button class="export-btn" onclick="copyEvidence()">Copy Evidence Text</button>
+            </div>
+        </div>
+        {% endif %}
+
+        {# Bufferbloat Section #}
+        {% if bufferbloat and bufferbloat.success %}
+        <div class="section">
+            <h2>Bufferbloat Test</h2>
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">Grade</div>
+                    <div class="card-value {{ bufferbloat.grade_class }}">{{ bufferbloat.bloat_grade }}</div>
+                    <div class="card-subtitle">DSLReports scale</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Idle Latency</div>
+                    <div class="card-value">{{ "%.1f"|format(bufferbloat.idle_latency_ms) }} ms</div>
+                    <div class="card-subtitle">baseline</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Loaded Latency</div>
+                    <div class="card-value">{{ "%.1f"|format(bufferbloat.loaded_latency_ms) }} ms</div>
+                    <div class="card-subtitle">under load</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Bloat</div>
+                    <div class="card-value">{{ "%.1f"|format(bufferbloat.bloat_ms) }} ms</div>
+                    <div class="card-subtitle">increase</div>
+                </div>
+            </div>
+            <p class="dim" style="margin-top: 1rem;">
+                Grade scale: A (&lt;5ms) | B (5-30ms) | C (30-60ms) | D (60-200ms) | F (&gt;200ms)
+            </p>
+        </div>
+        {% endif %}
+
+        {# Video Services Section #}
+        {% if video_services %}
+        <div class="section">
+            <h2>Video Conferencing Services</h2>
+            <div class="cards">
+                {% for service in video_services %}
+                <div class="card" style="border-top: 3px solid {{ service.status_color }};">
+                    <div class="card-title">{{ service.name }}</div>
+                    <div class="card-value {{ service.status_class }}">{{ service.status_text }}</div>
+                    <div class="card-subtitle">{{ service.stun_text }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            <details style="margin-top: 1rem;">
+                <summary style="cursor: pointer; color: var(--text-dim);">Detailed Results</summary>
+                <table style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>DNS</th>
+                            <th>Ports</th>
+                            <th>STUN</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for service in video_services %}
+                        <tr>
+                            <td>{{ service.name }}</td>
+                            <td class="{{ service.dns_class }}">{{ service.dns_text }}</td>
+                            <td>{% for port_info in service.ports_info %}<span class="{{ port_info.class }}">{{ port_info.port }}</span> {% endfor %}</td>
+                            <td class="{{ service.stun_class }}">{{ service.stun_detail_text }}</td>
+                            <td class="{{ service.status_class }}">{{ service.status_text }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if video_services_issues %}
+                <h4>Issues</h4>
+                <ul>
+                    {% for issue in video_services_issues %}
+                    <li class="warning">{{ issue }}</li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </details>
+        </div>
+        {% endif %}
+
+        {# Diagnostic Section #}
+        <div class="section diagnostic" style="border-left: 4px solid {{ diagnostic.color }};">
+            <div class="diag-header">
+                <span class="diag-badge" style="background: {{ diagnostic.color }};">{{ diagnostic.label }}</span>
+                <span class="diag-confidence">Confidence: {{ diagnostic.confidence }}</span>
+            </div>
+            <h2 style="color: {{ diagnostic.color }};">{{ diagnostic.summary }}</h2>
+            {% if diagnostic.details %}
+            <ul>
+                {% for detail in diagnostic.details %}
+                <li>{{ detail }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% if diagnostic.recommendations %}
+            <h4>Recommendations</h4>
+            <ul>
+                {% for rec in diagnostic.recommendations %}
+                <li>{{ rec }}</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+        {# Speed Test Section #}
+        <div class="section">
+            <h2>Speed Test</h2>
+            {% if speedtest.success %}
+            <div class="cards">
+                <div class="card">
+                    <div class="card-title">Download</div>
+                    <div class="card-value {{ speedtest.dl_class }}">{{ "%.1f"|format(speedtest.download_mbps) }} Mbps</div>
+                    <div class="card-subtitle">{{ speedtest.dl_pct|round|int }}% of {{ speedtest.expected_speed }} Mbps expected</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Upload</div>
+                    <div class="card-value">{{ "%.1f"|format(speedtest.upload_mbps) }} Mbps</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Ping</div>
+                    <div class="card-value {{ speedtest.ping_class }}">{{ "%.1f"|format(speedtest.ping_ms) }} ms</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Server</div>
+                    <div class="card-value small">{{ speedtest.server }}</div>
+                </div>
+            </div>
+            {% else %}
+            <p class="bad">{{ speedtest.error }}</p>
+            {% endif %}
+        </div>
+
+        {# Latency Tests Section #}
+        <div class="section">
+            <h2>Latency Tests</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Min</th>
+                        <th>Avg</th>
+                        <th>Max</th>
+                        <th>Jitter</th>
+                        <th>Loss</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ping in ping_results %}
+                    {% if ping.success %}
+                    <tr>
+                        <td>{{ ping.target_name }}</td>
+                        <td>{{ "%.1f"|format(ping.min_ms) }} ms</td>
+                        <td class="{{ ping.avg_class }}">{{ "%.1f"|format(ping.avg_ms) }} ms</td>
+                        <td>{{ "%.1f"|format(ping.max_ms) }} ms</td>
+                        <td class="{{ ping.jitter_class }}">{{ "%.1f"|format(ping.jitter_ms) }} ms</td>
+                        <td class="{{ ping.loss_class }}">{{ "%.1f"|format(ping.packet_loss) }}%</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>{{ ping.target_name }}</td>
+                        <td colspan="5" class="bad">Error: {{ ping.error }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# DNS Resolution Section #}
+        <div class="section">
+            <h2>DNS Resolution</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Target</th>
+                        <th>Resolved IP</th>
+                        <th>Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dns in dns_results %}
+                    {% if dns.success %}
+                    <tr>
+                        <td>{{ dns.target }}</td>
+                        <td>{{ dns.resolved_ip or '-' }}</td>
+                        <td class="{{ dns.time_class }}">{{ dns.time_str }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>{{ dns.target }}</td>
+                        <td colspan="2" class="bad">{{ dns.error }}</td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {# MTR Route Sections #}
+        {% for mtr in mtr_results %}
+        <div class="section">
+            <h2>Route to {{ mtr.target_name }}</h2>
+            {% if mtr.success and mtr.hops %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Hop</th>
+                        <th>Host</th>
+                        <th>Loss</th>
+                        <th>Avg</th>
+                        <th>Best</th>
+                        <th>Worst</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for hop in mtr.hops %}
+                    <tr>
+                        <td>{{ hop.hop_number }}</td>
+                        <td>{{ hop.host }}</td>
+                        <td class="{{ hop.loss_class }}">{{ "%.1f"|format(hop.loss_pct) }}%</td>
+                        <td class="{{ hop.avg_class }}">{{ "%.1f"|format(hop.avg_ms) }} ms</td>
+                        <td>{{ "%.1f"|format(hop.best_ms) }} ms</td>
+                        <td>{{ "%.1f"|format(hop.worst_ms) }} ms</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="bad">{{ mtr.error }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        {# Route Health Heatmap #}
+        {% if route_heatmap %}
+        <div class="section">
+            <h2>Route Health Overview</h2>
+            <p class="dim">Green = 0% loss | Yellow = &lt;10% loss | Red = 10% loss (hover for details)</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        {% for i in range(route_heatmap.max_hops) %}
+                        <th>Hop {{ i + 1 }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for route in route_heatmap.routes %}
+                    <tr>
+                        <td><strong>{{ route.target_name }}</strong></td>
+                        {% for i in range(route_heatmap.max_hops) %}
+                        {% if i < route.hops|length %}
+                        <td class="{{ route.hops[i].color }}" title="{{ route.hops[i].title }}" style="text-align:center;font-size:1.2em;cursor:help;">&#9679;</td>
+                        {% else %}
+                        <td style="text-align:center;">-</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {# Historical Comparison Section #}
+        {% if historical %}
+        <div class="section">
+            <h2>Comparison with Previous Run</h2>
+            <p class="dim">Previous: {{ historical.timestamp }}</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Current</th>
+                        <th>Previous</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in historical.rows %}
+                    <tr>
+                        <td>{{ row.metric }}</td>
+                        <td>{{ row.current }}</td>
+                        <td>{{ row.previous }}</td>
+                        <td class="{{ row.change_class }}">{{ row.change_text }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {# Charts Section #}
+        <div class="charts-grid">
+            <div class="section">
+                <h2>Latency Comparison</h2>
+                <div class="chart-container">
+                    <canvas id="latencyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Jitter & Packet Loss</h2>
+                <div class="chart-container">
+                    <canvas id="jitterChart"></canvas>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Route Analysis</h2>
+                <div class="tab-container">
+                    <div class="tab-buttons" id="mtrTabs"></div>
+                    <div id="mtrChartContainer">
+                        <div class="chart-container">
+                            <canvas id="mtrChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="export-buttons">
+            <button class="export-btn" onclick="copyJSON()">Copy as JSON</button>
+            <button class="export-btn" onclick="window.print()">Print Report</button>
+        </div>
+    </div>
+
+    <script>
+        // Theme toggle
+        function toggleTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+        }
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        }
+
+        // Copy results as JSON
+        function copyJSON() {
+            const data = {
+                timestamp: '{{ timestamp }}',
+                ping: {{ chart_data.ping_avg | tojson }},
+                labels: {{ chart_data.ping_labels | tojson }}
+            };
+            navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+                .then(() => alert('Copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        }
+
+        function copyEvidence() {
+            const evidenceEl = document.querySelector('.section[style*="border-left: 4px solid var(--bad)"]');
+            if (evidenceEl) {
+                const text = evidenceEl.innerText;
+                navigator.clipboard.writeText(text)
+                    .then(() => alert('Evidence copied to clipboard!'))
+                    .catch(err => console.error('Failed to copy:', err));
+            }
+        }
+
+        const chartColors = {
+            good: '#22c55e',
+            warning: '#eab308',
+            bad: '#ef4444',
+            blue: '#3b82f6',
+            purple: '#8b5cf6',
+            cyan: '#06b6d4',
+        };
+
+        const zoomOptions = {
+            zoom: {
+                wheel: { enabled: true },
+                pinch: { enabled: true },
+                mode: 'xy',
+            },
+            pan: {
+                enabled: true,
+                mode: 'xy',
+            }
+        };
+
+        // Latency Chart
+        new Chart(document.getElementById('latencyChart'), {
+            type: 'bar',
+            data: {
+                labels: {{ chart_data.ping_labels | tojson }},
+                datasets: [
+                    {
+                        label: 'Min',
+                        data: {{ chart_data.ping_min | tojson }},
+                        backgroundColor: chartColors.good,
+                    },
+                    {
+                        label: 'Avg',
+                        data: {{ chart_data.ping_avg | tojson }},
+                        backgroundColor: chartColors.blue,
+                    },
+                    {
+                        label: 'Max',
+                        data: {{ chart_data.ping_max | tojson }},
+                        backgroundColor: chartColors.warning,
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#f1f5f9' }
+                    },
+                    zoom: zoomOptions
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    y: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' },
+                        title: {
+                            display: true,
+                            text: 'Latency (ms)',
+                            color: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Jitter & Loss Chart
+        new Chart(document.getElementById('jitterChart'), {
+            type: 'bar',
+            data: {
+                labels: {{ chart_data.ping_labels | tojson }},
+                datasets: [
+                    {
+                        label: 'Jitter (ms)',
+                        data: {{ chart_data.ping_jitter | tojson }},
+                        backgroundColor: chartColors.purple,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: 'Packet Loss (%)',
+                        data: {{ chart_data.ping_loss | tojson }},
+                        backgroundColor: chartColors.bad,
+                        yAxisID: 'y1',
+                    },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#f1f5f9' }
+                    },
+                    zoom: zoomOptions
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' }
+                    },
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        ticks: { color: '#94a3b8' },
+                        grid: { color: '#334155' },
+                        title: {
+                            display: true,
+                            text: 'Jitter (ms)',
+                            color: '#94a3b8'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        ticks: { color: '#94a3b8' },
+                        grid: { drawOnChartArea: false },
+                        title: {
+                            display: true,
+                            text: 'Packet Loss (%)',
+                            color: '#94a3b8'
+                        }
+                    }
+                }
+            }
+        });
+
+        // MTR Chart with route selector
+        const mtrData = {{ chart_data.mtr_all_routes | tojson }};
+        let currentMtrChart = null;
+
+        function createMtrTabs() {
+            const tabContainer = document.getElementById('mtrTabs');
+            if (!mtrData.target_names || mtrData.target_names.length === 0) {
+                tabContainer.textContent = 'No route data available';
+                tabContainer.className = 'dim';
+                return;
+            }
+
+            mtrData.target_names.forEach((name, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'tab-btn' + (index === 0 ? ' active' : '');
+                btn.textContent = name;
+                btn.onclick = () => selectMtrRoute(index);
+                tabContainer.appendChild(btn);
+            });
+
+            if (mtrData.routes.length > 0) {
+                renderMtrChart(0);
+            }
+        }
+
+        function selectMtrRoute(index) {
+            document.querySelectorAll('#mtrTabs .tab-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+            renderMtrChart(index);
+        }
+
+        function renderMtrChart(routeIndex) {
+            const route = mtrData.routes[routeIndex];
+            if (!route) return;
+
+            if (currentMtrChart) {
+                currentMtrChart.destroy();
+            }
+
+            const ctx = document.getElementById('mtrChart').getContext('2d');
+            currentMtrChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: route.labels,
+                    datasets: [
+                        {
+                            label: 'Latency (ms)',
+                            data: route.latency,
+                            borderColor: chartColors.cyan,
+                            backgroundColor: 'rgba(6, 182, 212, 0.1)',
+                            fill: true,
+                            tension: 0.3,
+                            yAxisID: 'y',
+                        },
+                        {
+                            label: 'Packet Loss (%)',
+                            data: route.loss,
+                            borderColor: chartColors.bad,
+                            backgroundColor: 'transparent',
+                            borderDash: [5, 5],
+                            yAxisID: 'y1',
+                        },
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#f1f5f9' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const hopIndex = context.dataIndex;
+                                    return 'Host: ' + route.hosts[hopIndex];
+                                }
+                            }
+                        },
+                        zoom: zoomOptions
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            ticks: { color: '#94a3b8' },
+                            grid: { color: '#334155' },
+                            title: {
+                                display: true,
+                                text: 'Latency (ms)',
+                                color: '#94a3b8'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            ticks: { color: '#94a3b8' },
+                            grid: { drawOnChartArea: false },
+                            title: {
+                                display: true,
+                                text: 'Packet Loss (%)',
+                                color: '#94a3b8'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        createMtrTabs();
+    </script>
+</body>
+</html>

@@ -62,25 +62,30 @@ def run_mtr(
     exit_code, stdout, stderr = run_command(cmd, timeout=count * 2 + 30)
 
     if exit_code != 0:
-        # Provide actionable error messages
+        # Provide actionable error messages (technical and simple)
         if "Command not found" in stderr:
             result.error = (
                 "mtr not found.\n"
                 "  Install (Debian/Ubuntu): sudo apt install mtr-tiny\n"
                 "  Install (Fedora/RHEL): sudo dnf install mtr"
             )
+            result.error_simple = "Route analysis unavailable. This is optional - tests will continue"
         elif "Operation not permitted" in stderr or "permission" in stderr.lower():
             result.error = (
                 "mtr requires elevated privileges.\n"
                 "  Option 1: Run with sudo: sudo python3 -m nettest\n"
                 "  Option 2: Set capabilities: sudo setcap cap_net_raw+ep /usr/sbin/mtr"
             )
+            result.error_simple = "Permission needed for route analysis. Try: run as administrator"
         elif "Name or service not known" in stderr:
             result.error = f"Cannot resolve '{target}'. Check DNS settings or use IP address."
+            result.error_simple = "Cannot find server. Try: check if the address is correct"
         elif "SO_BINDTODEVICE" in stderr:
             result.error = f"Cannot bind to interface '{interface}'. Check interface name or run with sudo."
+            result.error_simple = "Network adapter issue. Try: check your network settings"
         else:
             result.error = stderr or "mtr failed - check network connectivity"
+            result.error_simple = "Route analysis failed. Try: check your internet connection"
         return result
 
     # Parse report output
@@ -109,5 +114,6 @@ def run_mtr(
             "  - Firewall blocking ICMP/UDP packets\n"
             "  - Incompatible mtr version (try updating mtr)"
         )
+        result.error_simple = "Route analysis failed. The destination may be unreachable"
 
     return result

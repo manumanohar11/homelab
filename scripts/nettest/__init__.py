@@ -21,6 +21,13 @@ from .models import (
     ISPEvidence,
     PortResult,
     HttpResult,
+    VideoServiceResult,
+)
+from .exceptions import (
+    NettestError,
+    ConfigurationError,
+    DependencyError,
+    TestExecutionError,
 )
 
 __all__ = [
@@ -36,5 +43,10 @@ __all__ = [
     "ISPEvidence",
     "PortResult",
     "HttpResult",
+    "VideoServiceResult",
+    "NettestError",
+    "ConfigurationError",
+    "DependencyError",
+    "TestExecutionError",
     "__version__",
 ]

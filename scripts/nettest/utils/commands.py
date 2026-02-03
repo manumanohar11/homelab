@@ -4,10 +4,26 @@ Command execution utilities and dependency checking.
 
 import shutil
 import subprocess
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any
+from typing_extensions import TypedDict
+
+
+class InstallInstructions(TypedDict):
+    """Installation instructions for different platforms."""
+    debian: str
+    fedora: str
+
+
+class ToolInfo(TypedDict, total=False):
+    """Information about a required tool."""
+    required: bool
+    description: str
+    install: InstallInstructions
+    alternatives: List[str]
+
 
 # Tool requirements with installation instructions
-REQUIRED_TOOLS: Dict[str, Dict[str, Any]] = {
+REQUIRED_TOOLS: Dict[str, ToolInfo] = {
     "ping": {
         "required": True,
         "description": "Basic connectivity test",
@@ -44,7 +60,7 @@ REQUIRED_TOOLS: Dict[str, Dict[str, Any]] = {
 }
 
 
-def run_command(cmd: list, timeout: int = 60) -> Tuple[int, str, str]:
+def run_command(cmd: List[str], timeout: int = 60) -> Tuple[int, str, str]:
     """
     Run a command and return exit code, stdout, stderr.
 
@@ -71,6 +87,19 @@ def run_command(cmd: list, timeout: int = 60) -> Tuple[int, str, str]:
         return -1, "", str(e)
 
 
+def check_command_exists(command: str) -> bool:
+    """
+    Check if a command exists in the system PATH.
+
+    Args:
+        command: Name of the command to check
+
+    Returns:
+        True if the command exists, False otherwise
+    """
+    return shutil.which(command) is not None
+
+
 def check_dependencies(quiet: bool = False, console: Optional[Any] = None) -> Dict[str, bool]:
     """
     Check if required tools are installed.
@@ -82,7 +111,7 @@ def check_dependencies(quiet: bool = False, console: Optional[Any] = None) -> Di
     Returns:
         Dict of tool_name -> is_available
     """
-    results = {}
+    results: Dict[str, bool] = {}
 
     for tool, info in REQUIRED_TOOLS.items():
         # Check main tool

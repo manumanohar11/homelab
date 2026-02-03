@@ -114,6 +114,8 @@ def test_video_service(
         issues.append(f"DNS resolution failed: {dns_result.error}")
         result.status = "blocked"
         result.issues = issues
+        result.error = f"DNS resolution failed for {name}: {dns_result.error}"
+        result.error_simple = f"Cannot connect to {name}. Try: check your internet connection"
         return result
 
     # Test 2: TCP Port Connectivity
@@ -135,6 +137,8 @@ def test_video_service(
     if not critical_port_ok:
         result.status = "blocked"
         result.issues = issues
+        result.error = f"Port 443 (HTTPS) blocked for {name}"
+        result.error_simple = f"{name} is blocked. Your network may be restricting video calls"
         return result
 
     # Test 3: STUN Connectivity
@@ -154,8 +158,12 @@ def test_video_service(
         result.status = "ready"
     elif critical_port_ok:
         result.status = "degraded"
+        result.error = f"{name} connectivity is degraded: {', '.join(issues)}"
+        result.error_simple = f"{name} may have issues. Video calls might not work perfectly"
     else:
         result.status = "blocked"
+        result.error = f"{name} is blocked: {', '.join(issues)}"
+        result.error_simple = f"{name} is blocked. Your network may be restricting video calls"
 
     result.issues = issues
     return result

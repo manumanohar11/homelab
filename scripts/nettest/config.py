@@ -6,14 +6,15 @@ including support for named test profiles.
 """
 
 import os
-from typing import Dict, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 
 # Optional YAML support
+YAML_AVAILABLE: bool
 try:
     import yaml
     YAML_AVAILABLE = True
 except ImportError:
-    yaml = None  # type: ignore
+    yaml = None  # type: ignore[assignment]
     YAML_AVAILABLE = False
 
 
@@ -72,7 +73,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
 
 # Video Conferencing Service Endpoints
 # STUN servers: Use official servers where available, Cloudflare public STUN as fallback
-VIDEO_SERVICES = {
+VIDEO_SERVICES: Dict[str, Dict[str, Union[str, List[int], int]]] = {
     "Microsoft Teams": {
         "domain": "teams.microsoft.com",
         "tcp_ports": [443, 3478],
@@ -106,7 +107,7 @@ VIDEO_SERVICES = {
 }
 
 # Config search paths (in order of priority)
-CONFIG_SEARCH_PATHS = [
+CONFIG_SEARCH_PATHS: List[str] = [
     "./nettest.yml",
     "./nettest.yaml",
     os.path.expanduser("~/.config/nettest/config.yml"),
@@ -114,7 +115,7 @@ CONFIG_SEARCH_PATHS = [
 ]
 
 
-def deep_merge(base: dict, override: dict) -> dict:
+def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     """
     Deep merge two dictionaries, with override taking precedence.
 
@@ -138,7 +139,7 @@ def load_config(
     config_path: Optional[str] = None,
     quiet: bool = False,
     console: Optional[Any] = None
-) -> dict:
+) -> Dict[str, Any]:
     """
     Load configuration from YAML file with fallback to defaults.
 
@@ -210,7 +211,7 @@ def load_config(
     return config
 
 
-def get_profile(config: dict, profile_name: str) -> Optional[dict]:
+def get_profile(config: Dict[str, Any], profile_name: str) -> Optional[Dict[str, Any]]:
     """
     Get a named test profile from configuration.
 
@@ -221,11 +222,12 @@ def get_profile(config: dict, profile_name: str) -> Optional[dict]:
     Returns:
         Profile settings dict, or None if not found
     """
-    profiles = config.get("profiles", {})
-    return profiles.get(profile_name)
+    profiles: Dict[str, Dict[str, Any]] = config.get("profiles", {})
+    result: Optional[Dict[str, Any]] = profiles.get(profile_name)
+    return result
 
 
-def apply_profile(config: dict, profile_name: str) -> dict:
+def apply_profile(config: Dict[str, Any], profile_name: str) -> Dict[str, Any]:
     """
     Apply a named profile's settings to the configuration.
 
@@ -261,7 +263,7 @@ def apply_profile(config: dict, profile_name: str) -> dict:
     return result
 
 
-def save_config(config: dict, path: str) -> None:
+def save_config(config: Dict[str, Any], path: str) -> None:
     """
     Save configuration to YAML file.
 
@@ -279,7 +281,7 @@ def save_config(config: dict, path: str) -> None:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 
-def list_profiles(config: dict) -> list:
+def list_profiles(config: Dict[str, Any]) -> List[str]:
     """
     List available profile names.
 

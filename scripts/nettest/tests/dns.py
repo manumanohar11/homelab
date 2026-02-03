@@ -29,21 +29,26 @@ def run_dns_test(target: str) -> DnsResult:
     exit_code, stdout, stderr = run_command(cmd, timeout=10)
 
     if exit_code != 0:
-        # Provide actionable error messages
+        # Provide actionable error messages (technical and simple)
         if "Command not found" in stderr:
             result.error = (
                 "dig not found.\n"
                 "  Install (Debian/Ubuntu): sudo apt install dnsutils\n"
                 "  Install (Fedora/RHEL): sudo dnf install bind-utils"
             )
+            result.error_simple = "DNS test unavailable. This is optional - tests will continue"
         elif "connection timed out" in stderr.lower():
             result.error = f"DNS query timed out for '{target}'. Check your DNS server connectivity."
+            result.error_simple = "DNS server slow to respond. This may affect browsing speed"
         elif "SERVFAIL" in stderr:
             result.error = f"DNS server failure for '{target}'. Your DNS server may be misconfigured."
+            result.error_simple = "DNS server problem. Try: use Google DNS (8.8.8.8) or Cloudflare (1.1.1.1)"
         elif "NXDOMAIN" in stderr:
             result.error = f"Domain '{target}' does not exist (NXDOMAIN)."
+            result.error_simple = "Website address not found. Try: check for typos in the address"
         else:
             result.error = stderr or "DNS lookup failed - check your DNS settings"
+            result.error_simple = "DNS lookup failed. Try: restart your router"
         return result
 
     # Parse query time

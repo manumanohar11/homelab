@@ -54,7 +54,7 @@ def run_speedtest() -> SpeedTestResult:
     elif stderr and not last_error:
         last_error = stderr.strip()
 
-    # Provide error message with actual error if available
+    # Provide error message with actual error if available (technical and simple)
     if last_error:
         if "403" in last_error or "Forbidden" in last_error:
             result.error = (
@@ -62,10 +62,16 @@ def run_speedtest() -> SpeedTestResult:
                 "  Try again later or use Ookla official CLI:\n"
                 "  https://www.speedtest.net/apps/cli"
             )
+            result.error_simple = "Speed test temporarily blocked. Try: wait a few minutes and try again"
         elif "timeout" in last_error.lower():
             result.error = f"Speed test timed out: {last_error}"
+            result.error_simple = "Speed test took too long. Try: check your internet connection"
+        elif "connection" in last_error.lower() or "network" in last_error.lower():
+            result.error = f"Speed test failed: {last_error}"
+            result.error_simple = "Cannot test speed. Check your internet connection"
         else:
             result.error = f"Speed test failed: {last_error}"
+            result.error_simple = "Speed test failed. Try: restart your router and try again"
     else:
         result.error = (
             "Speed test tools not found.\n"
@@ -73,4 +79,5 @@ def run_speedtest() -> SpeedTestResult:
             "  Install (Fedora/RHEL): pip install speedtest-cli\n"
             "  Or use Ookla official: https://www.speedtest.net/apps/cli"
         )
+        result.error_simple = "Speed test unavailable. Install speedtest-cli for this feature"
     return result

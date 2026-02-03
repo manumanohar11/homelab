@@ -1,5 +1,6 @@
 """HTML report generator with charts and styling."""
 
+import html as html_module
 import json
 import os
 from datetime import datetime
@@ -10,6 +11,41 @@ from ..models import (
     MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality, ISPEvidence,
     BufferbloatResult, VideoServiceResult
 )
+
+# Try to import Jinja2 for template rendering
+try:
+    from jinja2 import Environment, BaseLoader, TemplateNotFound
+    JINJA2_AVAILABLE = True
+except ImportError:
+    JINJA2_AVAILABLE = False
+
+
+def _load_template_file(filename: str) -> str:
+    """Load a template file from the templates directory.
+
+    Uses importlib.resources for package compatibility.
+    """
+    try:
+        # Python 3.9+ preferred method
+        from importlib.resources import files
+        template_dir = files(__package__).joinpath('templates')
+        return (template_dir / filename).read_text(encoding='utf-8')
+    except (ImportError, TypeError):
+        # Fallback for older Python or non-package usage
+        template_path = os.path.join(os.path.dirname(__file__), 'templates', filename)
+        with open(template_path, 'r', encoding='utf-8') as f:
+            return f.read()
+
+
+class TemplateLoader(BaseLoader):
+    """Custom Jinja2 loader that loads from the templates directory."""
+
+    def get_source(self, environment, template):
+        try:
+            source = _load_template_file(template)
+            return source, template, lambda: True
+        except (FileNotFoundError, OSError):
+            raise TemplateNotFound(template)
 
 
 def get_status_class(value: float, metric: str, thresholds: Dict, reverse: bool = False) -> str:
@@ -60,10 +96,513 @@ def _prepare_mtr_chart_data(mtr_results: List[MtrResult]) -> Dict[str, Any]:
     return chart_data
 
 
+def _prepare_ping_data(ping_results: List[PingResult], thresholds: Dict) -> List[Dict]:
+    """Prepare ping results data for template."""
+    data = []
+    for pr in ping_results:
+        item = {
+            'target_name': pr.target_name,
+            'success': pr.success,
+            'error': pr.error if not pr.success else None,
+        }
+        if pr.success:
+            item.update({
+                'min_ms': pr.min_ms,
+                'avg_ms': pr.avg_ms,
+                'max_ms': pr.max_ms,
+                'jitter_ms': pr.jitter_ms,
+                'packet_loss': pr.packet_loss,
+                'avg_class': get_status_class(pr.avg_ms, "latency", thresholds),
+                'jitter_class': get_status_class(pr.jitter_ms, "jitter", thresholds),
+                'loss_class': get_status_class(pr.packet_loss, "packet_loss", thresholds),
+            })
+        data.append(item)
+    return data
+
+
+def _prepare_dns_data(dns_results: List[DnsResult], thresholds: Dict) -> List[Dict]:
+    """Prepare DNS results data for template."""
+    data = []
+    for dr in dns_results:
+        item = {
+            'target': dr.target,
+            'success': dr.success,
+            'error': dr.error if not dr.success else None,
+        }
+        if dr.success:
+            time_class = get_status_class(dr.resolution_time_ms, "latency", thresholds) if dr.resolution_time_ms > 0 else ""
+            time_str = f"{dr.resolution_time_ms:.0f} ms" if dr.resolution_time_ms > 0 else "N/A (IP)"
+            item.update({
+                'resolved_ip': dr.resolved_ip,
+                'time_class': time_class,
+                'time_str': time_str,
+            })
+        data.append(item)
+    return data
+
+
+def _prepare_mtr_data(mtr_results: List[MtrResult], thresholds: Dict) -> List[Dict]:
+    """Prepare MTR results data for template."""
+    data = []
+    for mtr in mtr_results:
+        item = {
+            'target_name': mtr.target_name,
+            'success': mtr.success,
+            'error': mtr.error if not mtr.success else None,
+            'hops': [],
+        }
+        if mtr.success and mtr.hops:
+            for hop in mtr.hops:
+                item['hops'].append({
+                    'hop_number': hop.hop_number,
+                    'host': hop.host,
+                    'loss_pct': hop.loss_pct,
+                    'avg_ms': hop.avg_ms,
+                    'best_ms': hop.best_ms,
+                    'worst_ms': hop.worst_ms,
+                    'loss_class': get_status_class(hop.loss_pct, "packet_loss", thresholds),
+                    'avg_class': get_status_class(hop.avg_ms, "latency", thresholds),
+                })
+        data.append(item)
+    return data
+
+
+def _prepare_route_heatmap_data(mtr_results: List[MtrResult]) -> Optional[Dict]:
+    """Prepare route heatmap data for template."""
+    if not mtr_results or not any(m.success for m in mtr_results):
+        return None
+
+    max_hops = max(len(m.hops) for m in mtr_results if m.success)
+    routes = []
+
+    for mtr in mtr_results:
+        if not mtr.success:
+            continue
+
+        hops_data = []
+        for i in range(len(mtr.hops)):
+            hop = mtr.hops[i]
+            if hop.loss_pct == 0:
+                color = "good"
+            elif hop.loss_pct < 10:
+                color = "warning"
+            else:
+                color = "bad"
+            host_escaped = html_module.escape(hop.host)
+            title = f"{host_escaped}: {hop.loss_pct:.0f}% loss, {hop.avg_ms:.1f}ms"
+            hops_data.append({'color': color, 'title': title})
+
+        routes.append({
+            'target_name': html_module.escape(mtr.target_name),
+            'hops': hops_data,
+        })
+
+    return {'max_hops': max_hops, 'routes': routes}
+
+
+def _prepare_diagnostic_data(diagnostic: DiagnosticResult) -> Dict:
+    """Prepare diagnostic data for template."""
+    diag_colors = {
+        "none": "#22c55e",
+        "local": "#ef4444",
+        "isp": "#ef4444",
+        "internet": "#eab308",
+        "target": "#eab308",
+    }
+    diag_labels = {
+        "none": "No Issues",
+        "local": "Local Network Issue",
+        "isp": "ISP Issue",
+        "internet": "Internet Backbone Issue",
+        "target": "Target-Specific Issue",
+    }
+    return {
+        'color': diag_colors.get(diagnostic.category, "#94a3b8"),
+        'label': diag_labels.get(diagnostic.category, "Unknown"),
+        'summary': diagnostic.summary,
+        'confidence': diagnostic.confidence,
+        'details': diagnostic.details or [],
+        'recommendations': diagnostic.recommendations or [],
+    }
+
+
+def _prepare_speedtest_data(
+    speedtest_result: SpeedTestResult,
+    expected_speed: float,
+    thresholds: Dict
+) -> Dict:
+    """Prepare speed test data for template."""
+    dl_pct = (speedtest_result.download_mbps / expected_speed) * 100 if expected_speed > 0 and speedtest_result.success else 0
+
+    data = {
+        'success': speedtest_result.success,
+        'error': speedtest_result.error if not speedtest_result.success else None,
+        'expected_speed': expected_speed,
+    }
+
+    if speedtest_result.success:
+        data.update({
+            'download_mbps': speedtest_result.download_mbps,
+            'upload_mbps': speedtest_result.upload_mbps,
+            'ping_ms': speedtest_result.ping_ms,
+            'server': speedtest_result.server,
+            'dl_pct': dl_pct,
+            'dl_class': get_status_class(dl_pct, "download_pct", thresholds, reverse=True),
+            'ping_class': get_status_class(speedtest_result.ping_ms, "latency", thresholds),
+        })
+
+    return data
+
+
+def _prepare_executive_summary_data(
+    connection_score: Optional[ConnectionScore],
+    speedtest_result: SpeedTestResult,
+    ping_results: List[PingResult],
+    expected_speed: float,
+) -> Optional[Dict]:
+    """Prepare executive summary data for template."""
+    if connection_score is None:
+        return None
+
+    # Determine gauge color
+    if connection_score.overall >= 80:
+        gauge_color = "var(--good)"
+    elif connection_score.overall >= 60:
+        gauge_color = "var(--warning)"
+    else:
+        gauge_color = "var(--bad)"
+
+    # Calculate metrics
+    speed_pct = int((speedtest_result.download_mbps / expected_speed) * 100) if expected_speed > 0 and speedtest_result.success else 0
+
+    avg_latency = 0
+    avg_loss = 0
+    successful_pings = [p for p in ping_results if p.success]
+    if successful_pings:
+        avg_latency = sum(p.avg_ms for p in successful_pings) / len(successful_pings)
+        avg_loss = sum(p.packet_loss for p in successful_pings) / len(successful_pings)
+
+    # Color classes
+    speed_class = "good" if speed_pct >= 80 else ("warning" if speed_pct >= 50 else "bad")
+    latency_class = "good" if avg_latency < 50 else ("warning" if avg_latency < 100 else "bad")
+    loss_class = "good" if avg_loss == 0 else ("warning" if avg_loss < 5 else "bad")
+
+    return {
+        'gauge_color': gauge_color,
+        'speed_pct': speed_pct,
+        'avg_latency': avg_latency,
+        'avg_loss': avg_loss,
+        'speed_class': speed_class,
+        'latency_class': latency_class,
+        'loss_class': loss_class,
+    }
+
+
+def _prepare_voip_data(voip_quality: Optional[VoIPQuality]) -> Optional[Dict]:
+    """Prepare VoIP quality data for template."""
+    if voip_quality is None:
+        return None
+
+    mos_class = "good" if voip_quality.mos_score >= 4.0 else (
+        "warning" if voip_quality.mos_score >= 3.6 else "bad"
+    )
+
+    return {
+        'mos_score': voip_quality.mos_score,
+        'quality': voip_quality.quality,
+        'r_factor': voip_quality.r_factor,
+        'suitable_for': voip_quality.suitable_for or [],
+        'mos_class': mos_class,
+    }
+
+
+def _prepare_evidence_data(evidence: Optional[ISPEvidence]) -> Optional[Dict]:
+    """Prepare ISP evidence data for template."""
+    if evidence is None:
+        return None
+
+    has_issues = (
+        evidence.speed_complaint or
+        evidence.packet_loss_complaint or
+        evidence.latency_complaint or
+        evidence.problem_hops
+    )
+
+    if not has_issues:
+        return None
+
+    return {
+        'timestamp': evidence.timestamp,
+        'summary': evidence.summary,
+        'speed_complaint': evidence.speed_complaint,
+        'packet_loss_complaint': evidence.packet_loss_complaint,
+        'latency_complaint': evidence.latency_complaint,
+        'problem_hops': evidence.problem_hops or [],
+        'has_issues': has_issues,
+    }
+
+
+def _prepare_bufferbloat_data(bufferbloat: Optional[BufferbloatResult]) -> Optional[Dict]:
+    """Prepare bufferbloat data for template."""
+    if bufferbloat is None or not bufferbloat.success:
+        return None
+
+    grade_colors = {
+        "A": "good",
+        "B": "good",
+        "C": "warning",
+        "D": "bad",
+        "F": "bad",
+    }
+
+    return {
+        'success': bufferbloat.success,
+        'bloat_grade': bufferbloat.bloat_grade,
+        'idle_latency_ms': bufferbloat.idle_latency_ms,
+        'loaded_latency_ms': bufferbloat.loaded_latency_ms,
+        'bloat_ms': bufferbloat.bloat_ms,
+        'grade_class': grade_colors.get(bufferbloat.bloat_grade, ""),
+    }
+
+
+def _prepare_video_services_data(results: Optional[List[VideoServiceResult]]) -> tuple:
+    """Prepare video services data for template."""
+    if not results:
+        return None, []
+
+    status_colors = {"ready": "var(--good)", "degraded": "var(--warning)", "blocked": "var(--bad)"}
+    status_texts = {"ready": "Ready", "degraded": "Degraded", "blocked": "Blocked"}
+    status_classes = {"ready": "good", "degraded": "warning", "blocked": "bad"}
+
+    services = []
+    all_issues = []
+
+    for r in results:
+        stun_text = f"{r.stun_latency_ms:.0f}ms STUN" if r.stun_ok else "STUN blocked"
+
+        ports_info = []
+        for port, ok in r.tcp_ports.items():
+            ports_info.append({
+                'port': port,
+                'class': 'good' if ok else 'bad',
+            })
+
+        services.append({
+            'name': r.name,
+            'status': r.status,
+            'status_color': status_colors.get(r.status, "var(--text-dim)"),
+            'status_text': status_texts.get(r.status, r.status),
+            'status_class': status_classes.get(r.status, ""),
+            'stun_text': stun_text,
+            'stun_ok': r.stun_ok,
+            'stun_latency_ms': r.stun_latency_ms,
+            'stun_class': 'good' if r.stun_ok else 'bad',
+            'stun_detail_text': f"{r.stun_latency_ms:.0f}ms" if r.stun_ok else "Failed",
+            'dns_ok': r.dns_ok,
+            'dns_latency_ms': r.dns_latency_ms,
+            'dns_class': 'good' if r.dns_ok else 'bad',
+            'dns_text': f"{r.dns_latency_ms:.0f}ms" if r.dns_ok else "Failed",
+            'ports_info': ports_info,
+        })
+
+        for issue in r.issues:
+            all_issues.append(f"{r.name}: {issue}")
+
+    return services, all_issues
+
+
+def _prepare_historical_data(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    historical: Optional[Dict]
+) -> Optional[Dict]:
+    """Prepare historical comparison data for template."""
+    if not historical:
+        return None
+
+    prev_ping = {p["target_name"]: p for p in historical.get("ping", [])}
+    prev_speed = historical.get("speedtest", {})
+
+    rows = []
+    for result in ping_results:
+        if result.success:
+            prev = prev_ping.get(result.target_name, {})
+            prev_avg = prev.get("avg_ms", 0)
+            if prev_avg > 0:
+                diff = result.avg_ms - prev_avg
+                pct = (diff / prev_avg) * 100
+                if abs(pct) < 5:
+                    change_class = ""
+                    change_text = "stable"
+                elif diff < 0:
+                    change_class = "good"
+                    change_text = f"{abs(diff):.1f}ms ({abs(pct):.0f}%)"
+                else:
+                    change_class = "bad"
+                    change_text = f"{diff:.1f}ms ({pct:.0f}%)"
+
+                rows.append({
+                    'metric': result.target_name,
+                    'current': f"{result.avg_ms:.1f}ms",
+                    'previous': f"{prev_avg:.1f}ms",
+                    'change_class': change_class,
+                    'change_text': change_text,
+                })
+
+    if speedtest_result.success and prev_speed.get("success"):
+        prev_dl = prev_speed.get("download_mbps", 0)
+        if prev_dl > 0:
+            diff = speedtest_result.download_mbps - prev_dl
+            pct = (diff / prev_dl) * 100
+            if abs(pct) < 5:
+                change_class = ""
+                change_text = "stable"
+            elif diff > 0:
+                change_class = "good"
+                change_text = f"{diff:.1f}Mbps ({pct:.0f}%)"
+            else:
+                change_class = "bad"
+                change_text = f"{abs(diff):.1f}Mbps ({abs(pct):.0f}%)"
+
+            rows.append({
+                'metric': 'Download Speed',
+                'current': f"{speedtest_result.download_mbps:.1f}Mbps",
+                'previous': f"{prev_dl:.1f}Mbps",
+                'change_class': change_class,
+                'change_text': change_text,
+            })
+
+    if not rows:
+        return None
+
+    return {
+        'timestamp': historical.get('timestamp', 'Unknown'),
+        'rows': rows,
+    }
+
+
+def _prepare_chart_data(ping_results: List[PingResult], mtr_results: List[MtrResult]) -> Dict:
+    """Prepare chart data for JavaScript."""
+    return {
+        'ping_labels': [pr.target_name for pr in ping_results if pr.success],
+        'ping_avg': [pr.avg_ms for pr in ping_results if pr.success],
+        'ping_min': [pr.min_ms for pr in ping_results if pr.success],
+        'ping_max': [pr.max_ms for pr in ping_results if pr.success],
+        'ping_jitter': [pr.jitter_ms for pr in ping_results if pr.success],
+        'ping_loss': [pr.packet_loss for pr in ping_results if pr.success],
+        'mtr_all_routes': _prepare_mtr_chart_data(mtr_results),
+    }
+
+
+def _render_with_jinja2(context: Dict) -> str:
+    """Render HTML report using Jinja2 templates."""
+    env = Environment(loader=TemplateLoader())
+
+    # Load CSS and inject into context
+    styles_css = _load_template_file('styles.css')
+    context['styles_css'] = styles_css
+
+    template = env.get_template('report.html')
+    return template.render(**context)
+
+
+def generate_html(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    dns_results: List[DnsResult],
+    mtr_results: List[MtrResult],
+    expected_speed: float,
+    output_dir: str,
+    diagnostic: DiagnosticResult,
+    thresholds: Dict[str, Any],
+    historical_data: Optional[Dict] = None,
+    connection_score: Optional[ConnectionScore] = None,
+    voip_quality: Optional[VoIPQuality] = None,
+    isp_evidence: Optional[ISPEvidence] = None,
+    bufferbloat_result: Optional[BufferbloatResult] = None,
+    video_service_results: Optional[List[VideoServiceResult]] = None,
+) -> str:
+    """
+    Generate HTML report with charts.
+
+    Args:
+        ping_results: Ping test results
+        speedtest_result: Speed test result
+        dns_results: DNS test results
+        mtr_results: MTR results
+        expected_speed: Expected download speed in Mbps
+        output_dir: Directory to save HTML file
+        diagnostic: Diagnostic analysis result
+        thresholds: Threshold configuration
+        historical_data: Previous test results for comparison (optional)
+
+    Returns:
+        Path to generated HTML file
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if JINJA2_AVAILABLE:
+        # Use Jinja2 template rendering
+        video_services, video_services_issues = _prepare_video_services_data(video_service_results)
+
+        context = {
+            'timestamp': timestamp,
+            'ping_results': _prepare_ping_data(ping_results, thresholds),
+            'dns_results': _prepare_dns_data(dns_results, thresholds),
+            'mtr_results': _prepare_mtr_data(mtr_results, thresholds),
+            'route_heatmap': _prepare_route_heatmap_data(mtr_results),
+            'diagnostic': _prepare_diagnostic_data(diagnostic),
+            'speedtest': _prepare_speedtest_data(speedtest_result, expected_speed, thresholds),
+            'connection_score': connection_score,
+            'executive_summary': _prepare_executive_summary_data(
+                connection_score, speedtest_result, ping_results, expected_speed
+            ),
+            'voip_quality': _prepare_voip_data(voip_quality),
+            'isp_evidence': _prepare_evidence_data(isp_evidence),
+            'bufferbloat': _prepare_bufferbloat_data(bufferbloat_result),
+            'video_services': video_services,
+            'video_services_issues': video_services_issues,
+            'historical': _prepare_historical_data(ping_results, speedtest_result, historical_data),
+            'chart_data': _prepare_chart_data(ping_results, mtr_results),
+        }
+
+        html = _render_with_jinja2(context)
+    else:
+        # Fallback to original f-string approach
+        html = _generate_html_fallback(
+            timestamp=timestamp,
+            ping_results=ping_results,
+            speedtest_result=speedtest_result,
+            dns_results=dns_results,
+            mtr_results=mtr_results,
+            expected_speed=expected_speed,
+            diagnostic=diagnostic,
+            thresholds=thresholds,
+            historical_data=historical_data,
+            connection_score=connection_score,
+            voip_quality=voip_quality,
+            isp_evidence=isp_evidence,
+            bufferbloat_result=bufferbloat_result,
+            video_service_results=video_service_results,
+        )
+
+    # Write HTML file
+    os.makedirs(output_dir, exist_ok=True)
+    filename = f"nettest_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+    filepath = os.path.join(output_dir, filename)
+
+    with open(filepath, 'w') as f:
+        f.write(html)
+
+    return filepath
+
+
+# ============================================================================
+# Fallback HTML generation (used when Jinja2 is not available)
+# ============================================================================
+
 def _build_route_heatmap(mtr_results: List[MtrResult], thresholds: Dict) -> str:
     """Build HTML for route health heatmap grid."""
-    import html as html_module
-
     if not mtr_results or not any(m.success for m in mtr_results):
         return ""
 
@@ -109,130 +648,6 @@ def _build_route_heatmap(mtr_results: List[MtrResult], thresholds: Dict) -> str:
             </table>
         </div>
     """
-
-
-def generate_html(
-    ping_results: List[PingResult],
-    speedtest_result: SpeedTestResult,
-    dns_results: List[DnsResult],
-    mtr_results: List[MtrResult],
-    expected_speed: float,
-    output_dir: str,
-    diagnostic: DiagnosticResult,
-    thresholds: Dict[str, Any],
-    historical_data: Optional[Dict] = None,
-    connection_score: Optional[ConnectionScore] = None,
-    voip_quality: Optional[VoIPQuality] = None,
-    isp_evidence: Optional[ISPEvidence] = None,
-    bufferbloat_result: Optional[BufferbloatResult] = None,
-    video_service_results: Optional[List[VideoServiceResult]] = None,
-) -> str:
-    """
-    Generate HTML report with charts.
-
-    Args:
-        ping_results: Ping test results
-        speedtest_result: Speed test result
-        dns_results: DNS test results
-        mtr_results: MTR results
-        expected_speed: Expected download speed in Mbps
-        output_dir: Directory to save HTML file
-        diagnostic: Diagnostic analysis result
-        thresholds: Threshold configuration
-        historical_data: Previous test results for comparison (optional)
-
-    Returns:
-        Path to generated HTML file
-    """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Prepare data for charts
-    ping_labels = json.dumps([pr.target_name for pr in ping_results if pr.success])
-    ping_avg = json.dumps([pr.avg_ms for pr in ping_results if pr.success])
-    ping_min = json.dumps([pr.min_ms for pr in ping_results if pr.success])
-    ping_max = json.dumps([pr.max_ms for pr in ping_results if pr.success])
-    ping_jitter = json.dumps([pr.jitter_ms for pr in ping_results if pr.success])
-    ping_loss = json.dumps([pr.packet_loss for pr in ping_results if pr.success])
-
-    # MTR data for all targets (not just first)
-    mtr_chart_data = _prepare_mtr_chart_data(mtr_results)
-    mtr_all_routes_json = json.dumps(mtr_chart_data)
-
-    # Calculate download percentage
-    dl_pct = (speedtest_result.download_mbps / expected_speed) * 100 if expected_speed > 0 and speedtest_result.success else 0
-
-    # Build latency table rows
-    latency_rows = _build_latency_rows(ping_results, thresholds)
-
-    # Build DNS table rows
-    dns_rows = _build_dns_rows(dns_results, thresholds)
-
-    # Build MTR sections
-    mtr_sections = _build_mtr_sections(mtr_results, thresholds)
-
-    # Build route heatmap
-    route_heatmap = _build_route_heatmap(mtr_results, thresholds)
-
-    # Build diagnostic section
-    diagnostic_section = _build_diagnostic_section(diagnostic)
-
-    # Build speed test section
-    speed_section = _build_speed_section(speedtest_result, expected_speed, dl_pct, thresholds)
-
-    # Build historical comparison if available
-    historical_section = ""
-    if historical_data:
-        historical_section = _build_historical_section(ping_results, speedtest_result, historical_data)
-
-    # Build executive summary
-    executive_summary = _build_executive_summary(
-        connection_score, speedtest_result, ping_results, expected_speed
-    )
-
-    # Build VoIP quality section
-    quality_section = _build_quality_section(voip_quality)
-
-    # Build ISP evidence section
-    evidence_section = _build_evidence_section(isp_evidence)
-
-    # Build bufferbloat section
-    bufferbloat_section = _build_bufferbloat_section(bufferbloat_result)
-
-    # Build video services section
-    video_services_section = _build_video_services_section(video_service_results)
-
-    html = _generate_html_template(
-        timestamp=timestamp,
-        executive_summary=executive_summary,
-        quality_section=quality_section,
-        evidence_section=evidence_section,
-        bufferbloat_section=bufferbloat_section,
-        video_services_section=video_services_section,
-        diagnostic_section=diagnostic_section,
-        speed_section=speed_section,
-        latency_rows=latency_rows,
-        dns_rows=dns_rows,
-        mtr_sections=mtr_sections,
-        route_heatmap=route_heatmap,
-        historical_section=historical_section,
-        ping_labels=ping_labels,
-        ping_min=ping_min,
-        ping_avg=ping_avg,
-        ping_max=ping_max,
-        ping_jitter=ping_jitter,
-        ping_loss=ping_loss,
-        mtr_all_routes=mtr_all_routes_json,
-    )
-
-    # Write HTML file
-    os.makedirs(output_dir, exist_ok=True)
-    filename = f"nettest_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
-    filepath = os.path.join(output_dir, filename)
-
-    with open(filepath, 'w') as f:
-        f.write(html)
-
-    return filepath
 
 
 def _build_latency_rows(ping_results: List[PingResult], thresholds: Dict) -> str:
@@ -802,8 +1217,371 @@ def _build_video_services_section(results: Optional[List[VideoServiceResult]]) -
     """
 
 
-def _generate_html_template(**kwargs) -> str:
-    """Generate the full HTML template with all sections."""
+def _generate_html_fallback(
+    timestamp: str,
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    dns_results: List[DnsResult],
+    mtr_results: List[MtrResult],
+    expected_speed: float,
+    diagnostic: DiagnosticResult,
+    thresholds: Dict[str, Any],
+    historical_data: Optional[Dict],
+    connection_score: Optional[ConnectionScore],
+    voip_quality: Optional[VoIPQuality],
+    isp_evidence: Optional[ISPEvidence],
+    bufferbloat_result: Optional[BufferbloatResult],
+    video_service_results: Optional[List[VideoServiceResult]],
+) -> str:
+    """Generate HTML using fallback f-string approach (when Jinja2 not available)."""
+    # Prepare data for charts
+    ping_labels = json.dumps([pr.target_name for pr in ping_results if pr.success])
+    ping_avg = json.dumps([pr.avg_ms for pr in ping_results if pr.success])
+    ping_min = json.dumps([pr.min_ms for pr in ping_results if pr.success])
+    ping_max = json.dumps([pr.max_ms for pr in ping_results if pr.success])
+    ping_jitter = json.dumps([pr.jitter_ms for pr in ping_results if pr.success])
+    ping_loss = json.dumps([pr.packet_loss for pr in ping_results if pr.success])
+
+    # MTR data for all targets
+    mtr_chart_data = _prepare_mtr_chart_data(mtr_results)
+    mtr_all_routes_json = json.dumps(mtr_chart_data)
+
+    # Calculate download percentage
+    dl_pct = (speedtest_result.download_mbps / expected_speed) * 100 if expected_speed > 0 and speedtest_result.success else 0
+
+    # Build sections
+    latency_rows = _build_latency_rows(ping_results, thresholds)
+    dns_rows = _build_dns_rows(dns_results, thresholds)
+    mtr_sections = _build_mtr_sections(mtr_results, thresholds)
+    route_heatmap = _build_route_heatmap(mtr_results, thresholds)
+    diagnostic_section = _build_diagnostic_section(diagnostic)
+    speed_section = _build_speed_section(speedtest_result, expected_speed, dl_pct, thresholds)
+
+    historical_section = ""
+    if historical_data:
+        historical_section = _build_historical_section(ping_results, speedtest_result, historical_data)
+
+    executive_summary = _build_executive_summary(
+        connection_score, speedtest_result, ping_results, expected_speed
+    )
+    quality_section = _build_quality_section(voip_quality)
+    evidence_section = _build_evidence_section(isp_evidence)
+    bufferbloat_section = _build_bufferbloat_section(bufferbloat_result)
+    video_services_section = _build_video_services_section(video_service_results)
+
+    # Load CSS from file or use embedded
+    try:
+        styles_css = _load_template_file('styles.css')
+    except (FileNotFoundError, OSError):
+        # Fallback to embedded CSS if file not found
+        styles_css = _get_embedded_css()
+
+    return _generate_html_template_fallback(
+        timestamp=timestamp,
+        styles_css=styles_css,
+        executive_summary=executive_summary,
+        quality_section=quality_section,
+        evidence_section=evidence_section,
+        bufferbloat_section=bufferbloat_section,
+        video_services_section=video_services_section,
+        diagnostic_section=diagnostic_section,
+        speed_section=speed_section,
+        latency_rows=latency_rows,
+        dns_rows=dns_rows,
+        mtr_sections=mtr_sections,
+        route_heatmap=route_heatmap,
+        historical_section=historical_section,
+        ping_labels=ping_labels,
+        ping_min=ping_min,
+        ping_avg=ping_avg,
+        ping_max=ping_max,
+        ping_jitter=ping_jitter,
+        ping_loss=ping_loss,
+        mtr_all_routes=mtr_all_routes_json,
+    )
+
+
+def _get_embedded_css() -> str:
+    """Return embedded CSS as fallback when styles.css cannot be loaded."""
+    return """:root {
+    --good: #22c55e;
+    --warning: #eab308;
+    --bad: #ef4444;
+    --bg: #0f172a;
+    --bg-card: #1e293b;
+    --text: #f1f5f9;
+    --text-dim: #94a3b8;
+    --border: #334155;
+}
+
+[data-theme="light"] {
+    --bg: #f8fafc;
+    --bg-card: #ffffff;
+    --text: #0f172a;
+    --text-dim: #64748b;
+    --border: #e2e8f0;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.container { max-width: 1200px; margin: 0 auto; }
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+h1 { color: var(--text); }
+.timestamp { color: var(--text-dim); }
+
+.theme-toggle {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.section {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+}
+
+.section h2 {
+    margin-bottom: 1rem;
+    color: var(--text);
+    font-size: 1.25rem;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.card {
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    border: 1px solid var(--border);
+}
+
+.card-title {
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.card-value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin: 0.5rem 0;
+}
+
+.card-value.small { font-size: 1rem; }
+.card-subtitle { color: var(--text-dim); font-size: 0.875rem; }
+
+table { width: 100%; border-collapse: collapse; }
+
+th, td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    color: var(--text-dim);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+}
+
+.good { color: var(--good); }
+.warning { color: var(--warning); }
+.bad { color: var(--bad); }
+.dim { color: var(--text-dim); }
+
+.chart-container { position: relative; height: 300px; margin-top: 1rem; }
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 1.5rem;
+}
+
+.diagnostic { margin-bottom: 2rem; }
+
+.diag-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.diag-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--bg);
+}
+
+.diag-confidence { color: var(--text-dim); font-size: 0.875rem; }
+
+.diagnostic ul { list-style: none; padding: 0; margin: 0.5rem 0; }
+
+.diagnostic li {
+    padding: 0.25rem 0;
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.diagnostic li::before {
+    content: "-";
+    position: absolute;
+    left: 0.5rem;
+    color: var(--text-dim);
+}
+
+.diagnostic h4 {
+    margin-top: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-dim);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+}
+
+.export-buttons { display: flex; gap: 0.5rem; margin-top: 1rem; }
+
+.export-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.75rem;
+}
+
+.tab-container { margin-bottom: 1rem; }
+
+.tab-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.tab-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.tab-btn.active {
+    background: var(--good);
+    color: var(--bg);
+    border-color: var(--good);
+}
+
+.executive-summary { margin-bottom: 2rem; }
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2rem;
+    align-items: center;
+}
+
+.health-gauge { position: relative; width: 180px; height: 180px; }
+
+.gauge-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(
+        var(--gauge-color) calc(var(--gauge-value) * 3.6deg),
+        var(--border) calc(var(--gauge-value) * 3.6deg)
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gauge-inner {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.gauge-score { font-size: 3rem; font-weight: bold; line-height: 1; }
+.gauge-label { font-size: 0.875rem; color: var(--text-dim); text-transform: uppercase; }
+.gauge-grade { font-size: 1.25rem; font-weight: 600; margin-top: 0.25rem; }
+
+.summary-details { display: flex; flex-direction: column; gap: 1rem; }
+.summary-title { font-size: 1.5rem; font-weight: 600; }
+.summary-subtitle { color: var(--text-dim); font-size: 1rem; }
+
+.metric-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+.metric-pill {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 80px;
+}
+
+.metric-value { font-size: 1.25rem; font-weight: 600; }
+.metric-label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; }
+
+@media (max-width: 600px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    body { padding: 1rem; }
+    .header { flex-direction: column; gap: 1rem; text-align: center; }
+    .summary-grid { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+}
+
+@media print {
+    body { background: white; color: black; }
+    .theme-toggle, .export-buttons { display: none; }
+}"""
+
+
+def _generate_html_template_fallback(**kwargs) -> str:
+    """Generate the full HTML template with all sections (fallback mode)."""
     return f"""<!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -813,397 +1591,7 @@ def _generate_html_template(**kwargs) -> str:
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
-        :root {{
-            --good: #22c55e;
-            --warning: #eab308;
-            --bad: #ef4444;
-            --bg: #0f172a;
-            --bg-card: #1e293b;
-            --text: #f1f5f9;
-            --text-dim: #94a3b8;
-            --border: #334155;
-        }}
-
-        [data-theme="light"] {{
-            --bg: #f8fafc;
-            --bg-card: #ffffff;
-            --text: #0f172a;
-            --text-dim: #64748b;
-            --border: #e2e8f0;
-        }}
-
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.6;
-            padding: 2rem;
-            transition: background-color 0.3s, color 0.3s;
-        }}
-
-        .container {{
-            max-width: 1200px;
-            margin: 0 auto;
-        }}
-
-        .header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 2rem;
-        }}
-
-        h1 {{
-            color: var(--text);
-        }}
-
-        .timestamp {{
-            color: var(--text-dim);
-        }}
-
-        .theme-toggle {{
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.5rem 1rem;
-            color: var(--text);
-            cursor: pointer;
-            font-size: 0.875rem;
-        }}
-
-        .theme-toggle:hover {{
-            border-color: var(--text-dim);
-        }}
-
-        .section {{
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid var(--border);
-        }}
-
-        .section h2 {{
-            margin-bottom: 1rem;
-            color: var(--text);
-            font-size: 1.25rem;
-        }}
-
-        .cards {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }}
-
-        .card {{
-            background: var(--bg);
-            border-radius: 8px;
-            padding: 1rem;
-            text-align: center;
-            border: 1px solid var(--border);
-        }}
-
-        .card-title {{
-            color: var(--text-dim);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }}
-
-        .card-value {{
-            font-size: 2rem;
-            font-weight: bold;
-            margin: 0.5rem 0;
-        }}
-
-        .card-value.small {{
-            font-size: 1rem;
-        }}
-
-        .card-subtitle {{
-            color: var(--text-dim);
-            font-size: 0.875rem;
-        }}
-
-        table {{
-            width: 100%;
-            border-collapse: collapse;
-        }}
-
-        th, td {{
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }}
-
-        th {{
-            color: var(--text-dim);
-            font-weight: 500;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-        }}
-
-        .good {{ color: var(--good); }}
-        .warning {{ color: var(--warning); }}
-        .bad {{ color: var(--bad); }}
-        .dim {{ color: var(--text-dim); }}
-
-        .chart-container {{
-            position: relative;
-            height: 300px;
-            margin-top: 1rem;
-        }}
-
-        .charts-grid {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
-            gap: 1.5rem;
-        }}
-
-        .diagnostic {{
-            margin-bottom: 2rem;
-        }}
-
-        .diag-header {{
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }}
-
-        .diag-badge {{
-            padding: 0.25rem 0.75rem;
-            border-radius: 9999px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--bg);
-        }}
-
-        .diag-confidence {{
-            color: var(--text-dim);
-            font-size: 0.875rem;
-        }}
-
-        .diagnostic ul {{
-            list-style: none;
-            padding: 0;
-            margin: 0.5rem 0;
-        }}
-
-        .diagnostic li {{
-            padding: 0.25rem 0;
-            padding-left: 1.5rem;
-            position: relative;
-        }}
-
-        .diagnostic li::before {{
-            content: "-";
-            position: absolute;
-            left: 0.5rem;
-            color: var(--text-dim);
-        }}
-
-        .diagnostic h4 {{
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            color: var(--text-dim);
-            font-size: 0.875rem;
-            text-transform: uppercase;
-        }}
-
-        .export-buttons {{
-            display: flex;
-            gap: 0.5rem;
-            margin-top: 1rem;
-        }}
-
-        .export-btn {{
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: var(--text);
-            cursor: pointer;
-            font-size: 0.75rem;
-        }}
-
-        .export-btn:hover {{
-            border-color: var(--text-dim);
-        }}
-
-        .tab-container {{
-            margin-bottom: 1rem;
-        }}
-
-        .tab-buttons {{
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }}
-
-        .tab-btn {{
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.5rem 1rem;
-            color: var(--text);
-            cursor: pointer;
-            font-size: 0.875rem;
-            transition: all 0.2s;
-        }}
-
-        .tab-btn:hover {{
-            border-color: var(--text-dim);
-        }}
-
-        .tab-btn.active {{
-            background: var(--good);
-            color: var(--bg);
-            border-color: var(--good);
-        }}
-
-        .executive-summary {{
-            margin-bottom: 2rem;
-        }}
-
-        .summary-grid {{
-            display: grid;
-            grid-template-columns: auto 1fr;
-            gap: 2rem;
-            align-items: center;
-        }}
-
-        .health-gauge {{
-            position: relative;
-            width: 180px;
-            height: 180px;
-        }}
-
-        .gauge-circle {{
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(
-                var(--gauge-color) calc(var(--gauge-value) * 3.6deg),
-                var(--border) calc(var(--gauge-value) * 3.6deg)
-            );
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }}
-
-        .gauge-inner {{
-            width: 140px;
-            height: 140px;
-            border-radius: 50%;
-            background: var(--bg-card);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }}
-
-        .gauge-score {{
-            font-size: 3rem;
-            font-weight: bold;
-            line-height: 1;
-        }}
-
-        .gauge-label {{
-            font-size: 0.875rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-        }}
-
-        .gauge-grade {{
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-top: 0.25rem;
-        }}
-
-        .summary-details {{
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }}
-
-        .summary-title {{
-            font-size: 1.5rem;
-            font-weight: 600;
-        }}
-
-        .summary-subtitle {{
-            color: var(--text-dim);
-            font-size: 1rem;
-        }}
-
-        .metric-row {{
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-        }}
-
-        .metric-pill {{
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-width: 80px;
-        }}
-
-        .metric-value {{
-            font-size: 1.25rem;
-            font-weight: 600;
-        }}
-
-        .metric-label {{
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-        }}
-
-        @media (max-width: 600px) {{
-            .charts-grid {{
-                grid-template-columns: 1fr;
-            }}
-
-            body {{
-                padding: 1rem;
-            }}
-
-            .header {{
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }}
-
-            .summary-grid {{
-                grid-template-columns: 1fr;
-                justify-items: center;
-                text-align: center;
-            }}
-        }}
-
-        @media print {{
-            body {{
-                background: white;
-                color: black;
-            }}
-            .theme-toggle, .export-buttons {{
-                display: none;
-            }}
-        }}
+{kwargs['styles_css']}
     </style>
 </head>
 <body>

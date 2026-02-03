@@ -1,8 +1,8 @@
 """Network diagnostic analysis to determine problem location."""
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Tuple
 
-from .models import PingResult, SpeedTestResult, MtrResult, DiagnosticResult
+from .models import PingResult, SpeedTestResult, MtrResult, MtrHop, DiagnosticResult
 
 
 def diagnose_network(
@@ -25,10 +25,10 @@ def diagnose_network(
     Returns:
         DiagnosticResult with problem category, confidence, and recommendations
     """
-    issues = []
-    local_issues = []
-    isp_issues = []
-    internet_issues = []
+    issues: List[str] = []
+    local_issues: List[str] = []
+    isp_issues: List[str] = []
+    internet_issues: List[str] = []
     target_issues: Dict[str, List[str]] = {}
 
     # Check speedtest results
@@ -100,7 +100,7 @@ def diagnose_network(
         if not mtr.success or not mtr.hops:
             continue
 
-        first_problem_hop = None
+        first_problem_hop: Optional[Tuple[int, MtrHop]] = None
         for i, hop in enumerate(mtr.hops):
             if hop.loss_pct > loss_threshold or hop.avg_ms > latency_threshold:
                 first_problem_hop = (i, hop)
@@ -119,11 +119,11 @@ def diagnose_network(
                 internet_issues.append(f"Problems start at hop {hop.hop_number} ({hop.host}) - internet backbone issue")
 
     # Determine the primary problem category
-    category = "none"
-    confidence = "low"
-    summary = ""
-    details = []
-    recommendations = []
+    category: str = "none"
+    confidence: str = "low"
+    summary: str = ""
+    details: List[str] = []
+    recommendations: List[str] = []
 
     if local_issues:
         category = "local"

@@ -1,6 +1,6 @@
 """Terminal output formatter using Rich."""
 
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 from rich.console import Console
 from rich.panel import Panel
@@ -10,7 +10,8 @@ from rich import box
 
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
-    MtrResult, DiagnosticResult, PortResult, HttpResult, VideoServiceResult
+    MtrResult, DiagnosticResult, PortResult, HttpResult, VideoServiceResult,
+    ConnectionScore
 )
 
 
@@ -397,3 +398,240 @@ def _display_video_services(results: List[VideoServiceResult], console: Console)
             console.print(f"  [yellow]{issue}[/yellow]")
 
     console.print()
+
+
+def simple_display(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    diagnostic: DiagnosticResult,
+    connection_score: Optional[ConnectionScore],
+    console: Console,
+) -> None:
+    """
+    Display results in simple, non-technical format for everyday users.
+
+    Shows maximum 5-7 lines with plain English descriptions.
+    No jargon like jitter, packet loss percentage, or MOS score.
+
+    Args:
+        ping_results: Ping test results
+        speedtest_result: Speed test result
+        diagnostic: Diagnostic analysis result
+        connection_score: Connection health score (optional)
+        console: Rich console instance
+    """
+    console.print()
+
+    # Determine overall grade and quality description
+    grade, stars, quality_desc, color = _calculate_simple_grade(
+        ping_results, speedtest_result, diagnostic, connection_score
+    )
+
+    # Line 1: Overall grade with stars
+    console.print(
+        f"[bold {color}]Your Internet: {grade} {stars}[/bold {color}]"
+    )
+
+    # Line 2: One-line quality summary
+    console.print(f"[{color}]Your connection is {quality_desc}[/{color}]")
+
+    console.print()
+
+    # Line 3: Speed summary
+    if speedtest_result and speedtest_result.success:
+        dl = speedtest_result.download_mbps
+        ul = speedtest_result.upload_mbps
+        dl_desc = _speed_to_description(dl)
+        console.print(
+            f"[cyan]Speed:[/cyan] {dl_desc} ({dl:.0f} Mbps down | {ul:.0f} Mbps up)"
+        )
+    else:
+        console.print("[cyan]Speed:[/cyan] Could not test")
+
+    # Line 4: Responsiveness (latency in plain terms)
+    avg_latency = _get_average_latency(ping_results)
+    if avg_latency is not None:
+        latency_desc, latency_color = _latency_to_description(avg_latency)
+        console.print(
+            f"[cyan]Responsiveness:[/cyan] [{latency_color}]{latency_desc}[/{latency_color}] ({avg_latency:.0f}ms)"
+        )
+
+    # Line 5: Actionable tip if there are issues
+    tip = _generate_actionable_tip(ping_results, speedtest_result, diagnostic)
+    if tip:
+        console.print()
+        console.print(f"[yellow]Tip: {tip}[/yellow]")
+
+    console.print()
+
+
+def _calculate_simple_grade(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    diagnostic: DiagnosticResult,
+    connection_score: Optional[ConnectionScore],
+) -> Tuple[str, str, str, str]:
+    """
+    Calculate a simple letter grade with stars.
+
+    Returns:
+        Tuple of (grade, stars, quality_description, color)
+    """
+    # If we have a connection score, use it
+    if connection_score:
+        grade = connection_score.grade
+        overall = connection_score.overall
+    else:
+        # Calculate a basic score from available data
+        score = 100
+
+        # Deduct for latency issues
+        avg_latency = _get_average_latency(ping_results)
+        if avg_latency is not None:
+            if avg_latency > 150:
+                score -= 40
+            elif avg_latency > 100:
+                score -= 25
+            elif avg_latency > 50:
+                score -= 10
+
+        # Deduct for packet loss
+        avg_loss = _get_average_packet_loss(ping_results)
+        if avg_loss is not None and avg_loss > 0:
+            if avg_loss > 5:
+                score -= 30
+            elif avg_loss > 2:
+                score -= 20
+            elif avg_loss > 0.5:
+                score -= 10
+
+        # Deduct for speed issues
+        if speedtest_result and speedtest_result.success:
+            if speedtest_result.download_mbps < 5:
+                score -= 30
+            elif speedtest_result.download_mbps < 25:
+                score -= 15
+
+        # Deduct for diagnostic issues
+        if diagnostic.category != "none":
+            if diagnostic.confidence == "high":
+                score -= 20
+            elif diagnostic.confidence == "medium":
+                score -= 10
+
+        overall = max(0, min(100, score))
+        grade = _score_to_grade(overall)
+
+    # Map grade to stars and description
+    grade_info = {
+        "A+": ("*****", "Excellent", "green"),
+        "A":  ("****-", "Very Good", "green"),
+        "B+": ("***--", "Good", "green"),
+        "B":  ("***--", "Good", "yellow"),
+        "C":  ("**---", "Fair", "yellow"),
+        "D":  ("*----", "Poor", "red"),
+        "F":  ("-----", "Very Poor", "red"),
+    }
+
+    stars, desc, color = grade_info.get(grade, ("**---", "Fair", "yellow"))
+    return grade, stars, desc, color
+
+
+def _score_to_grade(score: int) -> str:
+    """Convert numeric score to letter grade."""
+    if score >= 95:
+        return "A+"
+    elif score >= 85:
+        return "A"
+    elif score >= 75:
+        return "B+"
+    elif score >= 65:
+        return "B"
+    elif score >= 50:
+        return "C"
+    elif score >= 35:
+        return "D"
+    else:
+        return "F"
+
+
+def _get_average_latency(ping_results: List[PingResult]) -> Optional[float]:
+    """Get average latency from ping results."""
+    successful = [p for p in ping_results if p.success]
+    if not successful:
+        return None
+    return sum(p.avg_ms for p in successful) / len(successful)
+
+
+def _get_average_packet_loss(ping_results: List[PingResult]) -> Optional[float]:
+    """Get average packet loss from ping results."""
+    successful = [p for p in ping_results if p.success]
+    if not successful:
+        return None
+    return sum(p.packet_loss for p in successful) / len(successful)
+
+
+def _speed_to_description(download_mbps: float) -> str:
+    """Convert download speed to user-friendly description."""
+    if download_mbps >= 100:
+        return "Very Fast"
+    elif download_mbps >= 50:
+        return "Fast"
+    elif download_mbps >= 25:
+        return "Good"
+    elif download_mbps >= 10:
+        return "Moderate"
+    elif download_mbps >= 5:
+        return "Slow"
+    else:
+        return "Very Slow"
+
+
+def _latency_to_description(latency_ms: float) -> Tuple[str, str]:
+    """Convert latency to user-friendly description and color."""
+    if latency_ms <= 20:
+        return "Excellent", "green"
+    elif latency_ms <= 50:
+        return "Fast", "green"
+    elif latency_ms <= 100:
+        return "Good", "yellow"
+    elif latency_ms <= 150:
+        return "Slow", "yellow"
+    else:
+        return "Very Slow", "red"
+
+
+def _generate_actionable_tip(
+    ping_results: List[PingResult],
+    speedtest_result: SpeedTestResult,
+    diagnostic: DiagnosticResult,
+) -> Optional[str]:
+    """
+    Generate one actionable tip for the user based on detected issues.
+
+    Returns the most important tip, or None if no issues.
+    """
+    # Check for packet loss (connection stability issues)
+    avg_loss = _get_average_packet_loss(ping_results)
+    if avg_loss is not None and avg_loss > 2:
+        return "Your connection is dropping data. Try restarting your router."
+
+    # Check for high latency
+    avg_latency = _get_average_latency(ping_results)
+    if avg_latency is not None and avg_latency > 100:
+        return "Your connection is slow to respond. Try moving closer to your router or using a wired connection."
+
+    # Check for slow speeds
+    if speedtest_result and speedtest_result.success:
+        if speedtest_result.download_mbps < 10:
+            return "Your download speed is low. Check if others are using the network or contact your provider."
+
+    # Check diagnostic category
+    if diagnostic.category == "local":
+        return "There may be an issue with your device or router. Try restarting both."
+    elif diagnostic.category == "isp":
+        return "Your internet provider may be having issues. Consider contacting them if problems persist."
+    elif diagnostic.category == "internet" or diagnostic.category == "target":
+        return "Some websites may be slow right now. This is usually temporary."
+
+    return None

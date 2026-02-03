@@ -41,21 +41,28 @@ def run_ping_test(
     exit_code, stdout, stderr = run_command(cmd, timeout=count * 3 + 10)
 
     if exit_code != 0 and not stdout:
-        # Provide actionable error messages
+        # Provide actionable error messages (technical and simple)
         if "Name or service not known" in stderr or "Temporary failure in name resolution" in stderr:
             result.error = f"DNS resolution failed for '{target}'. Check your DNS settings or try an IP address."
+            result.error_simple = "Cannot find server. Try: check if the address is correct"
         elif "Network is unreachable" in stderr:
             result.error = "Network unreachable. Check your network connection and default gateway."
+            result.error_simple = "Cannot reach the internet. Try: check your WiFi connection"
         elif "Operation not permitted" in stderr:
             result.error = "Permission denied. Try running with sudo or check firewall settings."
+            result.error_simple = "Permission issue. Try: run the program with administrator access"
         elif "Command timed out" in stderr:
             result.error = f"Ping timed out after {count * 3 + 10}s. Host may be down or blocking ICMP."
+            result.error_simple = "Connection too slow. Try: restart your router"
         elif "Command not found" in stderr:
             result.error = "ping not found. Install: sudo apt install iputils-ping"
+            result.error_simple = "Ping tool not installed. Ask your system administrator for help"
         elif "SO_BINDTODEVICE" in stderr or "invalid argument" in stderr.lower():
             result.error = f"Cannot bind to interface '{interface}'. Check interface name or run with sudo."
+            result.error_simple = "Network interface issue. Try: check your network adapter settings"
         else:
             result.error = stderr or "Ping failed - check network connectivity"
+            result.error_simple = "Connection failed. Try: check your internet connection"
         return result
 
     # Parse individual ping times for jitter calculation

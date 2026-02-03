@@ -1,6 +1,6 @@
 """Output formatters for network test results."""
 
-from .terminal import display_terminal
+from .terminal import display_terminal, simple_display
 from .html import generate_html
 from .json_output import output_json
 from .evidence import generate_isp_evidence
@@ -15,6 +15,7 @@ except ImportError:
 
 __all__ = [
     "display_terminal",
+    "simple_display",
     "generate_html",
     "output_json",
     "generate_isp_evidence",
