@@ -4,8 +4,7 @@ Command execution utilities and dependency checking.
 
 import shutil
 import subprocess
-from typing import Dict, List, Tuple, Optional, Any
-from typing_extensions import TypedDict
+from typing import Dict, List, Tuple, Optional, Any, TypedDict
 
 
 class InstallInstructions(TypedDict):
