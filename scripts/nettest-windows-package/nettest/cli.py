@@ -18,8 +18,6 @@ from .tests import (
     measure_http_latency,
     calculate_connection_score,
     calculate_mos_score,
-    detect_bufferbloat,
-    run_video_service_tests,
 )
 from .tests.ping import run_ping_test
 from .output import display_terminal, generate_html, output_json, generate_isp_evidence, export_csv
@@ -401,7 +399,7 @@ def main() -> None:
             console.print("[yellow]Warning: prometheus-client not installed. Skipping metrics.[/yellow]")
 
     # Run all tests
-    ping_results, speedtest_result, dns_results, mtr_results = run_tests_with_progress(
+    ping_results, speedtest_result, dns_results, mtr_results, bufferbloat_result, video_service_results = run_tests_with_progress(
         targets,
         ping_count=ping_count,
         mtr_count=mtr_count,
@@ -414,6 +412,8 @@ def main() -> None:
         interface=args.interface,
         console=console,
         json_logger=json_logger,
+        run_bufferbloat=run_bufferbloat,
+        run_video_services=run_video_services,
     )
 
     # Run optional TCP port tests
@@ -442,12 +442,10 @@ def main() -> None:
             result = measure_http_latency(url)
             http_results.append(result)
 
-    # Run video service tests if requested
-    video_service_results = []
-    if run_video_services:
-        if not suppress_output:
-            console.print("[dim]Running video service connectivity tests...[/dim]")
-        video_service_results = run_video_service_tests()
+    # Video service results are now returned from run_tests_with_progress()
+    # Just ensure we have a list if tests weren't run
+    if video_service_results is None:
+        video_service_results = []
 
     # Run diagnostics
     diagnostic = diagnose_network(
@@ -481,12 +479,9 @@ def main() -> None:
         ping_results, speedtest_result, mtr_results, diagnostic, expected_speed
     )
 
-    # Run bufferbloat test if requested
-    bufferbloat_result = None
-    if run_bufferbloat:
-        if not suppress_output:
-            console.print("[dim]Running bufferbloat test...[/dim]")
-        bufferbloat_result = detect_bufferbloat(interface=args.interface)
+    # Bufferbloat results are now returned from run_tests_with_progress()
+    # Display result summary if available
+    if bufferbloat_result is not None and not suppress_output:
         if bufferbloat_result.success:
             console.print(f"[green]Bufferbloat: Grade {bufferbloat_result.bloat_grade} ({bufferbloat_result.idle_latency_ms:.1f}ms baseline)[/green]")
         else:

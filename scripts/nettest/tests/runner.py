@@ -3,11 +3,16 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple, Optional, Any
 
-from ..models import PingResult, SpeedTestResult, DnsResult, MtrResult
+from ..models import (
+    PingResult, SpeedTestResult, DnsResult, MtrResult,
+    BufferbloatResult, VideoServiceResult
+)
 from .ping import run_ping_test
 from .speedtest import run_speedtest
 from .dns import run_dns_test
 from .mtr import run_mtr
+from .bufferbloat import detect_bufferbloat
+from .video_services import run_video_service_tests
 
 
 def run_tests_with_progress(
@@ -23,7 +28,9 @@ def run_tests_with_progress(
     interface: Optional[str] = None,
     console: Optional[Any] = None,
     json_logger: Optional[Any] = None,
-) -> Tuple[List[PingResult], SpeedTestResult, List[DnsResult], List[MtrResult]]:
+    run_bufferbloat: bool = False,
+    run_video_services: bool = False,
+) -> Tuple[List[PingResult], SpeedTestResult, List[DnsResult], List[MtrResult], Optional[BufferbloatResult], List[VideoServiceResult]]:
     """
     Run network tests with progress indicators.
 
@@ -40,9 +47,11 @@ def run_tests_with_progress(
         interface: Network interface to use (e.g., "eth0")
         console: Rich console for progress output
         json_logger: JsonLogger instance for structured logging
+        run_bufferbloat: Run bufferbloat detection test
+        run_video_services: Run video conferencing service tests
 
     Returns:
-        Tuple of (ping_results, speedtest_result, dns_results, mtr_results)
+        Tuple of (ping_results, speedtest_result, dns_results, mtr_results, bufferbloat_result, video_service_results)
     """
     from rich.progress import (
         Progress, SpinnerColumn, TextColumn,
@@ -53,6 +62,8 @@ def run_tests_with_progress(
     dns_results: List[DnsResult] = []
     mtr_results: List[MtrResult] = []
     speedtest_result = SpeedTestResult()
+    bufferbloat_result: Optional[BufferbloatResult] = None
+    video_service_results: List[VideoServiceResult] = []
 
     # Calculate total steps based on what tests we're running
     num_targets = len(targets)
@@ -63,6 +74,10 @@ def run_tests_with_progress(
         total_steps += num_targets
     if not skip_mtr:
         total_steps += num_targets
+    if run_bufferbloat:
+        total_steps += 1
+    if run_video_services:
+        total_steps += 1  # Video services run as a batch
 
     # Use console if provided, otherwise create a default
     if console is None:
@@ -169,6 +184,18 @@ def run_tests_with_progress(
                         json_logger.log_mtr_result(result)
                     progress.advance(overall_task)
 
+        # Run bufferbloat test (always sequential - measures latency under load)
+        if run_bufferbloat:
+            progress.update(overall_task, description="[cyan]Testing bufferbloat...")
+            bufferbloat_result = detect_bufferbloat(interface=interface)
+            progress.advance(overall_task)
+
+        # Run video service tests
+        if run_video_services:
+            progress.update(overall_task, description="[cyan]Testing video services...")
+            video_service_results = run_video_service_tests()
+            progress.advance(overall_task)
+
         progress.update(overall_task, description="[green]Tests complete!")
 
-    return ping_results, speedtest_result, dns_results, mtr_results
+    return ping_results, speedtest_result, dns_results, mtr_results, bufferbloat_result, video_service_results
