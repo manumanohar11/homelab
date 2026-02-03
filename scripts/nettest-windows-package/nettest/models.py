@@ -5,7 +5,7 @@ All result types are immutable dataclasses that can be serialized to JSON.
 """
 
 from dataclasses import dataclass, field
-from typing import List
+from typing import Dict, List
 
 
 @dataclass
@@ -137,3 +137,18 @@ class HttpResult:
     response_time_ms: float = 0.0
     success: bool = False
     error: str = ""
+
+
+@dataclass
+class VideoServiceResult:
+    """Result of video conferencing service connectivity test."""
+    name: str                              # "Zoom", "WhatsApp", etc.
+    domain: str                            # Primary domain tested
+    dns_ok: bool = False                   # Could resolve primary domain
+    dns_latency_ms: float = 0.0            # DNS resolution time
+    tcp_ports: Dict[int, bool] = field(default_factory=dict)  # {443: True, 8801: False}
+    tcp_latencies: Dict[int, float] = field(default_factory=dict)  # {443: 15.2, 8801: 0.0}
+    stun_ok: bool = False                  # STUN binding succeeded
+    stun_latency_ms: float = 0.0           # RTT to STUN server
+    status: str = "blocked"                # "ready", "degraded", "blocked"
+    issues: List[str] = field(default_factory=list)  # ["Port 8801 blocked"]

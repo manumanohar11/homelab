@@ -19,18 +19,56 @@ $ErrorActionPreference = "Stop"
 # Configuration
 $ImageName = "nettest"
 $OutputDir = "$PSScriptRoot\output"
+$DockerCmd = $null
 
 Write-Host "Network Testing Tool - Windows" -ForegroundColor Cyan
 Write-Host "===============================" -ForegroundColor Cyan
 Write-Host ""
 
-# Check Docker
+# Find Docker executable
 Write-Host "Checking Docker..." -ForegroundColor Yellow
-try {
-    docker version | Out-Null
-} catch {
-    Write-Host "ERROR: Docker is not running!" -ForegroundColor Red
+
+# Try docker in PATH first
+$DockerInPath = Get-Command docker -ErrorAction SilentlyContinue
+if ($DockerInPath) {
+    $DockerCmd = "docker"
+}
+
+# Check common Docker Desktop installation paths
+if (-not $DockerCmd) {
+    $DockerPaths = @(
+        "$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe",
+        "$env:LOCALAPPDATA\Docker\wsl\docker.exe"
+    )
+    foreach ($path in $DockerPaths) {
+        if (Test-Path $path) {
+            $DockerCmd = $path
+            break
+        }
+    }
+}
+
+# Docker not found
+if (-not $DockerCmd) {
+    Write-Host "ERROR: Docker is not installed!" -ForegroundColor Red
     Write-Host "Please install Docker Desktop from: https://www.docker.com/products/docker-desktop" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "After installing, RESTART your computer and run this script again." -ForegroundColor Yellow
+    exit 1
+}
+
+# Verify Docker is running
+try {
+    & $DockerCmd version 2>&1 | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "Docker not running" }
+} catch {
+    Write-Host "ERROR: Docker is installed but not running!" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Please start Docker Desktop:" -ForegroundColor Yellow
+    Write-Host "  1. Look for the whale icon in your system tray" -ForegroundColor Yellow
+    Write-Host "  2. Or search 'Docker Desktop' in Start menu and open it" -ForegroundColor Yellow
+    Write-Host "  3. Wait 1-2 minutes for it to start" -ForegroundColor Yellow
+    Write-Host "  4. Run this script again" -ForegroundColor Yellow
     exit 1
 }
 
@@ -40,10 +78,14 @@ if (-not (Test-Path $OutputDir)) {
 }
 
 # Build image if not exists
-$ImageExists = docker images -q $ImageName 2>$null
+$ImageExists = & $DockerCmd images -q $ImageName 2>$null
 if (-not $ImageExists) {
     Write-Host "Building Docker image (first run only)..." -ForegroundColor Yellow
-    docker build -t $ImageName $PSScriptRoot
+    & $DockerCmd build -t $ImageName $PSScriptRoot
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Failed to build Docker image!" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Run test based on mode
@@ -56,7 +98,7 @@ $HistoryFile = "$OutputDir\history_$($env:COMPUTERNAME).json"
 
 switch ($Mode) {
     "quick" {
-        docker run --rm `
+        & $DockerCmd run --rm `
             --cap-add NET_RAW `
             -v "${OutputDir}:/output" `
             $ImageName `
@@ -64,7 +106,7 @@ switch ($Mode) {
             --output /output
     }
     "full" {
-        docker run --rm `
+        & $DockerCmd run --rm `
             --cap-add NET_RAW `
             -v "${OutputDir}:/output" `
             $ImageName `
@@ -73,7 +115,7 @@ switch ($Mode) {
             --output /output
     }
     "compare" {
-        docker run --rm `
+        & $DockerCmd run --rm `
             --cap-add NET_RAW `
             -v "${OutputDir}:/output" `
             $ImageName `

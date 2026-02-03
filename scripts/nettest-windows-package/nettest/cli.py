@@ -11,7 +11,7 @@ from rich.panel import Panel
 from . import __version__
 from .config import load_config, apply_profile, list_profiles
 from .diagnostics import diagnose_network
-from .models import PortResult, HttpResult
+from .models import PortResult, HttpResult, VideoServiceResult
 from .tests import (
     run_tests_with_progress,
     check_tcp_port,
@@ -19,6 +19,7 @@ from .tests import (
     calculate_connection_score,
     calculate_mos_score,
     detect_bufferbloat,
+    run_video_service_tests,
 )
 from .tests.ping import run_ping_test
 from .output import display_terminal, generate_html, output_json, generate_isp_evidence, export_csv
@@ -208,6 +209,11 @@ Examples:
         action="store_true",
         help="Run ping and DNS tests in parallel"
     )
+    parser.add_argument(
+        "--video-services", "-vs",
+        action="store_true",
+        help="Test video conferencing service connectivity (Teams, Zoom, WhatsApp, Meet, Webex)"
+    )
 
     return parser
 
@@ -310,6 +316,7 @@ def main() -> None:
     # Handle interactive mode
     run_bufferbloat = args.bufferbloat
     run_export_csv = args.export_csv
+    run_video_services = args.video_services
     generate_evidence_report = False
 
     if args.interactive:
@@ -326,6 +333,7 @@ def main() -> None:
         targets = interactive_settings["targets"]
         run_bufferbloat = interactive_settings.get("bufferbloat", False)
         run_export_csv = interactive_settings.get("export_csv", False)
+        run_video_services = interactive_settings.get("video_services", False)
         generate_evidence_report = interactive_settings.get("generate_evidence", False)
     else:
         # Determine skip flags from profile
@@ -434,6 +442,13 @@ def main() -> None:
             result = measure_http_latency(url)
             http_results.append(result)
 
+    # Run video service tests if requested
+    video_service_results = []
+    if run_video_services:
+        if not suppress_output:
+            console.print("[dim]Running video service connectivity tests...[/dim]")
+        video_service_results = run_video_service_tests()
+
     # Run diagnostics
     diagnostic = diagnose_network(
         ping_results,
@@ -488,7 +503,8 @@ def main() -> None:
     # Handle output
     if args.format == "json":
         output_json(ping_results, speedtest_result, dns_results, mtr_results, diagnostic,
-                    port_results=port_results, http_results=http_results)
+                    port_results=port_results, http_results=http_results,
+                    video_service_results=video_service_results)
     else:
         if not suppress_output:
             display_terminal(
@@ -502,6 +518,7 @@ def main() -> None:
                 console,
                 port_results=port_results,
                 http_results=http_results,
+                video_service_results=video_service_results,
             )
 
             # Show VoIP quality if calculated
@@ -548,6 +565,7 @@ def main() -> None:
             voip_quality=voip_quality,
             isp_evidence=isp_evidence,
             bufferbloat_result=bufferbloat_result,
+            video_service_results=video_service_results,
         )
         if not suppress_output:
             console.print(f"[green]HTML report saved to: {html_path}[/green]")

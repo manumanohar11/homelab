@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from ..models import (
     PingResult, SpeedTestResult, DnsResult,
     MtrResult, DiagnosticResult, ConnectionScore, VoIPQuality, ISPEvidence,
-    BufferbloatResult
+    BufferbloatResult, VideoServiceResult
 )
 
 
@@ -125,6 +125,7 @@ def generate_html(
     voip_quality: Optional[VoIPQuality] = None,
     isp_evidence: Optional[ISPEvidence] = None,
     bufferbloat_result: Optional[BufferbloatResult] = None,
+    video_service_results: Optional[List[VideoServiceResult]] = None,
 ) -> str:
     """
     Generate HTML report with charts.
@@ -197,12 +198,16 @@ def generate_html(
     # Build bufferbloat section
     bufferbloat_section = _build_bufferbloat_section(bufferbloat_result)
 
+    # Build video services section
+    video_services_section = _build_video_services_section(video_service_results)
+
     html = _generate_html_template(
         timestamp=timestamp,
         executive_summary=executive_summary,
         quality_section=quality_section,
         evidence_section=evidence_section,
         bufferbloat_section=bufferbloat_section,
+        video_services_section=video_services_section,
         diagnostic_section=diagnostic_section,
         speed_section=speed_section,
         latency_rows=latency_rows,
@@ -703,6 +708,100 @@ def _build_bufferbloat_section(bufferbloat: Optional[BufferbloatResult]) -> str:
     """
 
 
+def _build_video_services_section(results: Optional[List[VideoServiceResult]]) -> str:
+    """Build video conferencing services section."""
+    if not results:
+        return ""
+
+    # Build service cards
+    cards_html = ""
+    for r in results:
+        status_colors = {"ready": "var(--good)", "degraded": "var(--warning)", "blocked": "var(--bad)"}
+        status_icons = {"ready": "Ready", "degraded": "Degraded", "blocked": "Blocked"}
+        status_class = {"ready": "good", "degraded": "warning", "blocked": "bad"}
+
+        color = status_colors.get(r.status, "var(--text-dim)")
+        icon = status_icons.get(r.status, r.status)
+        css_class = status_class.get(r.status, "")
+
+        stun_text = f"{r.stun_latency_ms:.0f}ms STUN" if r.stun_ok else "STUN blocked"
+
+        cards_html += f"""
+            <div class="card" style="border-top: 3px solid {color};">
+                <div class="card-title">{r.name}</div>
+                <div class="card-value {css_class}">{icon}</div>
+                <div class="card-subtitle">{stun_text}</div>
+            </div>
+        """
+
+    # Build detailed table
+    rows_html = ""
+    for r in results:
+        dns_class = "good" if r.dns_ok else "bad"
+        dns_text = f"{r.dns_latency_ms:.0f}ms" if r.dns_ok else "Failed"
+
+        ports_html = ""
+        for port, ok in r.tcp_ports.items():
+            port_class = "good" if ok else "bad"
+            ports_html += f'<span class="{port_class}">{port}</span> '
+
+        stun_class = "good" if r.stun_ok else "bad"
+        stun_text = f"{r.stun_latency_ms:.0f}ms" if r.stun_ok else "Failed"
+
+        status_class = {"ready": "good", "degraded": "warning", "blocked": "bad"}.get(r.status, "")
+        status_text = {"ready": "Ready", "degraded": "Degraded", "blocked": "Blocked"}.get(r.status, r.status)
+
+        rows_html += f"""
+            <tr>
+                <td>{r.name}</td>
+                <td class="{dns_class}">{dns_text}</td>
+                <td>{ports_html}</td>
+                <td class="{stun_class}">{stun_text}</td>
+                <td class="{status_class}">{status_text}</td>
+            </tr>
+        """
+
+    # Build issues list
+    issues_html = ""
+    all_issues = []
+    for r in results:
+        for issue in r.issues:
+            all_issues.append(f"{r.name}: {issue}")
+
+    if all_issues:
+        issues_html = "<h4>Issues</h4><ul>"
+        for issue in all_issues:
+            issues_html += f"<li class='warning'>{issue}</li>"
+        issues_html += "</ul>"
+
+    return f"""
+        <div class="section">
+            <h2>Video Conferencing Services</h2>
+            <div class="cards">
+                {cards_html}
+            </div>
+            <details style="margin-top: 1rem;">
+                <summary style="cursor: pointer; color: var(--text-dim);">Detailed Results</summary>
+                <table style="margin-top: 1rem;">
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>DNS</th>
+                            <th>Ports</th>
+                            <th>STUN</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+                {issues_html}
+            </details>
+        </div>
+    """
+
+
 def _generate_html_template(**kwargs) -> str:
     """Generate the full HTML template with all sections."""
     return f"""<!DOCTYPE html>
@@ -1124,6 +1223,8 @@ def _generate_html_template(**kwargs) -> str:
         {kwargs.get('evidence_section', '')}
 
         {kwargs.get('bufferbloat_section', '')}
+
+        {kwargs.get('video_services_section', '')}
 
         {kwargs['diagnostic_section']}
 
