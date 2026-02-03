@@ -18,6 +18,8 @@ try:
     JINJA2_AVAILABLE = True
 except ImportError:
     JINJA2_AVAILABLE = False
+    BaseLoader = object  # Placeholder for when Jinja2 is not available
+    TemplateNotFound = Exception  # Placeholder
 
 
 def _load_template_file(filename: str) -> str:
@@ -41,6 +43,8 @@ class TemplateLoader(BaseLoader):
     """Custom Jinja2 loader that loads from the templates directory."""
 
     def get_source(self, environment, template):
+        if not JINJA2_AVAILABLE:
+            raise RuntimeError("Jinja2 is not available")
         try:
             source = _load_template_file(template)
             return source, template, lambda: True
