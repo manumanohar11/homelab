@@ -46,7 +46,6 @@ graph TB
         Grafana[Grafana]
         AlertManager[AlertManager]
         UptimeKuma[Uptime Kuma]
-        cAdvisor[cAdvisor]
     end
 
     subgraph VPN["🔒 VPN & Network"]
@@ -75,7 +74,7 @@ graph TB
     subgraph MANAGEMENT["🛠️ Management"]
         Portainer[Portainer]
         Watchtower[Watchtower]
-        Dozzle[Dozzle]
+        Glances[Glances]
     end
 
     subgraph REQUESTS["📝 Requests"]
@@ -86,8 +85,8 @@ graph TB
 
     subgraph UTILITIES["🧰 Utilities"]
         Homepage[Homepage]
-        ITTools[IT-Tools]
-        Stirling[Stirling PDF]
+        Dozzle[Dozzle]
+        Glance[Glance]
     end
 
     Newt --> MEDIA
@@ -108,14 +107,14 @@ graph TB
 | **Ingress** | External access & authentication | Newt, Pangolin |
 | **Media Servers** | Content streaming | Plex, Jellyfin, Kavita, Navidrome |
 | **Photos** | Photo management & ML | Immich, PostgreSQL, Redis |
-| **Monitoring** | Metrics & alerting | Prometheus, Grafana, AlertManager |
+| **Monitoring** | Metrics & alerting | Prometheus, Grafana, AlertManager, Uptime Kuma |
 | **VPN** | Privacy & network routing | Gluetun |
 | **\*Arr Stack** | Media automation | Radarr, Sonarr, Lidarr, Readarr |
 | **Downloaders** | Content acquisition | qBittorrent, Prowlarr |
 | **Backup** | Data protection | Duplicati, Restic, DB Backup |
-| **Management** | Container operations | Portainer, Watchtower |
+| **Management** | Container operations | Portainer, Watchtower, Glances |
 | **Requests** | User request portals | Overseerr, Maintainerr |
-| **Utilities** | Tools & dashboards | Homepage, IT-Tools, Stirling PDF |
+| **Utilities** | Tools & dashboards | Homepage, Dozzle, Glance |
 
 ---
 
@@ -274,7 +273,6 @@ graph LR
 flowchart TB
     subgraph COLLECTORS["📊 Data Collectors"]
         NodeExporter["Node Exporter<br/>(System Metrics)"]
-        cAdvisor["cAdvisor<br/>(Container Metrics)"]
         ServiceMetrics["Service Exporters<br/>(App Metrics)"]
     end
 
@@ -293,7 +291,6 @@ flowchart TB
     end
 
     NodeExporter --> Prometheus
-    cAdvisor --> Prometheus
     ServiceMetrics --> Prometheus
     Prometheus --> PromQL
     PromQL --> Grafana

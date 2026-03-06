@@ -28,7 +28,6 @@ Complete guide to the monitoring stack: Prometheus, Grafana, alerting, and obser
 flowchart TB
     subgraph COLLECTION["📊 Data Collection"]
         NodeExporter["Node Exporter<br/>(System Metrics)"]
-        cAdvisor["cAdvisor<br/>(Container Metrics)"]
         AppMetrics["App Exporters<br/>(Service Metrics)"]
     end
 
@@ -46,7 +45,6 @@ flowchart TB
     end
 
     NodeExporter -->|scrape| Prometheus
-    cAdvisor -->|scrape| Prometheus
     AppMetrics -->|scrape| Prometheus
     Prometheus -->|query| Grafana
     Prometheus -->|alerts| AlertManager
@@ -78,7 +76,6 @@ flowchart TB
 | **Grafana** | Visualization & dashboards | 3000 |
 | **AlertManager** | Alert routing | 9093 |
 | **Node Exporter** | System metrics | 9100 |
-| **cAdvisor** | Container metrics | 8081 |
 | **Uptime Kuma** | Uptime monitoring | 3001 |
 
 ### Optional (via Profiles)
@@ -143,9 +140,6 @@ scrape_configs:
     static_configs:
       - targets: ['node-exporter:9100']
 
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
 ```
 
 ### Adding Scrape Targets
@@ -177,10 +171,10 @@ mindmap
       Memory Usage
       Disk Usage
       Network I/O
-    Containers
-      Container CPU
-      Container Memory
-      Container Status
+    Availability
+      Scrape Target Health
+      Service Uptime
+      Alert Status
     Custom
       Service Uptime
       Request Rates
@@ -202,14 +196,14 @@ mindmap
 (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100
 ```
 
-**Container CPU:**
+**Scrape Target Health:**
 ```promql
-rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100
+up
 ```
 
-**Container Memory:**
+**Prometheus Ingestion Rate:**
 ```promql
-container_memory_usage_bytes{name!=""}
+rate(prometheus_tsdb_head_samples_appended_total[5m])
 ```
 
 ### Data Retention
@@ -283,7 +277,6 @@ graph TB
 **Recommended Dashboard IDs:**
 - `1860` - Node Exporter Full
 - `893` - Docker and System Monitoring
-- `14282` - cAdvisor Container Metrics
 
 #### Custom Dashboard
 
@@ -646,28 +639,28 @@ graph TB
     style DASHBOARD fill:#2c3e50,color:#fff
 ```
 
-Create a dashboard showing all containers:
+Create a dashboard showing the health of key scrape targets:
 
 ```json
 {
   "panels": [
     {
-      "title": "Container CPU Usage",
+      "title": "Scrape Target Health",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "rate(container_cpu_usage_seconds_total{name!=\"\"}[5m]) * 100",
-          "legendFormat": "{{name}}"
+          "expr": "up",
+          "legendFormat": "{{job}}"
         }
       ]
     },
     {
-      "title": "Container Memory Usage",
+      "title": "Prometheus Ingestion Rate",
       "type": "timeseries",
       "targets": [
         {
-          "expr": "container_memory_usage_bytes{name!=\"\"} / 1024 / 1024",
-          "legendFormat": "{{name}}"
+          "expr": "rate(prometheus_tsdb_head_samples_appended_total[5m])",
+          "legendFormat": "samples/s"
         }
       ]
     }
@@ -767,22 +760,22 @@ groups:
   - name: containers
     rules:
       - alert: ContainerDown
-        expr: absent(container_last_seen{name=~"plex|immich_server|grafana"})
+        expr: up{job=~"prometheus|grafana|node-exporter|alertmanager"} == 0
         for: 1m
         labels:
           severity: critical
         annotations:
           summary: "Critical container is down"
-          description: "Container {{ $labels.name }} is not running"
+          description: "Scrape target {{ $labels.job }} is unavailable"
 
       - alert: ContainerHighCPU
-        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Container high CPU"
-          description: "Container {{ $labels.name }} CPU usage is high"
+          summary: "Host CPU usage is high"
+          description: "Node exporter reports sustained CPU usage above 80%"
 ```
 
 ### Reload Rules

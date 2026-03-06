@@ -1,13 +1,63 @@
 # ~/media-stack/docker-compose.monitoring.yml
 # Contains monitoring stack: Prometheus, Grafana, InfluxDB, Telegraf, and Alerting
 
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
+
+x-resources-grafana: &resources-grafana
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 1G
+      reservations:
+        memory: 256M
+
 services:
   prometheus:
+    <<: [*service-defaults, *resources-grafana]
     image: prom/prometheus:latest
     container_name: prometheus
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -26,30 +76,14 @@ services:
       - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
+      <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   alertmanager:
+    <<: [*service-defaults, *resources-small]
     image: prom/alertmanager:latest
     container_name: alertmanager
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
@@ -65,30 +99,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          memory: 64M
+      <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   grafana:
+    <<: [*service-defaults, *resources-large]
     image: grafana/grafana:latest
     container_name: grafana
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     networks:
       - media-stack
     ports:
@@ -107,30 +125,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   node-exporter:
+    <<: [*service-defaults, *resources-small]
     image: prom/node-exporter:latest
     container_name: node-exporter
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     networks:
       - media-stack
     ports:
@@ -146,27 +148,12 @@ services:
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9100/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          memory: 64M
+      <<: *healthcheck-defaults
+
   uptime-kuma:
+    <<: [*service-defaults, *resources-medium]
     image: louislam/uptime-kuma:1
     container_name: uptime-kuma
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     networks:
       - media-stack
     ports:
@@ -182,66 +169,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "/app/extra/healthcheck.js"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-
-  scrutiny:
-    image: ghcr.io/analogj/scrutiny:master-omnibus
-    container_name: scrutiny
-    restart: unless-stopped
-    cap_add:
-      - SYS_RAWIO
-      - SYS_ADMIN
-    networks:
-      - media-stack
-    ports:
-      - "8082:8080"
-    volumes:
-      - ${DOCKER_BASE_DIR}/scrutiny/config:/opt/scrutiny/config
-      - ${DOCKER_BASE_DIR}/scrutiny/influxdb:/opt/scrutiny/influxdb
-      - /run/udev:/run/udev:ro
-    devices:
-      - /dev/sda:/dev/sda   # Samsung SSD 750 EVO 250GB
-      - /dev/sdb:/dev/sdb   # ST4000VN008 4TB
-      - /dev/sdc:/dev/sdc   # ST1000DM010 1TB
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-      - "homepage.group=Monitoring"
-      - "homepage.name=Scrutiny"
-      - "homepage.icon=scrutiny"
-      - "homepage.href=http://${SERVER_IP:-localhost}:8082"
-      - "homepage.description=Hard Drive Health"

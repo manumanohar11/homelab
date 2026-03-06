@@ -1,18 +1,44 @@
 # ~/media-stack/docker-compose.media-extras.yml
 # Contains media utilities: Tautulli (Plex stats), Maintainerr (cleanup), Tdarr (transcoding)
 
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
 services:
   # Tautulli - Plex media server monitoring and statistics
   tautulli:
+    <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/tautulli:latest
     container_name: tautulli
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/tautulli:/config
     networks:
@@ -21,32 +47,16 @@ services:
       - "8181:8181"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8181/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # Maintainerr - Automated media cleanup based on rules (requires *arr stack)
   maintainerr:
+    <<: [*service-defaults, *resources-medium]
     image: ghcr.io/jorenn92/maintainerr:latest
     container_name: maintainerr
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
       TZ: ${TZ}
     volumes:
@@ -57,22 +67,8 @@ services:
       - "6246:6246"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6246"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:

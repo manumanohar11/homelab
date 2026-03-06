@@ -53,13 +53,7 @@
       "Bash(pip3 list:*)",
       "Bash(dig:*)",
       "Bash(git push)",
-      "Bash(PYTHONPATH=/mnt/local_disk_g/docker/scripts python3:*)",
-      "Bash(python -m nettest:*)",
-      "Bash(PYTHONPATH=/mnt/local_disk_g/docker/scripts/nettest python:*)",
-      "Bash(PYTHONPATH=/mnt/local_disk_g/docker/scripts/nettest python3:*)",
-      "Bash(/mnt/local_disk_g/docker/scripts/nettest.py:*)",
-      "Bash(# Count lines of code wc -l /mnt/local_disk_g/docker/scripts/nettest/*.py /mnt/local_disk_g/docker/scripts/nettest/**/*.py)",
-      "Bash(__NEW_LINE_7ac3ced8371e8d50__ echo -e \"\\\\n=== All tests passed! ===\")"
+      "Bash(__NEW_LINE_7ac3ced8371e8d50__ echo -e \"\\n=== All tests passed! ===\")"
     ],
     "deny": []
   },

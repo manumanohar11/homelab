@@ -28,12 +28,10 @@ flowchart TB
     subgraph DAILY["🕐 Daily Backups (3 AM)"]
         direction TB
         PG["PostgreSQL Backup"]
-        SQLite["SQLite Backup"]
     end
 
     subgraph LOCAL_STORAGE["💾 Local Storage"]
         DB_Backup["/data/db-backup/<br/>6-day retention"]
-        SQLite_Backup["/data/db-backup/sqlite/<br/>7-day retention"]
     end
 
     subgraph CLOUD["☁️ Cloud Backup (Duplicati)"]
@@ -43,7 +41,6 @@ flowchart TB
     end
 
     PG --> DB_Backup
-    SQLite --> SQLite_Backup
     DB_Backup --> Destinations
     Sources --> Destinations
 
@@ -57,7 +54,6 @@ flowchart TB
 | Backup Type | Schedule | Retention | Location |
 |:------------|:---------|:----------|:---------|
 | PostgreSQL | Daily 3:00 AM | 6 days | `/data/db-backup/` |
-| SQLite | Daily | 7 days | `/data/db-backup/sqlite/` |
 | Duplicati | Configurable | Configurable | Cloud storage |
 | Manual | On-demand | As needed | Local/Remote |
 
@@ -165,26 +161,7 @@ db-backup:
 
 **Backup location:** `/data/db-backup/`
 
-### SQLite Backup Service
-
-Backs up SQLite databases (Uptime Kuma, Grafana):
-
-```yaml
-sqlite-backup:
-  image: alpine
-  command: |
-    sh -c 'while true; do
-      # Backup Uptime Kuma
-      sqlite3 /source/uptime-kuma/kuma.db ".backup /backup/sqlite/kuma-$(date +%Y%m%d).db"
-      # Backup Grafana
-      sqlite3 /source/grafana/grafana.db ".backup /backup/sqlite/grafana-$(date +%Y%m%d).db"
-      # Keep 7 days
-      find /backup/sqlite -name "*.db" -mtime +7 -delete
-      sleep 86400
-    done'
-```
-
-**Backup location:** `/data/db-backup/sqlite/`
+SQLite-backed services such as Uptime Kuma and Grafana should be backed up manually or covered by your Duplicati jobs.
 
 ---
 

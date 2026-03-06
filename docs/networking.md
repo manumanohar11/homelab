@@ -305,19 +305,22 @@ gluetun:
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
+| 3000 | Grafana | HTTP | Direct |
+| 3001 | Uptime Kuma | HTTP | Direct |
 | 9090 | Prometheus | HTTP | Direct |
 | 9093 | AlertManager | HTTP | Direct |
 | 9100 | Node Exporter | HTTP | Direct |
-| 8081 | cAdvisor | HTTP | Direct |
 | 8765 | Speedtest Tracker | HTTP | Direct |
 | 8082 | Scrutiny | HTTP | Direct |
+| 61208 | Glances | HTTP | Direct |
 
 #### Utilities
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
-| 8083 | IT-Tools | HTTP | Direct |
-| 8084 | Stirling PDF | HTTP | Direct |
+| 3002 | Homepage | HTTP | Direct |
+| 8088 | Glance | HTTP | Direct |
+| 8889 | Dozzle | HTTP | Direct |
 | 8200 | Duplicati | HTTP | Direct |
 | 8000 | Restic | HTTP | Direct |
 
@@ -349,7 +352,7 @@ newt:
   environment:
     NEWT_ID: ${NEWT_ID}
     NEWT_SECRET: ${NEWT_SECRET}
-    NEWT_ENDPOINT: ${NEWT_ENDPOINT}
+    PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT}
 ```
 
 ### Option 2: Cloudflare Tunnel

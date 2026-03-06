@@ -38,11 +38,6 @@ scrape_configs:
     static_configs:
       - targets: ['node-exporter:9100']
 
-  # cAdvisor - Container metrics
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
-
   # Loki metrics
   - job_name: 'loki'
     static_configs:

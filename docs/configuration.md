@@ -39,15 +39,16 @@ include:
   - docker-compose.requests.yml
   - docker-compose.management.yml
   - docker-compose.monitoring.yml
+  - docker-compose.logging.yml
   - docker-compose.utilities.yml
   - docker-compose.backup.yml
 
   # Disabled by default
   # - docker-compose.arr.yml
   # - docker-compose.downloaders.yml
-  # - docker-compose.logging.yml
   # - docker-compose.automation.yml
   # - docker-compose.files.yml
+  # - docker-compose.local.yml
 ```
 
 ### Module Reference
@@ -57,15 +58,15 @@ include:
 | `common.yml` | YAML anchors, shared configs | Templates only |
 | `core.yml` | Core infrastructure | Docker Proxy, Gluetun, Newt |
 | `photos.yml` | Photo management | Immich, PostgreSQL, Redis |
-| `media-servers.yml` | Media streaming | Plex, Jellyfin, Tdarr |
-| `media-extras.yml` | Media utilities | Tautulli, Maintainerr, Kavita, Navidrome |
+| `media-servers.yml` | Media streaming | Plex, Jellyfin, Stash, Kavita, Navidrome |
+| `media-extras.yml` | Media utilities | Tautulli, Maintainerr, Tdarr |
 | `arr.yml` | Media automation | Radarr, Sonarr, Lidarr, Readarr, Bazarr |
 | `downloaders.yml` | Download clients | qBittorrent, Prowlarr, FlareSolverr |
 | `requests.yml` | Request portals | Overseerr, Jellyseerr |
-| `management.yml` | Container management | Portainer, Watchtower, Glances |
+| `management.yml` | Container management | Portainer, Watchtower, Glances, Glance |
 | `monitoring.yml` | Monitoring stack | Prometheus, Grafana, AlertManager |
 | `logging.yml` | Log aggregation | Loki, Promtail, Vector |
-| `utilities.yml` | Utility services | Homepage, Dozzle, IT-Tools |
+| `utilities.yml` | Utility services | Homepage, Dozzle, Scrutiny, Speedtest |
 | `backup.yml` | Backup services | Duplicati, Restic, DB Backup |
 | `automation.yml` | Workflow automation | n8n |
 | `files.yml` | File sharing | Nextcloud |
@@ -113,15 +114,17 @@ docker compose up -d
 | `monitoring` | Glances | management.yml |
 | `dashboard` | Glance | management.yml |
 | `jellyfin` | Jellyfin, Jellyseerr | media-servers.yml, requests.yml |
+| `kavita` | Kavita | media-servers.yml |
 | `stash` | Stash | media-servers.yml |
-| `tdarr` | Tdarr | media-servers.yml |
+| `tdarr` | Tdarr | media-extras.yml |
+| `requests` | Overseerr | requests.yml |
+| `maintainerr` | Maintainerr | media-extras.yml |
 | `notifiarr` | Notifiarr | requests.yml |
 | `restic` | Restic Server | backup.yml |
 | `db-backup` | DB Backup | backup.yml |
 | `scrutiny` | Scrutiny | utilities.yml |
 | `speedtest` | Speedtest Tracker | utilities.yml |
-| `kavita` | Kavita | media-extras.yml |
-| `navidrome` | Navidrome | media-extras.yml |
+| `navidrome` | Navidrome | media-servers.yml |
 | `vector` | Vector | logging.yml |
 
 ### Profile Examples
@@ -237,16 +240,19 @@ FIREWALL_OUTBOUND_SUBNETS=172.16.0.0/12,192.168.0.0/16
 
 ```bash
 # ============================================
-# API KEYS (For Homepage widgets)
+# API KEYS (shared with Homepage widgets)
 # ============================================
 
 PLEX_API_KEY=your_plex_token
+JELLYFIN_API_KEY=your_jellyfin_key
 TAUTULLI_API_KEY=your_tautulli_key
 OVERSEERR_API_KEY=your_overseerr_key
 RADARR_API_KEY=your_radarr_key
 SONARR_API_KEY=your_sonarr_key
 IMMICH_API_KEY=your_immich_key
 PORTAINER_API_KEY=your_portainer_key
+QBITTORRENT_USERNAME=admin
+QBITTORRENT_PASSWORD=change_me
 
 # ============================================
 # NOTIFICATIONS
@@ -264,7 +270,7 @@ WATCHTOWER_NOTIFICATION_URL=discord://token@id
 
 NEWT_ID=your_newt_id
 NEWT_SECRET=your_newt_secret
-NEWT_ENDPOINT=your_pangolin_endpoint
+PANGOLIN_ENDPOINT=https://pangolin.example.com
 ```
 
 ---
@@ -438,8 +444,8 @@ Configure scrape targets in:
 
 **Default targets:**
 - Node Exporter (system metrics)
-- cAdvisor (container metrics)
 - Prometheus itself
+- Uptime Kuma (service availability)
 
 ### Grafana
 

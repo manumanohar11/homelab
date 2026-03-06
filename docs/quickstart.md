@@ -194,6 +194,7 @@ SERVER_REGIONS=us
 # ============================================
 
 PLEX_API_KEY=your_plex_token
+JELLYFIN_API_KEY=your_jellyfin_key
 TAUTULLI_API_KEY=your_tautulli_key
 ```
 
@@ -260,20 +261,21 @@ include:
 
   # Choose what you want:
   - docker-compose.photos.yml           # ✅ Immich photo management
-  - docker-compose.media-servers.yml    # ✅ Plex, Jellyfin
-  - docker-compose.media-extras.yml     # ✅ Tautulli, Maintainerr
-  - docker-compose.requests.yml         # ✅ Overseerr
+  - docker-compose.media-servers.yml    # ✅ Plex + optional media profiles
+  - docker-compose.media-extras.yml     # ✅ Tautulli + optional extras
+  - docker-compose.requests.yml         # Optional request portals via profiles
   - docker-compose.management.yml       # ✅ Portainer, Watchtower
   - docker-compose.monitoring.yml       # ✅ Prometheus, Grafana
-  - docker-compose.utilities.yml        # ✅ Homepage, IT-Tools
+  - docker-compose.logging.yml          # ✅ Loki, Promtail
+  - docker-compose.utilities.yml        # ✅ Homepage, Dozzle
   - docker-compose.backup.yml           # ✅ Duplicati
 
   # Uncomment to enable:
   # - docker-compose.arr.yml            # *Arr stack (needs VPN)
   # - docker-compose.downloaders.yml    # qBittorrent (needs VPN)
-  # - docker-compose.logging.yml        # Loki log aggregation
   # - docker-compose.automation.yml     # n8n workflows
   # - docker-compose.files.yml          # Nextcloud
+  # - docker-compose.local.yml          # Host-specific overrides
 ```
 
 ### Common Scenarios

@@ -1,17 +1,52 @@
 # ~/media-stack/docker-compose.backup.yml
 # Contains backup services for automated data protection.
 
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 256M
+
 services:
   duplicati:
+    <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/duplicati:latest
     container_name: duplicati
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
     volumes:
       - ${DOCKER_BASE_DIR}/duplicati:/config
@@ -34,28 +69,14 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # Alternative: Restic with REST server for more advanced backup scenarios
   restic-rest-server:
+    <<: [*service-defaults, *resources-medium]
     image: restic/rest-server:latest
     container_name: restic-rest-server
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
       OPTIONS: "--prometheus --prometheus-no-auth"
       DISABLE_AUTHENTICATION: "false"
@@ -68,32 +89,16 @@ services:
       - "8000:8000"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
+      <<: *healthcheck-defaults
     profiles:
       - restic
 
   # Database backup service using docker-db-backup
   # Backs up PostgreSQL databases automatically
   db-backup:
+    <<: [*service-defaults, *resources-medium]
     image: tiredofit/db-backup:latest
     container_name: db-backup
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
       TIMEZONE: ${TZ}
       CONTAINER_ENABLE_MONITORING: "false"
@@ -130,15 +135,5 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
+    profiles:
+      - db-backup

@@ -70,8 +70,8 @@ Stream your media to any device.
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
 | **Plex** | 32400 | Premium media server with GPU transcoding | `linuxserver/plex` | ✅ |
-| **Jellyfin** | 8096 | Open-source media server | `jellyfin/jellyfin` | 📦 `jellyfin` |
-| **Kavita** | 5000 | Ebook & comic reader | `jvmilazz0/kavita` | 📦 `kavita` |
+| **Jellyfin** | 8096 | Open-source media server | `lscr.io/linuxserver/jellyfin` | 📦 `jellyfin` |
+| **Kavita** | 5000 | Ebook & comic reader | `lscr.io/linuxserver/kavita` | 📦 `kavita` |
 | **Navidrome** | 4533 | Music streaming (Subsonic compatible) | `deluan/navidrome` | 📦 `navidrome` |
 | **Stash** | 9999 | Adult media organizer | `stashapp/stash` | 📦 `stash` |
 | **Tdarr** | 8265 | Distributed media transcoding | `ghcr.io/haveagitgat/tdarr` | 📦 `tdarr` |
@@ -181,10 +181,10 @@ User-facing request portals and media tools.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Overseerr** | 5055 | Media request portal (Plex) | `linuxserver/overseerr` | ✅ |
+| **Overseerr** | 5055 | Media request portal (Plex) | `lscr.io/linuxserver/overseerr` | 📦 `requests` |
 | **Jellyseerr** | 5056 | Media request portal (Jellyfin) | `fallenbagel/jellyseerr` | 📦 `jellyfin` |
-| **Maintainerr** | 6246 | Automated media cleanup | `ghcr.io/jorenn92/maintainerr` | ✅ |
-| **Tautulli** | 8181 | Plex statistics & monitoring | `linuxserver/tautulli` | ✅ |
+| **Maintainerr** | 6246 | Automated media cleanup | `ghcr.io/jorenn92/maintainerr` | 📦 `maintainerr` |
+| **Tautulli** | 8181 | Plex statistics & monitoring | `lscr.io/linuxserver/tautulli` | ✅ |
 | **Notifiarr** | 5454 | Unified notifications | `golift/notifiarr` | 📦 `notifiarr` |
 
 ### Overseerr
@@ -216,7 +216,6 @@ Track system health and performance.
 | **Grafana** | 3000 | Visualization dashboards | `grafana/grafana` | ✅ |
 | **AlertManager** | 9093 | Alert routing & management | `prom/alertmanager` | ✅ |
 | **Node Exporter** | 9100 | System metrics | `prom/node-exporter` | ✅ |
-| **cAdvisor** | 8081 | Container metrics | `gcr.io/cadvisor/cadvisor` | ✅ |
 | **Uptime Kuma** | 3001 | Uptime monitoring | `louislam/uptime-kuma` | ✅ |
 | **Speedtest Tracker** | 8765 | Internet speed history | `linuxserver/speedtest-tracker` | 📦 `speedtest` |
 | **Scrutiny** | 8082 | Disk S.M.A.R.T. health | `ghcr.io/analogj/scrutiny` | 📦 `scrutiny` |
@@ -253,8 +252,6 @@ Container management and utility tools.
 | **Watchtower** | - | Auto container updates | `containrrr/watchtower` | ✅ |
 | **Homepage** | 3002 | Customizable dashboard | `ghcr.io/gethomepage/homepage` | ✅ |
 | **Dozzle** | 8889 | Real-time log viewer | `amir20/dozzle` | ✅ |
-| **IT-Tools** | 8083 | Developer utilities | `corentinth/it-tools` | ✅ |
-| **Stirling PDF** | 8084 | PDF manipulation | `frooodle/s-pdf` | ✅ |
 | **Glance** | 8080 | Alternative dashboard | `glanceapp/glance` | 📦 `dashboard` |
 
 ### Portainer
@@ -291,10 +288,9 @@ Data protection and recovery.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Duplicati** | 8200 | Cloud backup | `linuxserver/duplicati` | ✅ |
+| **Duplicati** | 8200 | Cloud backup | `lscr.io/linuxserver/duplicati` | ✅ |
 | **Restic Server** | 8000 | REST backup repository | `restic/rest-server` | 📦 `restic` |
-| **DB Backup** | - | PostgreSQL backup | `prodrigestivill/postgres-backup-local` | 📦 `db-backup` |
-| **SQLite Backup** | - | SQLite database backup | `alpine` | ✅ |
+| **DB Backup** | - | PostgreSQL backup | `tiredofit/db-backup` | 📦 `db-backup` |
 
 ### Duplicati
 
@@ -359,11 +355,11 @@ Centralized log aggregation.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Loki** | 3100 | Log aggregation | `grafana/loki` | ⚪ |
-| **Promtail** | - | Log collector | `grafana/promtail` | ⚪ |
+| **Loki** | 3100 | Log aggregation | `grafana/loki` | ✅ |
+| **Promtail** | - | Log collector | `grafana/promtail` | ✅ |
 | **Vector** | - | Log pipeline | `timberio/vector` | 📦 `vector` |
 
-**Enable:** Uncomment `docker-compose.logging.yml`
+**Default state:** Included in `docker-compose.yml`
 
 ---
 

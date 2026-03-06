@@ -1,13 +1,45 @@
 # ~/media-stack/docker-compose.logging.yml
 # Contains centralized logging with Loki and Promtail.
 
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
+
 services:
   loki:
+    <<: [*service-defaults, *resources-large]
     image: grafana/loki:latest
     container_name: loki
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - media-stack
@@ -18,18 +50,6 @@ services:
       - ${DOCKER_BASE_DIR}/loki/data:/loki
     # Note: Loki's minimal image lacks wget/curl for healthchecks
     # Promtail uses service_started dependency instead
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Monitoring"
@@ -38,11 +58,9 @@ services:
       - "homepage.description=Log Aggregation"
 
   promtail:
+    <<: [*service-defaults, *resources-medium]
     image: grafana/promtail:latest
     container_name: promtail
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     command: -config.file=/etc/promtail/config.yml
     networks:
       - media-stack
@@ -56,22 +74,8 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "cat /proc/1/status || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "homepage.group=Monitoring"
       - "homepage.name=Promtail"
@@ -79,11 +83,9 @@ services:
 
   # Vector as alternative log shipper (more powerful than Promtail)
   vector:
+    <<: [*service-defaults, *resources-medium]
     image: timberio/vector:latest-alpine
     container_name: vector
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     networks:
       - media-stack
     volumes:
@@ -98,21 +100,7 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8686/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
+      <<: *healthcheck-defaults
     labels:
       - "homepage.group=Monitoring"
       - "homepage.name=Vector"

@@ -11,8 +11,8 @@ services:
       file: hwaccel.transcoding.yml
       service: nvenc # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
     group_add:
-      - "44"  # GID for 'video' found on your host
-      - "992" # GID for 'render' found on your host
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-109}"
     volumes:
       - ${UPLOAD_LOCATION}:/data
       - ${THUMB_LOCATION}:/data/thumbs

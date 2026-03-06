@@ -1,43 +1,78 @@
 # ~/media-stack/docker-compose.utilities.yml
-# Contains utility services: Homepage, Speedtest Tracker, Scrutiny, Dozzle, IT-Tools, Stirling PDF
+# Contains utility services: Homepage, Speedtest Tracker, Scrutiny, and Dozzle
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
 
 services:
   # Homepage - Application dashboard with service integration
   homepage:
+    <<: [*service-defaults, *resources-small]
     image: ghcr.io/gethomepage/homepage:latest
     container_name: homepage
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       # Allow access from all hosts (required for newer versions)
       HOMEPAGE_ALLOWED_HOSTS: "*"
       # Use Docker socket proxy instead of direct socket access
       DOCKER_HOST: tcp://docker-socket-proxy:2375
       # ---- API keys for Homepage service widgets ----
       # *Arr Suite
-      HOMEPAGE_VAR_RADARR_API_KEY: ${HOMEPAGE_VAR_RADARR_API_KEY:-}
-      HOMEPAGE_VAR_SONARR_API_KEY: ${HOMEPAGE_VAR_SONARR_API_KEY:-}
-      HOMEPAGE_VAR_LIDARR_API_KEY: ${HOMEPAGE_VAR_LIDARR_API_KEY:-}
-      HOMEPAGE_VAR_BAZARR_API_KEY: ${HOMEPAGE_VAR_BAZARR_API_KEY:-}
-      HOMEPAGE_VAR_PROWLARR_API_KEY: ${HOMEPAGE_VAR_PROWLARR_API_KEY:-}
+      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY:-}
+      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY:-}
+      HOMEPAGE_VAR_LIDARR_API_KEY: ${LIDARR_API_KEY:-}
+      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
+      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
       # Download Clients
-      HOMEPAGE_VAR_QBITTORRENT_USER: ${HOMEPAGE_VAR_QBITTORRENT_USER:-admin}
-      HOMEPAGE_VAR_QBITTORRENT_PASS: ${HOMEPAGE_VAR_QBITTORRENT_PASS:-}
+      HOMEPAGE_VAR_QBITTORRENT_USER: ${QBITTORRENT_USERNAME:-admin}
+      HOMEPAGE_VAR_QBITTORRENT_PASS: ${QBITTORRENT_PASSWORD:-}
       # Media Servers
-      HOMEPAGE_VAR_PLEX_API_KEY: ${HOMEPAGE_VAR_PLEX_API_KEY:-}
-      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${HOMEPAGE_VAR_JELLYFIN_API_KEY:-}
-      HOMEPAGE_VAR_TAUTULLI_API_KEY: ${HOMEPAGE_VAR_TAUTULLI_API_KEY:-}
-      HOMEPAGE_VAR_OVERSEERR_API_KEY: ${HOMEPAGE_VAR_OVERSEERR_API_KEY:-}
+      HOMEPAGE_VAR_PLEX_API_KEY: ${PLEX_API_KEY:-}
+      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
+      HOMEPAGE_VAR_TAUTULLI_API_KEY: ${TAUTULLI_API_KEY:-}
+      HOMEPAGE_VAR_OVERSEERR_API_KEY: ${OVERSEERR_API_KEY:-}
       # Other Services
-      HOMEPAGE_VAR_IMMICH_API_KEY: ${HOMEPAGE_VAR_IMMICH_API_KEY:-}
-      HOMEPAGE_VAR_PORTAINER_API_KEY: ${HOMEPAGE_VAR_PORTAINER_API_KEY:-}
+      HOMEPAGE_VAR_IMMICH_API_KEY: ${IMMICH_API_KEY:-}
+      HOMEPAGE_VAR_PORTAINER_API_KEY: ${PORTAINER_API_KEY:-}
     volumes:
       - ${DOCKER_BASE_DIR}/homepage:/app/config
-      - /mnt/media:/mnt/media:ro
+      - ${DOCKER_MEDIA_DIR}:/mnt/media:ro
     networks:
       - media-stack
     ports:
@@ -47,36 +82,18 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # Speedtest Tracker - Track internet speed over time
   speedtest-tracker:
+    <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/speedtest-tracker:latest
     container_name: speedtest-tracker
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       DB_CONNECTION: sqlite
       SPEEDTEST_SCHEDULE: "0 */4 * * *"
       PRUNE_RESULTS_OLDER_THAN: 365
@@ -88,22 +105,8 @@ services:
       - "8765:80"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/api/healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
@@ -111,9 +114,9 @@ services:
 
   # Scrutiny - S.M.A.R.T disk health monitoring
   scrutiny:
+    <<: [*service-defaults, *resources-medium]
     image: ghcr.io/analogj/scrutiny:master-omnibus
     container_name: scrutiny
-    restart: unless-stopped
     cap_add:
       - SYS_RAWIO
     environment:
@@ -126,32 +129,13 @@ services:
       - media-stack
     ports:
       - "8082:8080"
-    devices:
-      # Detected disks on this system:
-      # sda - 232.9G Samsung SSD 750 EVO 250GB
-      # sdb - 3.6T ST4000VN008-2DR166
-      # sdc - 931.5G ST1000DM010-2EP102
-      - /dev/sda:/dev/sda
-      - /dev/sdb:/dev/sdb
-      - /dev/sdc:/dev/sdc
+    # Add host-specific disk mappings in docker-compose.local.yml.
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
       interval: 1m
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
@@ -159,11 +143,9 @@ services:
 
   # Dozzle - Real-time Docker log viewer
   dozzle:
+    <<: *service-defaults
     image: amir20/dozzle:latest
     container_name: dozzle
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
       DOZZLE_LEVEL: info
       DOZZLE_TAILSIZE: 300
@@ -179,15 +161,8 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
       resources:
         limits:
@@ -197,4 +172,3 @@ services:
           memory: 32M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-

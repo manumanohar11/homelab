@@ -23,6 +23,9 @@ include:
   - docker-compose.common.yml
   - docker-compose.core.yml
 
+  # Optional host-specific overrides
+  # - docker-compose.local.yml
+
   # Media management
   - docker-compose.photos.yml
   - docker-compose.media-servers.yml
@@ -42,7 +45,7 @@ include:
   # Backup
   - docker-compose.backup.yml
 
-  # Utilities (Homepage, Speedtest, Scrutiny, Dozzle, IT-Tools, Stirling PDF)
+  # Utilities (Homepage, Speedtest, Scrutiny, Dozzle)
   - docker-compose.utilities.yml
 
   # Media utilities (Tautulli, Maintainerr, Tdarr)
@@ -51,13 +54,16 @@ include:
 # --- Available Profiles ---
 # monitoring    - Glances system monitor
 # dashboard     - Glance Homepage alternative dashboard
+# jellyfin      - Jellyfin and Jellyseerr
+# kavita        - Kavita ebook/comic reader
 # stash         - Stash media organizer
 # tdarr         - Tdarr media transcoding
 # notifiarr     - Notifiarr unified notifications
 # restic        - Restic backup server
+# db-backup     - Database backup worker
 # scrutiny      - Scrutiny disk S.M.A.R.T monitoring
 # speedtest     - Speedtest Tracker internet speed history
-# navidrome     - Navidrome music streaming
 # requests      - Overseerr/Jellyseerr (requires *arr stack)
 # maintainerr   - Maintainerr media cleanup (requires *arr stack)
+# navidrome     - Navidrome music streaming
 # vector        - Vector log shipper (alternative to Promtail)

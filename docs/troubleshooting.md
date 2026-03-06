@@ -21,19 +21,26 @@ Solutions to common issues, debugging tips, and frequently asked questions.
 
 ### Network Diagnostics
 
-If services can't reach external APIs or downloads are slow, run the network testing tool:
+If services cannot reach external APIs or downloads are slow, start with host and container connectivity checks:
 
 ```bash
-cd ~/docker/scripts && python3 -m nettest --profile full --bufferbloat
+# Check the VPN gateway first
+docker compose logs --tail=100 gluetun
+
+# Verify outbound connectivity from the host
+ping -c 10 1.1.1.1
+mtr -rwzc 25 1.1.1.1
+
+# Verify outbound connectivity from a specific container
+docker exec [container-name] curl -I https://example.com
 ```
 
-This will:
-- Identify if the problem is with your local network, ISP, internet backbone, or specific targets
-- Generate a connection health score (0-100)
-- Calculate VoIP quality (MOS score)
-- Create ISP complaint evidence if issues detected
+This helps you isolate whether the issue is:
+- local to the host
+- isolated to the VPN-routed containers
+- specific to a remote service or API
 
-See [Network Testing Tool](scripts.md#network-testing-tool) for details.
+See [Utility Scripts](scripts.md) for repo maintenance helpers.
 
 ### Health Check Script
 
@@ -770,8 +777,9 @@ free -h
 ### Slow Network
 
 ```bash
-# Run comprehensive network diagnostics
-cd ~/docker/scripts && python3 -m nettest --expected-speed 100
+# Check host-to-internet latency and loss
+ping -c 20 1.1.1.1
+mtr -rwzc 50 1.1.1.1
 
 # Test from container
 docker exec [container] curl -o /dev/null -s -w "%{time_total}\n" http://google.com
@@ -781,7 +789,7 @@ docker exec [container] ping -c 10 google.com
 ```
 
 > [!TIP]
-> Use the [Network Testing Tool](scripts.md#network-testing-tool) for comprehensive diagnostics that identify whether issues are with your local network, ISP, internet backbone, or specific targets.
+> Compare host results with the same checks from a VPN-routed container to see whether the slowdown is local, VPN-related, or upstream.
 
 **Solutions:**
 - Check VPN server load
@@ -793,14 +801,15 @@ docker exec [container] ping -c 10 google.com
 <details>
 <summary><strong>Using the ISP Evidence Report</strong></summary>
 
-When network tests detect ISP issues, use the evidence report to contact support:
+When repeated `ping`, `mtr`, and throughput checks show upstream issues, save the outputs and contact support:
 
-**Generate the report:**
+**Capture evidence:**
 ```bash
-cd ~/docker/scripts && python3 -m nettest --profile full --export-csv
+ping -c 50 1.1.1.1 | tee isp-ping.txt
+mtr -rwzc 100 1.1.1.1 | tee isp-mtr.txt
 ```
 
-**Open the HTML report** and find the "ISP Complaint Evidence" section.
+Repeat those checks during the affected time window so you can show whether packet loss or latency spikes are persistent.
 
 **For Non-Technical Support:**
 > "My internet speed is only [X] Mbps when I'm paying for [Y] Mbps.
@@ -846,8 +855,9 @@ cd ~/docker/scripts && python3 -m nettest --profile full --export-csv
 
 Run a VoIP-focused test:
 ```bash
-cd ~/docker/scripts && python3 -m nettest --interactive
-# Choose option 6: VoIP quality test
+# Check latency and route stability during a call window
+ping -i 0.2 -c 50 1.1.1.1
+mtr -rwzc 50 1.1.1.1
 ```
 
 **Check the MOS Score:**

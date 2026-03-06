@@ -86,7 +86,9 @@ include:
 ./scripts/setup-logging.sh
 ```
 
-This copies all configuration files to the correct locations.
+This syncs tracked templates from `config-templates/` into the runtime directories under `${DOCKER_BASE_DIR}`.
+
+Use `./scripts/setup-logging.sh --check` later to verify that runtime configs still match the tracked templates.
 
 ### 3. Start the Services
 

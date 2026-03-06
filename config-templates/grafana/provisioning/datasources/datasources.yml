@@ -27,12 +27,6 @@ datasources:
     jsonData:
       maxLines: 1000
       timeout: 60
-      derivedFields:
-        # Link container logs to Prometheus metrics
-        - datasourceUid: prometheus
-          matcherRegex: 'container="([^"]+)"'
-          name: container
-          url: '/explore?left=["now-1h","now","Prometheus",{"expr":"container_cpu_usage_seconds_total{name=\"$${__value.raw}\"}"}]'
 
   # Alertmanager - For Grafana unified alerting
   - name: Alertmanager

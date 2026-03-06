@@ -92,16 +92,16 @@ graph LR
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/media-stack.git
-cd media-stack
+git clone https://github.com/yourusername/media-stack.git /opt/media-stack
+cd /opt/media-stack
 
 # 2. Configure environment
 cp .env.example .env
 nano .env  # Edit with your settings
 
 # 3. Create directories
-sudo mkdir -p /opt/docker /mnt/media/{Movies,TV,Music,Photos}
-sudo chown -R $USER:$USER /opt/docker /mnt/media
+sudo mkdir -p /opt/media-stack/data /mnt/media/{Movies,TV,Music,Photos}
+sudo chown -R $USER:$USER /opt/media-stack /mnt/media
 
 # 4. Launch!
 docker compose up -d
@@ -125,7 +125,7 @@ docker compose up -d
 | [📋 Logging](docs/logging.md) | Loki, Promtail, centralized log management |
 | [💾 Backup & Recovery](docs/backup.md) | Backup strategy, schedules, restore procedures |
 | [🔧 Troubleshooting](docs/troubleshooting.md) | Common issues, FAQ, debugging commands |
-| [🛠️ Utility Scripts](docs/scripts.md) | Network testing, diagnostics, automation tools |
+| [🛠️ Utility Scripts](docs/scripts.md) | Template sync and repo validation utilities |
 
 ---
 
@@ -135,6 +135,7 @@ docker compose up -d
 .
 ├── docker-compose.yml          # Main orchestration (includes modules)
 ├── docker-compose.*.yml        # Service modules (15 files)
+├── docker-compose.local.example.yml # Host-specific override example
 ├── hwaccel.*.yml               # Hardware acceleration configs
 ├── .env.example                # Configuration template
 ├── docs/                       # 📚 Documentation

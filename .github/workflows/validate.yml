@@ -1,0 +1,35 @@
+name: Validate Stack
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare environment file
+        run: cp .env.example .env
+
+      - name: Validate rendered compose config
+        run: docker compose config --quiet
+
+      - name: Sync tracked logging templates
+        run: bash scripts/setup-logging.sh
+
+      - name: Verify logging template sync
+        run: bash scripts/setup-logging.sh --check
+
+      - name: Run repository validation
+        run: python3 scripts/validate-stack.py

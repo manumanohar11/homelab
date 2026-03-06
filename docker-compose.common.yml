@@ -19,6 +19,13 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# --- Common Service Defaults ---
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging: *default-logging
+
 # --- Common Health Check Defaults ---
 x-healthcheck-defaults: &healthcheck-defaults
   interval: 30s

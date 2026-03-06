@@ -1,17 +1,52 @@
 # ~/media-stack/docker-compose.media-servers.yml
 # Contains media servers: Plex, Jellyfin, Stash, Kavita, Navidrome
 
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 1G
+      reservations:
+        memory: 256M
+
+x-resources-stash: &resources-stash
+  deploy:
+    resources:
+      limits:
+        cpus: '4'
+        memory: 4G
+      reservations:
+        memory: 512M
+
 services:
   plex:
+    <<: *service-defaults
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       VERSION: docker
       PLEX_CLAIM: ${PLEX_CLAIM:-}
       NVIDIA_VISIBLE_DEVICES: all
@@ -29,11 +64,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
       resources:
         reservations:
@@ -45,15 +75,11 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   jellyfin:
+    <<: *service-defaults
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
     volumes:
@@ -69,11 +95,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     deploy:
       resources:
         limits:
@@ -87,18 +108,16 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+    profiles:
+      - jellyfin
 
   stash:
+    <<: [*service-defaults, *resources-stash]
     image: stashapp/stash:latest
     container_name: stash
-    restart: unless-stopped
     network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       STASH_STASH: /data/
       STASH_GENERATED: /generated/
       STASH_METADATA: /metadata/
@@ -117,18 +136,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4G
-        reservations:
-          memory: 512M
     depends_on:
       gluetun:
         condition: service_healthy
@@ -139,15 +146,11 @@ services:
 
   # Kavita - Fast, feature-rich ebook/comic server
   kavita:
+    <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/kavita:latest
     container_name: kavita
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/kavita:/config
       - ${DOCKER_MEDIA_DIR}/Audio Books:/audiobooks:ro
@@ -158,33 +161,19 @@ services:
       - "5000:5000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+    profiles:
+      - kavita
 
   # Navidrome - Modern music server and streamer
   navidrome:
+    <<: [*service-defaults, *resources-medium]
     image: deluan/navidrome:latest
     container_name: navidrome
-    restart: unless-stopped
     user: "${PUID}:${PGID}"
-    security_opt:
-      - no-new-privileges:true
     environment:
       ND_SCANSCHEDULE: 1h
       ND_LOGLEVEL: info
@@ -204,22 +193,8 @@ services:
       - "4533:4533"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4533/ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:

@@ -1,0 +1,9 @@
+# /opt/media-stack/docker-compose.local.example.yml
+# Optional host-specific overrides.
+# Copy to docker-compose.local.yml and uncomment it in docker-compose.yml.
+
+services:
+  scrutiny:
+    devices:
+      - /dev/disk/by-id/ata-example-disk-1:/dev/disk/by-id/ata-example-disk-1
+      - /dev/disk/by-id/ata-example-disk-2:/dev/disk/by-id/ata-example-disk-2

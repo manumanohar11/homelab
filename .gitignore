@@ -53,6 +53,21 @@ volumes/
 cache/
 __pycache__/
 *.pyc
+scripts/.mypy_cache/
+scripts/.pytest_cache/
+scripts/.venv/
+scripts/.playwright-mcp/
+scripts/.coverage
+
+# Local build artifacts
+build/
+dist/
+scripts/build/
+scripts/dist/
+scripts/*.zip
+
+# Local compose overrides
+docker-compose.local.yml
 
 # Downloaded files
 downloads/

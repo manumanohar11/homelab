@@ -2,18 +2,53 @@
 # Contains media request services (Overseerr, Jellyseerr).
 # Note: These require *arr stack to be useful. Enable when docker-compose.arr.yml is active.
 
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
 services:
   # Overseerr - Plex request platform (requires *arr stack)
   overseerr:
+    <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/overseerr:latest
     container_name: overseerr
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/overseerr:/config
     networks:
@@ -22,22 +57,8 @@ services:
       - "5055:5055"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5055/api/v1/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
@@ -45,11 +66,9 @@ services:
 
   # Jellyseerr - Jellyfin request platform (requires *arr stack)
   jellyseerr:
+    <<: [*service-defaults, *resources-medium]
     image: fallenbagel/jellyseerr:latest
     container_name: jellyseerr
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
       TZ: ${TZ}
       LOG_LEVEL: info
@@ -61,34 +80,18 @@ services:
       - "5056:5055"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5055/api/v1/status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
-      - requests
+      - jellyfin
 
   # Notifiarr for unified notifications across *Arr apps
   notifiarr:
+    <<: [*service-defaults, *resources-small]
     image: golift/notifiarr:latest
     container_name: notifiarr
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     hostname: notifiarr
     environment:
       TZ: ${TZ}
@@ -102,22 +105,8 @@ services:
       - "5454:5454"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5454"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      <<: *healthcheck-defaults
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     profiles:
