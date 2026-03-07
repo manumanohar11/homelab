@@ -65,7 +65,7 @@ include:
 | `requests.yml` | Request portals | Overseerr, Jellyseerr |
 | `management.yml` | Container management | Portainer, Watchtower, Glances, Glance |
 | `monitoring.yml` | Monitoring stack | Prometheus, Grafana, AlertManager |
-| `logging.yml` | Log aggregation | Loki, Promtail, Vector |
+| `logging.yml` | Container log aggregation | Loki, Promtail |
 | `utilities.yml` | Utility services | Homepage, Dozzle, Scrutiny, Speedtest |
 | `backup.yml` | Backup services | Duplicati, Restic, DB Backup |
 | `automation.yml` | Workflow automation | n8n |
@@ -125,8 +125,6 @@ docker compose up -d
 | `scrutiny` | Scrutiny | utilities.yml |
 | `speedtest` | Speedtest Tracker | utilities.yml |
 | `navidrome` | Navidrome | media-servers.yml |
-| `vector` | Vector | logging.yml |
-
 ### Profile Examples
 
 **Full monitoring setup:**

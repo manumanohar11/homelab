@@ -1107,7 +1107,7 @@ docker compose up -d [service]
 For advanced log analysis, use the Loki/Grafana logging stack:
 - See [Logging Guide](logging.md) for setup
 - Access Grafana dashboards at `http://your-server:3000`
-- Pre-built dashboards for error tracking, security monitoring, and more
+- Pre-built dashboards for container error tracking and per-service log browsing
 
 ### Use Dozzle for Real-Time Logs
 

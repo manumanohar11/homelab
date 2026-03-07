@@ -160,11 +160,11 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "sum(count_over_time({job=\"auth\"} |~ \"(?i)(failed|invalid|unauthorized|denied)\" [$__range]))",
+          "expr": "sum(count_over_time({job=\"docker\"} |~ \"(?i)(warn|warning)\" [$__range]))",
           "refId": "A"
         }
       ],
-      "title": "Auth Failures",
+      "title": "Warning Count",
       "type": "stat"
     },
     {

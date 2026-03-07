@@ -419,7 +419,7 @@ receivers:
 
 ## Logging Stack
 
-Centralized log aggregation using Loki and Promtail.
+Centralized container logging using Loki and Promtail.
 
 > **Full documentation:** See the [Logging Guide](logging.md) for complete setup and usage.
 
@@ -427,28 +427,9 @@ Centralized log aggregation using Loki and Promtail.
 
 ```mermaid
 flowchart LR
-    subgraph SOURCES["Sources"]
-        Docker["Docker Containers"]
-        System["System Logs"]
-        Auth["Auth Logs"]
-    end
-
-    subgraph PIPELINE["Pipeline"]
-        Promtail["Promtail"]
-        Loki["Loki"]
-    end
-
-    subgraph OUTPUT["Output"]
-        Grafana["Grafana Dashboards"]
-        Alerts["AlertManager"]
-    end
-
-    Docker --> Promtail
-    System --> Promtail
-    Auth --> Promtail
-    Promtail --> Loki
-    Loki --> Grafana
-    Loki --> Alerts
+    Docker["Docker Containers"] --> Promtail["Promtail"]
+    Promtail --> Loki["Loki"]
+    Loki --> Grafana["Grafana Dashboards"]
 
     style Loki fill:#f46800,color:#fff
     style Promtail fill:#f46800,color:#fff
@@ -474,6 +455,8 @@ docker compose up -d loki promtail
 docker compose restart grafana
 ```
 
+This stack is intentionally separate from Prometheus alerting. It focuses on searchable container logs without extra host log parsing or a second log pipeline.
+
 ### Pre-configured Dashboards
 
 | Dashboard | Description |
@@ -481,7 +464,6 @@ docker compose restart grafana
 | **Logs Overview** | Error rates, log volumes, live errors |
 | **Container Logs** | Per-container log viewer with search |
 | **Media Stack Logs** | *Arr, VPN, Plex/Jellyfin logs |
-| **Security & Auth** | SSH attempts, sudo, auth failures |
 
 ### Quick LogQL Examples
 
@@ -491,18 +473,7 @@ docker compose restart grafana
 
 # Specific container
 {container="plex"}
-
-# Failed SSH logins
-{job="auth"} |~ "Failed password"
 ```
-
-### Pre-configured Alerts
-
-- High error rates per container
-- VPN disconnection
-- SSH brute force detection
-- Container restart loops
-- Out of memory events
 
 > **Learn more:** [Complete Logging Guide](logging.md)
 

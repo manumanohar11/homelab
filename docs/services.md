@@ -349,7 +349,7 @@ Self-hosted cloud storage:
 
 ---
 
-## Logging (Optional)
+## Logging
 
 Centralized log aggregation.
 
@@ -357,7 +357,6 @@ Centralized log aggregation.
 |:--------|:----:|:------------|:------|:------:|
 | **Loki** | 3100 | Log aggregation | `grafana/loki` | ✅ |
 | **Promtail** | - | Log collector | `grafana/promtail` | ✅ |
-| **Vector** | - | Log pipeline | `timberio/vector` | 📦 `vector` |
 
 **Default state:** Included in `docker-compose.yml`
 

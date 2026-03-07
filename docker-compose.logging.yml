@@ -1,5 +1,5 @@
 # ~/media-stack/docker-compose.logging.yml
-# Contains centralized logging with Loki and Promtail.
+# Contains beginner-friendly centralized container logging with Loki and Promtail.
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
@@ -66,8 +66,6 @@ services:
       - media-stack
     volumes:
       - ${DOCKER_BASE_DIR}/promtail/config:/etc/promtail
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       loki:
@@ -80,30 +78,3 @@ services:
       - "homepage.group=Monitoring"
       - "homepage.name=Promtail"
       - "homepage.description=Log Collector"
-
-  # Vector as alternative log shipper (more powerful than Promtail)
-  vector:
-    <<: [*service-defaults, *resources-medium]
-    image: timberio/vector:latest-alpine
-    container_name: vector
-    networks:
-      - media-stack
-    volumes:
-      - ${DOCKER_BASE_DIR}/vector/config:/etc/vector:ro
-      - /var/log:/var/log:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      VECTOR_CONFIG: /etc/vector/vector.yaml
-    depends_on:
-      loki:
-        condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8686/health || exit 1"]
-      <<: *healthcheck-defaults
-    labels:
-      - "homepage.group=Monitoring"
-      - "homepage.name=Vector"
-      - "homepage.description=Log Pipeline"
-    profiles:
-      - vector

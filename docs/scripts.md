@@ -10,7 +10,7 @@ Shared utility scripts for keeping the homelab stack organized and consistent.
 
 ### `scripts/setup-logging.sh`
 
-Syncs tracked logging and monitoring templates from `config-templates/` into `${DOCKER_BASE_DIR}` and creates any missing runtime directories.
+Syncs the tracked logging and monitoring templates from `config-templates/` into `${DOCKER_BASE_DIR}` and creates any missing runtime directories.
 
 ```bash
 # Sync tracked templates into runtime config directories

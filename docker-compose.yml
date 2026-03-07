@@ -66,4 +66,3 @@ include:
 # requests      - Overseerr/Jellyseerr (requires *arr stack)
 # maintainerr   - Maintainerr media cleanup (requires *arr stack)
 # navidrome     - Navidrome music streaming
-# vector        - Vector log shipper (alternative to Promtail)

@@ -40,7 +40,7 @@ docker-compose.downloaders.yml  # qBittorrent, Prowlarr, FlareSolverr, Bitmagnet
 docker-compose.media-servers.yml# Plex, Jellyfin, Stash, Tdarr
 docker-compose.management.yml   # Portainer, Watchtower, Glances
 docker-compose.monitoring.yml   # Prometheus, Grafana, InfluxDB, Alertmanager
-docker-compose.logging.yml      # Loki, Promtail, Vector
+docker-compose.logging.yml      # Loki and Promtail
 docker-compose.photos.yml       # Immich stack
 docker-compose.files.yml        # Nextcloud
 docker-compose.automation.yml   # n8n
@@ -53,7 +53,6 @@ configs/                        # Application configs (tracked in git)
   glance-homepage/              # Glance dashboard config
   loki/                         # Loki log aggregation config
   promtail/                     # Promtail log collector config
-  vector/                       # Vector log pipeline config
 .env                            # Environment variables (NOT tracked)
 .env.example                    # Template for environment variables
 ```

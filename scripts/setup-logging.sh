@@ -47,13 +47,11 @@ DOCKER_GIT_CONFIG_DIR="$(resolve_path_var "${DOCKER_GIT_CONFIG_DIR:-$PROJECT_DIR
 FILE_MAPPINGS=(
     "$DOCKER_GIT_CONFIG_DIR/loki/local-config.yaml|$DOCKER_BASE_DIR/loki/config/local-config.yaml"
     "$DOCKER_GIT_CONFIG_DIR/promtail/config.yml|$DOCKER_BASE_DIR/promtail/config/config.yml"
-    "$DOCKER_GIT_CONFIG_DIR/vector/vector.yaml|$DOCKER_BASE_DIR/vector/config/vector.yaml"
     "$DOCKER_GIT_CONFIG_DIR/prometheus/prometheus.yml|$DOCKER_BASE_DIR/prometheus/config/prometheus.yml"
     "$DOCKER_GIT_CONFIG_DIR/alertmanager/alertmanager.yml|$DOCKER_BASE_DIR/alertmanager/config/alertmanager.yml"
 )
 
 DIR_MAPPINGS=(
-    "$DOCKER_GIT_CONFIG_DIR/loki/rules|$DOCKER_BASE_DIR/loki/rules"
     "$DOCKER_GIT_CONFIG_DIR/grafana/provisioning|$DOCKER_BASE_DIR/grafana/provisioning"
     "$DOCKER_GIT_CONFIG_DIR/prometheus/rules|$DOCKER_BASE_DIR/prometheus/config/rules"
 )
@@ -61,9 +59,7 @@ DIR_MAPPINGS=(
 RUNTIME_DIRS=(
     "$DOCKER_BASE_DIR/loki/config"
     "$DOCKER_BASE_DIR/loki/data"
-    "$DOCKER_BASE_DIR/loki/rules"
     "$DOCKER_BASE_DIR/promtail/config"
-    "$DOCKER_BASE_DIR/vector/config"
     "$DOCKER_BASE_DIR/grafana/data"
     "$DOCKER_BASE_DIR/grafana/provisioning"
     "$DOCKER_BASE_DIR/prometheus/config"

@@ -122,7 +122,7 @@ docker compose up -d
 | [⚙️ Configuration](docs/configuration.md) | Module system, profiles, environment variables |
 | [🌐 Networking](docs/networking.md) | Network topology, VPN routing, port reference |
 | [📊 Monitoring](docs/monitoring.md) | Prometheus, Grafana, alerting setup |
-| [📋 Logging](docs/logging.md) | Loki, Promtail, centralized log management |
+| [📋 Logging](docs/logging.md) | Simple container logging with Loki and Promtail |
 | [💾 Backup & Recovery](docs/backup.md) | Backup strategy, schedules, restore procedures |
 | [🔧 Troubleshooting](docs/troubleshooting.md) | Common issues, FAQ, debugging commands |
 | [🛠️ Utility Scripts](docs/scripts.md) | Template sync and repo validation utilities |
