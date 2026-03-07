@@ -34,7 +34,7 @@ flowchart LR
 ### 1. Sync tracked config
 
 ```bash
-./scripts/setup-logging.sh
+./scripts/sync-monitoring-config.sh
 ```
 
 This copies the tracked templates from `config-templates/` into your runtime directories under `${DOCKER_BASE_DIR}`.
@@ -111,7 +111,7 @@ The repo now keeps the default dashboards focused on container logs:
 | Loki template | `config-templates/loki/local-config.yaml` |
 | Promtail template | `config-templates/promtail/config.yml` |
 | Grafana provisioning | `config-templates/grafana/provisioning/` |
-| Runtime sync script | `scripts/setup-logging.sh` |
+| Runtime sync script | `scripts/sync-monitoring-config.sh` |
 
 After syncing, the live runtime copies are under `${DOCKER_BASE_DIR}`.
 
@@ -122,13 +122,13 @@ After syncing, the live runtime copies are under `${DOCKER_BASE_DIR}`.
 ### Check for config drift
 
 ```bash
-./scripts/setup-logging.sh --check
+./scripts/sync-monitoring-config.sh --check
 ```
 
 ### Re-sync runtime config
 
 ```bash
-./scripts/setup-logging.sh
+./scripts/sync-monitoring-config.sh
 docker compose restart loki promtail grafana
 ```
 

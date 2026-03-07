@@ -462,19 +462,30 @@ Configure scrape targets in:
 
 ### Grafana
 
-Dashboards location:
+Tracked provisioning templates:
 ```
-/opt/media-stack/data/grafana/dashboards/
+/opt/media-stack/config-templates/grafana/provisioning/
 ```
 
-Provisioning:
+Runtime provisioning copy:
 ```
 /opt/media-stack/data/grafana/provisioning/
 ```
 
+After editing tracked templates, sync them with:
+
+```bash
+./scripts/sync-monitoring-config.sh
+```
+
 ### AlertManager
 
-Alert configuration:
+Tracked template:
+```
+/opt/media-stack/config-templates/alertmanager/alertmanager.yml
+```
+
+Runtime configuration:
 ```
 /opt/media-stack/data/alertmanager/config/alertmanager.yml
 ```

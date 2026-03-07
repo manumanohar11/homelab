@@ -1,817 +1,175 @@
-# 📊 Monitoring Guide
+# Monitoring Guide
 
 [← Back to README](../README.md)
 
-Complete guide to the monitoring stack: Prometheus, Grafana, alerting, and observability.
-
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Components](#components)
-- [Prometheus](#prometheus)
-- [Grafana](#grafana)
-- [AlertManager](#alertmanager)
-- [Logging Stack](#logging-stack)
-- [Additional Monitoring](#additional-monitoring)
-- [Custom Dashboards](#custom-dashboards)
-- [Alerting Rules](#alerting-rules)
+Simple monitoring guidance for this homelab.
 
 ---
 
 ## Overview
 
-### Architecture
+The default monitoring stack is intentionally small:
 
-```mermaid
-flowchart TB
-    subgraph COLLECTION["📊 Data Collection"]
-        NodeExporter["Node Exporter<br/>(System Metrics)"]
-        AppMetrics["App Exporters<br/>(Service Metrics)"]
-    end
+- `Prometheus` stores metrics
+- `Grafana` visualizes them
+- `Node Exporter` provides host metrics
+- `Uptime Kuma` handles simple uptime checks
+- `Alertmanager` is pre-wired, but mostly idle until you add real rules and notification receivers
 
-    subgraph STORAGE["💾 Storage"]
-        Prometheus["Prometheus<br/>(Time Series DB)"]
-    end
-
-    subgraph VISUALIZATION["📈 Visualization"]
-        Grafana["Grafana<br/>(Dashboards)"]
-    end
-
-    subgraph ALERTING["🚨 Alerting"]
-        AlertManager["AlertManager"]
-        Notifications["Notifications"]
-    end
-
-    NodeExporter -->|scrape| Prometheus
-    AppMetrics -->|scrape| Prometheus
-    Prometheus -->|query| Grafana
-    Prometheus -->|alerts| AlertManager
-    AlertManager -->|notify| Notifications
-
-    style Prometheus fill:#e6522c,color:#fff
-    style Grafana fill:#f46800,color:#fff
-    style AlertManager fill:#9b59b6,color:#fff
-```
-
-### Access Points
-
-| Service | URL | Default Credentials |
-|:--------|:----|:--------------------|
-| **Grafana** | `http://your-server:3000` | admin / admin |
-| **Prometheus** | `http://your-server:9090` | None |
-| **AlertManager** | `http://your-server:9093` | None |
-| **Uptime Kuma** | `http://your-server:3001` | Create on first visit |
-
----
-
-## Components
-
-### Enabled by Default
-
-| Component | Purpose | Port |
-|:----------|:--------|:----:|
-| **Prometheus** | Metrics storage & querying | 9090 |
-| **Grafana** | Visualization & dashboards | 3000 |
-| **AlertManager** | Alert routing | 9093 |
-| **Node Exporter** | System metrics | 9100 |
-| **Uptime Kuma** | Uptime monitoring | 3001 |
-
-### Optional (via Profiles)
-
-| Component | Purpose | Profile | Port |
-|:----------|:--------|:--------|:----:|
-| **Speedtest Tracker** | Internet speed history | `speedtest` | 8765 |
-| **Scrutiny** | Disk S.M.A.R.T. health | `scrutiny` | 8082 |
-| **Glances** | System resource monitor | `monitoring` | 61208 |
-
----
-
-## Prometheus
+Logging is documented separately in `docs/logging.md`.
 
 ### Data Flow
 
 ```mermaid
-sequenceDiagram
-    participant Targets as Scrape Targets
-    participant Prometheus as Prometheus
-    participant Storage as TSDB Storage
-    participant Rules as Alert Rules
-    participant AM as AlertManager
-
-    loop Every 15s
-        Prometheus->>Targets: HTTP GET /metrics
-        Targets-->>Prometheus: Metrics data
-        Prometheus->>Storage: Store time series
-    end
-
-    loop Every 15s
-        Prometheus->>Rules: Evaluate rules
-        Rules-->>Prometheus: Firing alerts
-        Prometheus->>AM: Send alerts
-    end
+flowchart LR
+    NodeExporter[Node Exporter] --> Prometheus[Prometheus]
+    Services[Metric-enabled services] --> Prometheus
+    Prometheus --> Grafana[Grafana]
+    Prometheus --> Alertmanager[Alertmanager]
+    UptimeKuma[Uptime Kuma] --> You[Web UI]
 ```
 
-### Configuration
+---
 
-Location: `/opt/media-stack/data/prometheus/prometheus.yml`
+## Default Services
 
-```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+| Service | URL | Purpose |
+|:--------|:----|:--------|
+| Grafana | `http://your-server:3000` | Metrics and logs UI |
+| Prometheus | `http://your-server:9090` | Metrics storage and query |
+| Alertmanager | `http://your-server:9093` | Alert routing scaffold |
+| Uptime Kuma | `http://your-server:3001` | Simple uptime monitoring |
+| Node Exporter | none | Host metrics endpoint |
 
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - alertmanager:9093
+### Optional Monitoring Profiles
 
-rule_files:
-  - /etc/prometheus/rules/*.yml
+| Profile | Service | Purpose |
+|:--------|:--------|:--------|
+| `monitoring` | Glances | Lightweight system monitor |
+| `speedtest` | Speedtest Tracker | Internet speed history |
+| `scrutiny` | Scrutiny | Disk health |
 
-scrape_configs:
-  - job_name: 'prometheus'
-    static_configs:
-      - targets: ['localhost:9090']
+---
 
-  - job_name: 'node-exporter'
-    static_configs:
-      - targets: ['node-exporter:9100']
+## What Is Preconfigured
 
-```
+### Prometheus
 
-### Adding Scrape Targets
+The tracked Prometheus template is:
 
-Add new targets to `prometheus.yml`:
+`config-templates/prometheus/prometheus.yml`
 
-```yaml
-scrape_configs:
-  # ... existing configs ...
+It is synced into the runtime copy at:
 
-  - job_name: 'your-service'
-    static_configs:
-      - targets: ['service-name:port']
-    metrics_path: /metrics  # default
-```
+`${DOCKER_BASE_DIR}/prometheus/config/prometheus.yml`
 
-Reload Prometheus:
+Default scrape targets are intentionally simple:
+
+- Prometheus
+- Alertmanager
+- Node Exporter
+- Grafana
+- optional app metrics if they expose `/metrics`
+
+### Grafana
+
+Grafana comes with datasources preconfigured for:
+
+- Prometheus
+- Loki
+- Alertmanager
+
+The repo currently tracks log dashboards by default. For metrics dashboards, the beginner-friendly path is to import them into Grafana only when you actually need them.
+
+### Alertmanager
+
+Alertmanager is kept minimal on purpose.
+
+- the service runs by default
+- the config is intentionally small
+- nothing becomes useful until you add real Prometheus alert rules and notification receivers
+
+That means you can ignore it at first if you only want metrics and dashboards.
+
+---
+
+## Syncing Runtime Config
+
+Edit the tracked templates first, then sync them into the runtime directories.
+
 ```bash
-docker compose restart prometheus
+./scripts/sync-monitoring-config.sh
 ```
 
-### Useful PromQL Queries
+To check for drift later:
 
-```mermaid
-mindmap
-  root((PromQL Queries))
-    System
-      CPU Usage
-      Memory Usage
-      Disk Usage
-      Network I/O
-    Availability
-      Scrape Target Health
-      Service Uptime
-      Alert Status
-    Custom
-      Service Uptime
-      Request Rates
-      Error Rates
+```bash
+./scripts/sync-monitoring-config.sh --check
 ```
 
-**CPU Usage:**
+---
+
+## Recommended Beginner Workflow
+
+### 1. Start the core stack
+
+```bash
+docker compose up -d prometheus grafana uptime-kuma node-exporter alertmanager
+```
+
+### 2. Confirm health
+
+```bash
+docker compose ps prometheus grafana uptime-kuma node-exporter alertmanager
+curl http://localhost:3000/api/health
+curl http://localhost:9090/-/healthy
+curl http://localhost:9093/-/healthy
+```
+
+### 3. Use the right tool for the job
+
+- use `Uptime Kuma` for simple up/down checks
+- use `Grafana + Prometheus` for metrics and trends
+- ignore `Alertmanager` until you are ready for real notifications
+
+---
+
+## Useful Queries
+
 ```promql
+# Are scrape targets up?
+up
+
+# Host CPU usage
 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
-```
 
-**Memory Usage:**
-```promql
+# Host memory usage
 (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
-```
 
-**Disk Usage:**
-```promql
+# Host disk usage
 (1 - (node_filesystem_avail_bytes / node_filesystem_size_bytes)) * 100
 ```
 
-**Scrape Target Health:**
-```promql
-up
-```
+---
 
-**Prometheus Ingestion Rate:**
-```promql
-rate(prometheus_tsdb_head_samples_appended_total[5m])
-```
+## Files That Matter
 
-### Data Retention
-
-Default retention: 30 days
-
-To change, edit compose file:
-```yaml
-prometheus:
-  command:
-    - '--storage.tsdb.retention.time=90d'
-```
+| Purpose | Path |
+|:--------|:-----|
+| Prometheus template | `config-templates/prometheus/prometheus.yml` |
+| Alertmanager template | `config-templates/alertmanager/alertmanager.yml` |
+| Grafana datasources | `config-templates/grafana/provisioning/datasources/datasources.yml` |
+| Runtime sync script | `scripts/sync-monitoring-config.sh` |
 
 ---
 
-## Grafana
+## If You Want Less Complexity
 
-### Initial Setup
+You do not need to use every monitoring feature.
 
-1. Access `http://your-server:3000`
-2. Login: admin / admin
-3. Change password when prompted
-4. Explore pre-configured dashboards
+- keep `Prometheus`, `Grafana`, and `Uptime Kuma`
+- treat `Alertmanager` as optional-to-configure infrastructure
+- add `Glances`, `Scrutiny`, or `Speedtest Tracker` only when you know you want them
+- import extra Grafana dashboards only after you miss something specific
 
-### Pre-configured Dashboards
-
-| Dashboard | Description |
-|:----------|:------------|
-| **Docker Overview** | Container status, resource usage |
-| **System Metrics** | CPU, memory, disk, network |
-| **Node Exporter Full** | Detailed system metrics |
-
-### Dashboard Organization
-
-```mermaid
-graph TB
-    subgraph GRAFANA["Grafana"]
-        subgraph FOLDERS["📁 Dashboard Folders"]
-            Infrastructure["Infrastructure"]
-            Media["Media Services"]
-            Custom["Custom"]
-        end
-
-        subgraph INFRA_DASH["Infrastructure Dashboards"]
-            Docker["Docker Overview"]
-            System["System Metrics"]
-            Node["Node Exporter Full"]
-        end
-
-        subgraph MEDIA_DASH["Media Dashboards"]
-            Plex["Plex Stats"]
-            Immich["Immich Metrics"]
-        end
-
-        Infrastructure --> INFRA_DASH
-        Media --> MEDIA_DASH
-    end
-
-    style GRAFANA fill:#f46800,color:#fff
-```
-
-### Adding Dashboards
-
-#### From Grafana.com
-
-1. Go to Dashboards → Import
-2. Enter dashboard ID (e.g., `1860` for Node Exporter)
-3. Select Prometheus data source
-4. Click Import
-
-**Recommended Dashboard IDs:**
-- `1860` - Node Exporter Full
-- `893` - Docker and System Monitoring
-
-#### Custom Dashboard
-
-1. Go to Dashboards → New → New Dashboard
-2. Add visualization
-3. Select Prometheus data source
-4. Enter PromQL query
-5. Configure display options
-6. Save dashboard
-
-### Data Sources
-
-Pre-configured:
-- **Prometheus** - `http://prometheus:9090`
-
-Add additional sources in Settings → Data Sources.
-
-### Plugins
-
-Installed by default:
-- grafana-clock-panel
-- grafana-simple-json-datasource
-- grafana-piechart-panel
-
-Add more in configuration:
-```yaml
-grafana:
-  environment:
-    GF_INSTALL_PLUGINS: grafana-worldmap-panel,grafana-polystat-panel
-```
-
----
-
-## AlertManager
-
-### Alert Flow
-
-```mermaid
-flowchart LR
-    subgraph PROMETHEUS["Prometheus"]
-        Rules["Alert Rules"]
-        Eval["Evaluation"]
-    end
-
-    subgraph ALERTMANAGER["AlertManager"]
-        Route["Routing"]
-        Group["Grouping"]
-        Silence["Silencing"]
-        Notify["Notification"]
-    end
-
-    subgraph RECEIVERS["Receivers"]
-        Discord["Discord"]
-        Slack["Slack"]
-        Email["Email"]
-        Webhook["Webhook"]
-    end
-
-    Rules --> Eval
-    Eval -->|"Firing"| Route
-    Route --> Group
-    Group --> Silence
-    Silence --> Notify
-    Notify --> Discord
-    Notify --> Slack
-    Notify --> Email
-    Notify --> Webhook
-
-    style PROMETHEUS fill:#e6522c,color:#fff
-    style ALERTMANAGER fill:#9b59b6,color:#fff
-```
-
-### Configuration
-
-Location: `/opt/media-stack/data/alertmanager/config/alertmanager.yml`
-
-```yaml
-global:
-  resolve_timeout: 5m
-
-route:
-  group_by: ['alertname']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'default'
-
-receivers:
-  - name: 'default'
-    # Configure your notification channels here
-```
-
-### Notification Channels
-
-#### Discord
-
-```yaml
-receivers:
-  - name: 'discord'
-    discord_configs:
-      - webhook_url: 'https://discord.com/api/webhooks/xxx/yyy'
-```
-
-#### Slack
-
-```yaml
-receivers:
-  - name: 'slack'
-    slack_configs:
-      - api_url: 'https://hooks.slack.com/services/xxx/yyy/zzz'
-        channel: '#alerts'
-```
-
-#### Email
-
-```yaml
-global:
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: 'alerts@example.com'
-  smtp_auth_username: 'your@email.com'
-  smtp_auth_password: 'app-password'
-
-receivers:
-  - name: 'email'
-    email_configs:
-      - to: 'admin@example.com'
-```
-
-### Silence Alerts
-
-1. Go to AlertManager UI (`http://your-server:9093`)
-2. Click "Silence"
-3. Configure matchers and duration
-4. Create silence
-
-> [!TIP]
-> Use silences during maintenance windows to prevent alert spam.
-
----
-
-## Logging Stack
-
-Centralized container logging using Loki and Promtail.
-
-> **Full documentation:** See the [Logging Guide](logging.md) for complete setup and usage.
-
-### Quick Overview
-
-```mermaid
-flowchart LR
-    Docker["Docker Containers"] --> Promtail["Promtail"]
-    Promtail --> Loki["Loki"]
-    Loki --> Grafana["Grafana Dashboards"]
-
-    style Loki fill:#f46800,color:#fff
-    style Promtail fill:#f46800,color:#fff
-```
-
-### Components
-
-| Service | Port | Purpose |
-|:--------|:----:|:--------|
-| **Loki** | 3100 | Log aggregation & storage |
-| **Promtail** | - | Log collection agent |
-
-### Enable Logging
-
-```bash
-# 1. Run setup script
-./scripts/setup-logging.sh
-
-# 2. Start services
-docker compose up -d loki promtail
-
-# 3. Restart Grafana to load dashboards
-docker compose restart grafana
-```
-
-This stack is intentionally separate from Prometheus alerting. It focuses on searchable container logs without extra host log parsing or a second log pipeline.
-
-### Pre-configured Dashboards
-
-| Dashboard | Description |
-|:----------|:------------|
-| **Logs Overview** | Error rates, log volumes, live errors |
-| **Container Logs** | Per-container log viewer with search |
-| **Media Stack Logs** | *Arr, VPN, Plex/Jellyfin logs |
-
-### Quick LogQL Examples
-
-```logql
-# All errors
-{job="docker"} |~ "(?i)error"
-
-# Specific container
-{container="plex"}
-```
-
-> **Learn more:** [Complete Logging Guide](logging.md)
-
----
-
-## Additional Monitoring
-
-### Uptime Kuma
-
-```mermaid
-graph TB
-    subgraph KUMA["Uptime Kuma"]
-        direction TB
-        HTTP["HTTP/HTTPS Monitors"]
-        TCP["TCP Port Monitors"]
-        Ping["Ping Monitors"]
-        Docker["Docker Monitors"]
-    end
-
-    subgraph TARGETS["Monitor Targets"]
-        Plex["Plex :32400"]
-        Immich["Immich :2283"]
-        Postgres["PostgreSQL :5432"]
-        Services["Other Services"]
-    end
-
-    HTTP --> Plex
-    HTTP --> Immich
-    TCP --> Postgres
-    HTTP --> Services
-
-    style KUMA fill:#5cdd8b,color:#000
-```
-
-Self-hosted uptime monitoring:
-
-1. Access `http://your-server:3001`
-2. Create account
-3. Add monitors:
-   - HTTP(s) - web services
-   - TCP - ports
-   - Ping - servers
-   - Docker - containers
-
-**Monitor Examples:**
-| Type | Target | Interval |
-|:-----|:-------|:---------|
-| HTTP | `http://plex:32400/web` | 60s |
-| HTTP | `http://immich:2283` | 60s |
-| TCP | `postgres:5432` | 30s |
-
-### Speedtest Tracker
-
-Internet speed monitoring:
-
-```bash
-# Enable profile
-docker compose --profile speedtest up -d
-```
-
-Access: `http://your-server:8765`
-
-Default login: admin@example.com / password
-
-Features:
-- Scheduled speed tests
-- Historical graphs
-- ISP tracking
-
-### Scrutiny
-
-Disk health monitoring:
-
-```bash
-# Enable profile
-docker compose --profile scrutiny up -d
-```
-
-Access: `http://your-server:8082`
-
-Monitors:
-- S.M.A.R.T. attributes
-- Temperature
-- Reallocated sectors
-- Failure prediction
-
-> [!WARNING]
-> Pay attention to Scrutiny warnings—disk failures can result in data loss!
-
-### Glances
-
-Real-time system monitor:
-
-```bash
-# Enable profile
-docker compose --profile monitoring up -d
-```
-
-Access: `http://your-server:61208`
-
-Shows:
-- CPU, memory, disk, network
-- Process list
-- Docker containers
-- Sensors
-
----
-
-## Custom Dashboards
-
-### Docker Container Dashboard
-
-```mermaid
-graph TB
-    subgraph DASHBOARD["Docker Dashboard"]
-        subgraph ROW1["Container Overview"]
-            Running["Running Count"]
-            Stopped["Stopped Count"]
-            Health["Health Status"]
-        end
-
-        subgraph ROW2["Resource Usage"]
-            CPU["CPU by Container"]
-            Memory["Memory by Container"]
-            Network["Network I/O"]
-        end
-
-        subgraph ROW3["Detailed Metrics"]
-            CPUGraph["CPU Time Series"]
-            MemGraph["Memory Time Series"]
-        end
-    end
-
-    style DASHBOARD fill:#2c3e50,color:#fff
-```
-
-Create a dashboard showing the health of key scrape targets:
-
-```json
-{
-  "panels": [
-    {
-      "title": "Scrape Target Health",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "up",
-          "legendFormat": "{{job}}"
-        }
-      ]
-    },
-    {
-      "title": "Prometheus Ingestion Rate",
-      "type": "timeseries",
-      "targets": [
-        {
-          "expr": "rate(prometheus_tsdb_head_samples_appended_total[5m])",
-          "legendFormat": "samples/s"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Media Server Dashboard
-
-Monitor Plex/Jellyfin:
-
-```promql
-# Active streams (requires Tautulli exporter)
-tautulli_current_streams
-
-# Transcode count
-tautulli_transcode_count
-
-# Library size
-tautulli_library_count
-```
-
-### System Health Dashboard
-
-```promql
-# Disk space remaining
-node_filesystem_avail_bytes{mountpoint="/"}
-
-# Memory available
-node_memory_MemAvailable_bytes
-
-# Network throughput
-rate(node_network_receive_bytes_total[5m])
-rate(node_network_transmit_bytes_total[5m])
-```
-
----
-
-## Alerting Rules
-
-### Alert Severity Levels
-
-```mermaid
-graph LR
-    subgraph SEVERITY["Alert Severity"]
-        Info["ℹ️ Info"]
-        Warning["⚠️ Warning"]
-        Critical["🔴 Critical"]
-    end
-
-    Info -->|"No action needed"| Log["Log only"]
-    Warning -->|"Investigate soon"| Notify["Notify team"]
-    Critical -->|"Immediate action"| Page["Page on-call"]
-
-    style Info fill:#3498db,color:#fff
-    style Warning fill:#f39c12,color:#fff
-    style Critical fill:#e74c3c,color:#fff
-```
-
-### Location
-
-`/opt/media-stack/data/prometheus/rules/alerts.yml`
-
-### Example Rules
-
-```yaml
-groups:
-  - name: system
-    rules:
-      - alert: HighCPUUsage
-        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High CPU usage detected"
-          description: "CPU usage is above 80% for 5 minutes"
-
-      - alert: HighMemoryUsage
-        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High memory usage detected"
-          description: "Memory usage is above 90%"
-
-      - alert: DiskSpaceLow
-        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Low disk space"
-          description: "Less than 10% disk space remaining"
-
-  - name: containers
-    rules:
-      - alert: ContainerDown
-        expr: up{job=~"prometheus|grafana|node-exporter|alertmanager"} == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Critical container is down"
-          description: "Scrape target {{ $labels.job }} is unavailable"
-
-      - alert: ContainerHighCPU
-        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Host CPU usage is high"
-          description: "Node exporter reports sustained CPU usage above 80%"
-```
-
-### Reload Rules
-
-```bash
-# Prometheus will auto-reload, or force:
-docker compose restart prometheus
-```
-
----
-
-## Maintenance
-
-### View Metrics Storage
-
-```bash
-# Check Prometheus data size
-du -sh /opt/media-stack/data/prometheus/
-
-# Check retention
-curl http://localhost:9090/api/v1/status/config | jq '.data.yaml' | grep retention
-```
-
-### Backup Dashboards
-
-```bash
-# Export all dashboards
-for dashboard in $(curl -s http://admin:admin@localhost:3000/api/search | jq -r '.[].uid'); do
-  curl -s "http://admin:admin@localhost:3000/api/dashboards/uid/$dashboard" | jq '.dashboard' > "dashboard_$dashboard.json"
-done
-```
-
-### Clean Old Data
-
-```bash
-# Prometheus handles retention automatically
-# To force cleanup, restart with lower retention temporarily
-```
-
----
-
-## Monitoring Checklist
-
-### Daily
-- [ ] Check Grafana dashboards for anomalies
-- [ ] Review any triggered alerts
-
-### Weekly
-- [ ] Check Prometheus storage usage
-- [ ] Review alert history
-- [ ] Verify all scrape targets are up
-
-### Monthly
-- [ ] Update dashboards as needed
-- [ ] Review and tune alert thresholds
-- [ ] Backup custom dashboards
-
----
-
-## Related Documentation
-
-- [Architecture](architecture.md) - System design
-- [Configuration](configuration.md) - Service configuration
-- [Troubleshooting](troubleshooting.md) - Debugging issues
-
----
-
-[← Back to README](../README.md)
+That keeps the monitoring story practical instead of turning it into a second job.

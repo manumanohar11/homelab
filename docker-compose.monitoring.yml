@@ -1,5 +1,5 @@
 # ~/media-stack/docker-compose.monitoring.yml
-# Contains monitoring stack: Prometheus, Grafana, InfluxDB, Telegraf, and Alerting
+# Contains the core monitoring stack: Prometheus, Grafana, Alertmanager, Node Exporter, and Uptime Kuma
 
 x-service-defaults: &service-defaults
   restart: unless-stopped

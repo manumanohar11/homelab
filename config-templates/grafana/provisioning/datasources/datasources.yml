@@ -1,5 +1,5 @@
 # Grafana Datasources Provisioning
-# Auto-configures Loki and Prometheus on first startup
+# Auto-configures Prometheus, Loki, and Alertmanager on first startup
 # https://grafana.com/docs/grafana/latest/administration/provisioning/#datasources
 
 apiVersion: 1

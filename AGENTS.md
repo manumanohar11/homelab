@@ -39,7 +39,7 @@ docker-compose.arr.yml          # *Arr suite (radarr, sonarr, readarr, etc.)
 docker-compose.downloaders.yml  # qBittorrent, Prowlarr, FlareSolverr, Bitmagnet
 docker-compose.media-servers.yml# Plex, Jellyfin, Stash, Tdarr
 docker-compose.management.yml   # Portainer, Watchtower, Glances
-docker-compose.monitoring.yml   # Prometheus, Grafana, InfluxDB, Alertmanager
+docker-compose.monitoring.yml   # Prometheus, Grafana, Alertmanager, Uptime Kuma
 docker-compose.logging.yml      # Loki and Promtail
 docker-compose.photos.yml       # Immich stack
 docker-compose.files.yml        # Nextcloud
@@ -104,7 +104,6 @@ configs/                        # Application configs (tracked in git)
 | Prometheus | 9090 | Metrics collection |
 | Grafana | 3000 | Visualization |
 | Alertmanager | 9093 | Alert management |
-| InfluxDB | 8086 | Time-series database |
 | Loki | 3100 | Log aggregation |
 | Uptime Kuma | 3001 | Uptime monitoring |
 

@@ -8,17 +8,21 @@ Shared utility scripts for keeping the homelab stack organized and consistent.
 
 ## Available Scripts
 
-### `scripts/setup-logging.sh`
+### `scripts/sync-monitoring-config.sh`
 
-Syncs the tracked logging and monitoring templates from `config-templates/` into `${DOCKER_BASE_DIR}` and creates any missing runtime directories.
+Syncs the tracked monitoring and logging templates from `config-templates/` into `${DOCKER_BASE_DIR}` and creates any missing runtime directories.
 
 ```bash
 # Sync tracked templates into runtime config directories
-./scripts/setup-logging.sh
+./scripts/sync-monitoring-config.sh
 
 # Check whether runtime configs drifted from tracked templates
-./scripts/setup-logging.sh --check
+./scripts/sync-monitoring-config.sh --check
 ```
+
+### `scripts/setup-logging.sh`
+
+Compatibility wrapper that forwards to `scripts/sync-monitoring-config.sh`.
 
 ### `scripts/validate-stack.py`
 
@@ -42,7 +46,7 @@ python3 scripts/validate-stack.py
 $EDITOR config-templates/prometheus/prometheus.yml
 
 # 2. Sync tracked templates into runtime directories
-./scripts/setup-logging.sh
+./scripts/sync-monitoring-config.sh
 
 # 3. Validate compose and documentation consistency
 python3 scripts/validate-stack.py

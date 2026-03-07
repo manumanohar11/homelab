@@ -25,11 +25,11 @@ jobs:
       - name: Validate rendered compose config
         run: docker compose config --quiet
 
-      - name: Sync tracked logging templates
-        run: bash scripts/setup-logging.sh
+      - name: Sync tracked monitoring templates
+        run: bash scripts/sync-monitoring-config.sh
 
-      - name: Verify logging template sync
-        run: bash scripts/setup-logging.sh --check
+      - name: Verify monitoring template sync
+        run: bash scripts/sync-monitoring-config.sh --check
 
       - name: Run repository validation
         run: python3 scripts/validate-stack.py

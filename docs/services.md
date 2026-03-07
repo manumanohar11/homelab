@@ -213,7 +213,7 @@ Track system health and performance.
 |:--------|:----:|:------------|:------|:------:|
 | **Prometheus** | 9090 | Metrics collection & storage | `prom/prometheus` | ✅ |
 | **Grafana** | 3000 | Visualization dashboards | `grafana/grafana` | ✅ |
-| **AlertManager** | 9093 | Alert routing & management | `prom/alertmanager` | ✅ |
+| **AlertManager** | 9093 | Alert routing scaffold | `prom/alertmanager` | ✅ |
 | **Node Exporter** | 9100 | System metrics | `prom/node-exporter` | ✅ |
 | **Uptime Kuma** | 3001 | Uptime monitoring | `louislam/uptime-kuma` | ✅ |
 | **Speedtest Tracker** | 8765 | Internet speed history | `linuxserver/speedtest-tracker` | 📦 `speedtest` |
