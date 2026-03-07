@@ -67,7 +67,7 @@ include:
 | `monitoring.yml` | Monitoring stack | Prometheus, Grafana, AlertManager |
 | `logging.yml` | Container log aggregation | Loki, Promtail |
 | `utilities.yml` | Utility services | Homepage, Dozzle, Scrutiny, Speedtest |
-| `backup.yml` | Backup services | Duplicati, Restic, DB Backup |
+| `backup.yml` | Backup services | Duplicati, Restic server, DB Backup |
 | `automation.yml` | Workflow automation | n8n |
 | `files.yml` | File sharing | Nextcloud |
 
@@ -194,8 +194,11 @@ DOCKER_GIT_CONFIG_DIR=/opt/media-stack/config-templates
 # Media storage
 DOCKER_MEDIA_DIR=/mnt/media
 
-# Backup destination
+# Duplicati destination path for local/NAS-style backups
 BACKUP_DESTINATION=/mnt/backup
+
+# Duplicati settings encryption key (recommended)
+DUPLICATI_ENCRYPTION_KEY=your_generated_key
 ```
 
 ### Database Settings

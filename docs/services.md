@@ -287,9 +287,9 @@ Data protection and recovery.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Duplicati** | 8200 | Cloud backup | `lscr.io/linuxserver/duplicati` | ✅ |
-| **Restic Server** | 8000 | REST backup repository | `restic/rest-server` | 📦 `restic` |
-| **DB Backup** | - | PostgreSQL backup | `tiredofit/db-backup` | 📦 `db-backup` |
+| **Duplicati** | 8200 | Main config backup tool | `lscr.io/linuxserver/duplicati` | ✅ |
+| **Restic Server** | 8000 | Advanced REST repository endpoint | `restic/rest-server` | 📦 `restic` |
+| **DB Backup** | - | PostgreSQL dump worker | `tiredofit/db-backup` | 📦 `db-backup` |
 
 ### Duplicati
 
@@ -299,13 +299,16 @@ Backup to cloud storage:
 - Amazon S3
 - Local NAS
 
+It is the primary backup workflow for this repo and covers `${DOCKER_BASE_DIR}` by default.
+
 **Default URL:** `http://your-server:8200`
 
 ### Database Backups
 
-Automated daily backups:
-- **PostgreSQL:** 3:00 AM, 6-day retention
-- **SQLite:** Daily, 7-day retention
+Optional SQL dump worker:
+- focused on PostgreSQL containers
+- writes dumps to `${DOCKER_BASE_DIR}/db-backup`
+- those dumps are then picked up by Duplicati automatically
 
 ---
 

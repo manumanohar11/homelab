@@ -111,7 +111,7 @@ graph TB
 | **VPN** | Privacy & network routing | Gluetun |
 | **\*Arr Stack** | Media automation | Radarr, Sonarr, Lidarr, Readarr |
 | **Downloaders** | Content acquisition | qBittorrent, Prowlarr |
-| **Backup** | Data protection | Duplicati, Restic, DB Backup |
+| **Backup** | Data protection | Duplicati, Restic Server, DB Backup |
 | **Management** | Container operations | Portainer, Watchtower, Glances |
 | **Requests** | User request portals | Overseerr, Maintainerr |
 | **Utilities** | Tools & dashboards | Homepage, Dozzle, Glance |

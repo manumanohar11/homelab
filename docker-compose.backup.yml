@@ -50,13 +50,10 @@ services:
       SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
     volumes:
       - ${DOCKER_BASE_DIR}/duplicati:/config
-      # Backup sources - all critical data directories
+      # Primary backup source: all service data, including db-backup output when enabled
       - ${DOCKER_BASE_DIR}:/source/docker-configs:ro
-      - ${DOCKER_BASE_DIR}/prometheus/data:/source/prometheus:ro
-      - ${DOCKER_BASE_DIR}/grafana/data:/source/grafana:ro
-      - ${DOCKER_BASE_DIR}/uptime-kuma:/source/uptime-kuma:ro
-      - ${DOCKER_BASE_DIR}/homepage:/source/homepage:ro
-      - ${DOCKER_BASE_DIR}/immich-server:/source/immich-server:ro
+      # Critical project secrets live in .env, which is outside DOCKER_BASE_DIR
+      - ${DOCKER_PROJECT_DIR:-/opt/media-stack}/.env:/source/project/.env:ro
       # Backup destination
       - ${BACKUP_DESTINATION:-/mnt/backup}:/backups
     networks:
@@ -72,7 +69,7 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # Alternative: Restic with REST server for more advanced backup scenarios
+  # Optional advanced repository endpoint for operators already using Restic clients
   restic-rest-server:
     <<: [*service-defaults, *resources-medium]
     image: restic/rest-server:latest
@@ -93,8 +90,7 @@ services:
     profiles:
       - restic
 
-  # Database backup service using docker-db-backup
-  # Backs up PostgreSQL databases automatically
+  # Optional PostgreSQL dump worker. Output lands inside ${DOCKER_BASE_DIR}/db-backup.
   db-backup:
     <<: [*service-defaults, *resources-medium]
     image: tiredofit/db-backup:latest

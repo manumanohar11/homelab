@@ -308,6 +308,7 @@ include:
 ## Backup Strategy
 
 1. **Config backup**: All `${DOCKER_BASE_DIR}` directories
-2. **Database backup**: Use db-backup service for PostgreSQL
-3. **Media backup**: Separate strategy for large media files
-4. **Recommended schedule**: Daily for configs, weekly for databases
+2. **Secrets backup**: Keep `.env` in your backup plan
+3. **Database backup**: Use db-backup service for PostgreSQL dumps into `${DOCKER_BASE_DIR}/db-backup`
+4. **Media backup**: Separate strategy for large media files
+5. **Recommended schedule**: Daily for configs, weekly for databases
