@@ -2,7 +2,8 @@
 # This is the main file to run the entire stack.
 # Command: docker compose up -d
 #
-# Enable/disable modules by commenting/uncommenting the include lines below.
+# Most optional services are controlled with profiles.
+# Comment include lines only if you want to remove a whole module locally.
 # Use profiles to enable optional services within modules:
 #   docker compose --profile vpn --profile monitoring up -d
 
@@ -29,8 +30,8 @@ include:
   # Media management
   - docker-compose.photos.yml
   - docker-compose.media-servers.yml
-  # - docker-compose.arr.yml
-  # - docker-compose.downloaders.yml
+  - docker-compose.arr.yml
+  - docker-compose.downloaders.yml
   - docker-compose.requests.yml
 
   # Management & monitoring
@@ -39,8 +40,8 @@ include:
   - docker-compose.logging.yml  # Loki/Promtail stack
 
   # Productivity
-  # - docker-compose.files.yml
-  # - docker-compose.automation.yml
+  - docker-compose.files.yml
+  - docker-compose.automation.yml
 
   # Backup
   - docker-compose.backup.yml
@@ -54,13 +55,17 @@ include:
 # --- Available Profiles ---
 # monitoring    - Glances system monitor
 # dashboard     - Glance Homepage alternative dashboard
+# arr           - *Arr apps plus downloader stack
+# downloaders   - VPN-routed download services only
 # jellyfin      - Jellyfin and Jellyseerr
 # kavita        - Kavita ebook/comic reader
 # stash         - Stash media organizer
 # tdarr         - Tdarr media transcoding
+# automation    - n8n workflow automation
 # notifiarr     - Notifiarr unified notifications
 # restic        - Restic backup server
 # db-backup     - Database backup worker
+# files         - Nextcloud file sharing
 # scrutiny      - Scrutiny disk S.M.A.R.T monitoring
 # speedtest     - Speedtest Tracker internet speed history
 # requests      - Overseerr/Jellyseerr (requires *arr stack)

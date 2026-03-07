@@ -261,21 +261,21 @@ Use anchors from `docker-compose.common.yml`:
 
 ## Enabling/Disabling Services
 
-### Method 1: Comment includes in docker-compose.yml
+### Preferred Method: Use profiles for optional services
+```yaml
+# In service definition:
+profiles:
+  - arr
+
+# To start:
+docker compose --profile arr up -d
+```
+
+### Secondary Method: Comment includes in docker-compose.yml
 ```yaml
 include:
   - docker-compose.core.yml
   # - docker-compose.arr.yml      # Commented = disabled
-```
-
-### Method 2: Use profiles for optional services
-```yaml
-# In service definition:
-profiles:
-  - jellyfin
-
-# To start:
-docker compose --profile jellyfin up -d
 ```
 
 ## Testing Changes

@@ -1,17 +1,30 @@
 # ~/media-stack/docker-compose.automation.yml
-# Contains n8n workflow automation tool
+# Contains workflow automation services. Enable with the `automation` profile.
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
 
 services:
   n8n:
+    <<: [*service-defaults, *resources-large]
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    networks:
-      - media-stack
-    ports:
-      - "5678:5678"
     environment:
       GENERIC_TIMEZONE: ${TZ}
       TZ: ${TZ}
@@ -26,24 +39,16 @@ services:
       N8N_DIAGNOSTICS_ENABLED: "false"
     volumes:
       - ${DOCKER_BASE_DIR}/n8n:/home/node/.n8n
+    networks:
+      - media-stack
+    ports:
+      - "5678:5678"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5678/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Automation"
@@ -51,3 +56,5 @@ services:
       - "homepage.icon=n8n"
       - "homepage.href=https://${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Workflow Automation"
+    profiles:
+      - automation

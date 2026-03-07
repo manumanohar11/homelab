@@ -29,7 +29,6 @@ Complete catalog of all 45+ services available in the Media Stack.
 |:------:|:--------|:--------------|
 | ✅ | Enabled by default | Already running |
 | 📦 | Optional profile | `--profile <name>` |
-| ⚪ | Disabled module | Uncomment in `docker-compose.yml` |
 
 ---
 
@@ -128,19 +127,19 @@ Automated media library management.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Radarr** | 7878 | Movie collection manager | `linuxserver/radarr` | ⚪ |
-| **Sonarr** | 8989 | TV show collection manager | `linuxserver/sonarr` | ⚪ |
-| **Lidarr** | 8686 | Music collection manager | `linuxserver/lidarr` | ⚪ |
-| **Readarr** | 8787 | Book collection manager | `linuxserver/readarr` | ⚪ |
-| **Bazarr** | 6767 | Subtitle manager | `linuxserver/bazarr` | ⚪ |
-| **Whisparr** | 6969 | Adult content manager | `ghcr.io/hotio/whisparr` | ⚪ |
-| **Recyclarr** | - | TRaSH Guide sync | `ghcr.io/recyclarr/recyclarr` | ⚪ |
+| **Radarr** | 7878 | Movie collection manager | `linuxserver/radarr` | 📦 `arr` |
+| **Sonarr** | 8989 | TV show collection manager | `linuxserver/sonarr` | 📦 `arr` |
+| **Lidarr** | 8686 | Music collection manager | `linuxserver/lidarr` | 📦 `arr` |
+| **Readarr** | 8787 | Book collection manager | `linuxserver/readarr` | 📦 `arr` |
+| **Bazarr** | 6767 | Subtitle manager | `linuxserver/bazarr` | 📦 `arr` |
+| **Whisparr** | 6969 | Adult content manager | `ghcr.io/hotio/whisparr` | 📦 `arr` |
+| **Recyclarr** | - | TRaSH Guide sync | `ghcr.io/recyclarr/recyclarr` | 📦 `arr` |
 
 ### Enable *Arr Stack
 
-1. Uncomment `docker-compose.arr.yml` in main compose file
+1. Enable the profile with `docker compose --profile arr up -d`
 2. Configure VPN credentials in `.env`
-3. Run `docker compose up -d`
+3. Add `--profile requests` too if you want Overseerr at the same time
 
 All *Arr services route through Gluetun VPN for privacy.
 
@@ -156,20 +155,20 @@ Content acquisition services (VPN-routed).
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **qBittorrent** | 8080 | Torrent client | `linuxserver/qbittorrent` | ⚪ |
-| **Prowlarr** | 9696 | Indexer manager | `linuxserver/prowlarr` | ⚪ |
-| **FlareSolverr** | 8191 | Cloudflare bypass | `ghcr.io/flaresolverr/flaresolverr` | ⚪ |
-| **Bitmagnet** | 3333 | DHT crawler | `ghcr.io/bitmagnet-io/bitmagnet` | ⚪ |
+| **qBittorrent** | 8080 | Torrent client | `linuxserver/qbittorrent` | 📦 `arr` / `downloaders` |
+| **Prowlarr** | 9696 | Indexer manager | `linuxserver/prowlarr` | 📦 `arr` / `downloaders` |
+| **FlareSolverr** | 8191 | Cloudflare bypass | `ghcr.io/flaresolverr/flaresolverr` | 📦 `arr` / `downloaders` |
+| **Bitmagnet** | 3333 | DHT crawler | `ghcr.io/bitmagnet-io/bitmagnet` | 📦 `arr` / `downloaders` |
 
 ### Enable Downloaders
 
-1. Uncomment `docker-compose.downloaders.yml`
+1. Enable downloaders with `docker compose --profile downloaders up -d`
 2. Configure VPN in `.env`:
    ```bash
    VPN_SERVICE_PROVIDER=mullvad
    OPENVPN_USER=your_account
    ```
-3. Run `docker compose up -d`
+3. Or use `docker compose --profile arr up -d` to start them together with the *Arr apps
 
 > ⚠️ **Important:** Always use VPN for downloading. All traffic routes through Gluetun.
 
@@ -316,7 +315,7 @@ Workflow automation services.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **n8n** | 5678 | Workflow automation | `n8nio/n8n` | ⚪ |
+| **n8n** | 5678 | Workflow automation | `n8nio/n8n` | 📦 `automation` |
 
 ### n8n
 
@@ -325,7 +324,7 @@ Low-code automation platform:
 - Create complex workflows
 - Self-hosted alternative to Zapier
 
-**Enable:** Uncomment `docker-compose.automation.yml`
+**Enable:** `docker compose --profile automation up -d`
 
 ---
 
@@ -335,7 +334,7 @@ File sync and sharing services.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Nextcloud** | 8080 | File sync & sharing | `nextcloud` | ⚪ |
+| **Nextcloud** | 8080 | File sync & sharing | `nextcloud` | 📦 `files` |
 
 ### Nextcloud
 
@@ -345,7 +344,7 @@ Self-hosted cloud storage:
 - Collaborative editing
 - Mobile apps
 
-**Enable:** Uncomment `docker-compose.files.yml`
+**Enable:** `docker compose --profile files up -d`
 
 ---
 

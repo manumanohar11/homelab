@@ -251,7 +251,7 @@ Expected:
 
 ## Step 5: Choose Your Services
 
-Edit `docker-compose.yml` to enable/disable service modules:
+Most service groups are already included in `docker-compose.yml`. Use profiles to turn optional ones on when you need them:
 
 ```yaml
 include:
@@ -259,22 +259,22 @@ include:
   - docker-compose.common.yml
   - docker-compose.core.yml
 
-  # Choose what you want:
+  # Standard modules:
   - docker-compose.photos.yml           # ✅ Immich photo management
   - docker-compose.media-servers.yml    # ✅ Plex + optional media profiles
+  - docker-compose.arr.yml              # Optional via `arr` profile
+  - docker-compose.downloaders.yml      # Optional via `downloaders` or `arr`
   - docker-compose.media-extras.yml     # ✅ Tautulli + optional extras
   - docker-compose.requests.yml         # Optional request portals via profiles
   - docker-compose.management.yml       # ✅ Portainer, Watchtower
   - docker-compose.monitoring.yml       # ✅ Prometheus, Grafana
   - docker-compose.logging.yml          # ✅ Loki, Promtail
+  - docker-compose.files.yml            # Optional via `files` profile
+  - docker-compose.automation.yml       # Optional via `automation` profile
   - docker-compose.utilities.yml        # ✅ Homepage, Dozzle
   - docker-compose.backup.yml           # ✅ Duplicati
 
-  # Uncomment to enable:
-  # - docker-compose.arr.yml            # *Arr stack (needs VPN)
-  # - docker-compose.downloaders.yml    # qBittorrent (needs VPN)
-  # - docker-compose.automation.yml     # n8n workflows
-  # - docker-compose.files.yml          # Nextcloud
+  # Keep this commented unless you need host-specific overrides:
   # - docker-compose.local.yml          # Host-specific overrides
 ```
 
@@ -293,18 +293,8 @@ include:
 
 #### Scenario 2: Full Media Automation
 
-```yaml
-include:
-  - docker-compose.common.yml
-  - docker-compose.core.yml
-  - docker-compose.photos.yml
-  - docker-compose.media-servers.yml
-  - docker-compose.media-extras.yml
-  - docker-compose.arr.yml              # Uncomment
-  - docker-compose.downloaders.yml      # Uncomment
-  - docker-compose.requests.yml
-  - docker-compose.management.yml
-  - docker-compose.utilities.yml
+```bash
+docker compose --profile arr --profile requests up -d
 ```
 
 ---
@@ -329,6 +319,9 @@ docker compose up -d
 
 # Start with optional profiles
 docker compose --profile speedtest --profile scrutiny up -d
+
+# Start the full *Arr stack with downloader dependencies
+docker compose --profile arr up -d
 
 # Watch startup logs
 docker compose logs -f
@@ -438,8 +431,7 @@ If you want automated media downloads:
 
 1. Get VPN subscription (Mullvad recommended)
 2. Configure VPN in `.env`
-3. Uncomment `docker-compose.arr.yml` and `docker-compose.downloaders.yml`
-4. Run `docker compose up -d`
+3. Run `docker compose --profile arr up -d`
 
 See [Configuration Guide](configuration.md#vpn-setup) for VPN setup.
 

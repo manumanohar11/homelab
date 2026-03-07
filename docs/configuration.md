@@ -32,22 +32,22 @@ include:
   - docker-compose.common.yml      # Shared templates
   - docker-compose.core.yml        # VPN, proxy, tunnels
 
-  # Service modules (enable what you need)
+  # Standard modules
   - docker-compose.photos.yml
   - docker-compose.media-servers.yml
+  - docker-compose.arr.yml
+  - docker-compose.downloaders.yml
   - docker-compose.media-extras.yml
   - docker-compose.requests.yml
   - docker-compose.management.yml
   - docker-compose.monitoring.yml
   - docker-compose.logging.yml
+  - docker-compose.files.yml
+  - docker-compose.automation.yml
   - docker-compose.utilities.yml
   - docker-compose.backup.yml
 
-  # Disabled by default
-  # - docker-compose.arr.yml
-  # - docker-compose.downloaders.yml
-  # - docker-compose.automation.yml
-  # - docker-compose.files.yml
+  # Host-specific overrides only
   # - docker-compose.local.yml
 ```
 
@@ -73,20 +73,23 @@ include:
 
 ### Enable/Disable Modules
 
-**Enable a module:** Uncomment the line in `docker-compose.yml`
+The normal way to turn optional parts of the stack on is with profiles, not by editing `docker-compose.yml`.
 
-```yaml
-# Before (disabled)
-# - docker-compose.arr.yml
-
-# After (enabled)
-- docker-compose.arr.yml
-```
-
-**Apply changes:**
 ```bash
-docker compose up -d
+# *Arr apps plus downloader stack
+docker compose --profile arr up -d
+
+# Downloaders only
+docker compose --profile downloaders up -d
+
+# Nextcloud
+docker compose --profile files up -d
+
+# n8n
+docker compose --profile automation up -d
 ```
+
+Comment an include line only if you want to permanently remove an entire module from your personal install.
 
 ---
 
@@ -113,15 +116,19 @@ docker compose up -d
 |:--------|:---------|:-------------|
 | `monitoring` | Glances | management.yml |
 | `dashboard` | Glance | management.yml |
+| `arr` | *Arr apps plus downloader stack | arr.yml, downloaders.yml |
+| `downloaders` | qBittorrent, Prowlarr, FlareSolverr, Bitmagnet | downloaders.yml |
 | `jellyfin` | Jellyfin, Jellyseerr | media-servers.yml, requests.yml |
 | `kavita` | Kavita | media-servers.yml |
 | `stash` | Stash | media-servers.yml |
 | `tdarr` | Tdarr | media-extras.yml |
+| `automation` | n8n | automation.yml |
 | `requests` | Overseerr | requests.yml |
 | `maintainerr` | Maintainerr | media-extras.yml |
 | `notifiarr` | Notifiarr | requests.yml |
 | `restic` | Restic Server | backup.yml |
 | `db-backup` | DB Backup | backup.yml |
+| `files` | Nextcloud | files.yml |
 | `scrutiny` | Scrutiny | utilities.yml |
 | `speedtest` | Speedtest Tracker | utilities.yml |
 | `navidrome` | Navidrome | media-servers.yml |
@@ -132,14 +139,19 @@ docker compose up -d
 docker compose --profile monitoring --profile speedtest --profile scrutiny up -d
 ```
 
+**Full media automation:**
+```bash
+docker compose --profile arr --profile requests up -d
+```
+
 **Jellyfin with requests:**
 ```bash
 docker compose --profile jellyfin up -d
 ```
 
-**Media extras:**
+**Optional apps:**
 ```bash
-docker compose --profile kavita --profile navidrome up -d
+docker compose --profile automation --profile files --profile kavita up -d
 ```
 
 ---

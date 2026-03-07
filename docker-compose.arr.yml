@@ -1,218 +1,175 @@
 # ~/media-stack/docker-compose.arr.yml
-# Contains the *Arr suite for media management.
+# Contains the *Arr suite for media management. Enable with the `arr` profile.
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  network_mode: "service:gluetun"
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 1m
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-arr-depends-on: &arr-depends-on
+  gluetun:
+    condition: service_healthy
+  prowlarr:
+    condition: service_healthy
+  qbittorrent:
+    condition: service_healthy
+
+x-resources-arr: &resources-arr
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 1G
+      reservations:
+        memory: 256M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
 
 services:
   radarr:
+    <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/radarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-      prowlarr:
-        condition: service_healthy
-      qbittorrent:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *arr-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Radarr"
       - "homepage.icon=radarr"
       - "homepage.description=Movie Management"
+    profiles:
+      - arr
 
   sonarr:
+    <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/sonarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-      prowlarr:
-        condition: service_healthy
-      qbittorrent:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *arr-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Sonarr"
       - "homepage.icon=sonarr"
       - "homepage.description=TV Show Management"
+    profiles:
+      - arr
 
   lidarr:
+    <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    user: "${PUID}:${PGID}"
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/lidarr:/config
       - ${DOCKER_MEDIA_DIR}/Songs:/music_library
       - ${DOCKER_BASE_DIR}/downloads:/downloads
+    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-      qbittorrent:
-        condition: service_healthy
-      prowlarr:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *arr-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Lidarr"
       - "homepage.icon=lidarr"
       - "homepage.description=Music Management"
+    profiles:
+      - arr
 
   readarr:
+    <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/readarr:develop
     container_name: readarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
-    user: "${PUID}:${PGID}"
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/readarr:/config
       - ${DOCKER_MEDIA_DIR}/Books:/books
       - ${DOCKER_BASE_DIR}/downloads:/downloads
+    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8787/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-      qbittorrent:
-        condition: service_healthy
-      prowlarr:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *arr-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Readarr"
       - "homepage.icon=readarr"
       - "homepage.description=Book Management"
+    profiles:
+      - arr
 
   bazarr:
+    <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/bazarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6767"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
       gluetun:
         condition: service_healthy
@@ -220,84 +177,48 @@ services:
         condition: service_healthy
       sonarr:
         condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Bazarr"
       - "homepage.icon=bazarr"
       - "homepage.description=Subtitle Management"
+    profiles:
+      - arr
 
   whisparr:
+    <<: [*service-defaults, *resources-arr]
     image: ghcr.io/hotio/whisparr:latest
     container_name: whisparr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/whisparr:/config
       - ${DOCKER_MEDIA_DIR}:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6969/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-      prowlarr:
-        condition: service_healthy
-      qbittorrent:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *arr-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Whisparr"
       - "homepage.icon=whisparr"
       - "homepage.description=Adult Content Management"
+    profiles:
+      - arr
 
   recyclarr:
+    <<: [*service-defaults, *resources-small]
     image: ghcr.io/recyclarr/recyclarr:latest
     container_name: recyclarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
-    user: "${PUID}:${PGID}"
-    volumes:
-      - ${DOCKER_BASE_DIR}/recyclarr:/config
     environment:
       TZ: ${TZ}
       RECYCLARR_CREATE_CONFIG: "true"
+    volumes:
+      - ${DOCKER_BASE_DIR}/recyclarr:/config
+    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD-SHELL", "test -f /config/recyclarr.yml || exit 1"]
       interval: 5m
@@ -311,21 +232,11 @@ services:
         condition: service_healthy
       sonarr:
         condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-        reservations:
-          memory: 64M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Media Management"
       - "homepage.name=Recyclarr"
       - "homepage.icon=recyclarr"
       - "homepage.description=TRaSH Guide Sync"
+    profiles:
+      - arr

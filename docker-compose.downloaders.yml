@@ -1,18 +1,66 @@
 # ~/media-stack/docker-compose.downloaders.yml
-# Contains services for downloading and indexing.
+# Contains download and indexer services. Enable with `downloaders` or `arr`.
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  network_mode: "service:gluetun"
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 1m
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-gluetun-depends-on: &gluetun-depends-on
+  gluetun:
+    condition: service_healthy
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 1G
+      reservations:
+        memory: 256M
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 256M
 
 services:
   qbittorrent:
+    <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       WEBUI_PORT: 8080
     volumes:
       - ${DOCKER_BASE_DIR}/qbittorrent:/config
@@ -20,121 +68,71 @@ services:
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 256M
+      <<: *gluetun-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Downloaders"
       - "homepage.name=qBittorrent"
       - "homepage.icon=qbittorrent"
       - "homepage.description=Torrent Client"
+    profiles:
+      - arr
+      - downloaders
 
   prowlarr:
+    <<: [*service-defaults, *resources-small]
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/prowlarr:/config
     user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
+      <<: *healthcheck-defaults
     depends_on:
-      gluetun:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 512M
-        reservations:
-          memory: 128M
+      <<: *gluetun-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Downloaders"
       - "homepage.name=Prowlarr"
       - "homepage.icon=prowlarr"
       - "homepage.description=Indexer Manager"
+    profiles:
+      - arr
+      - downloaders
 
   flaresolverr:
+    <<: [*service-defaults, *resources-medium]
     image: ghcr.io/flaresolverr/flaresolverr:latest
     container_name: flaresolverr
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
       LOG_LEVEL: "info"
       LOG_HTML: "false"
       CAPTCHA_SOLVER: "none"
       TZ: ${TZ}
-    depends_on:
-      gluetun:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8191/health"]
-      interval: 1m
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+      <<: *healthcheck-defaults
+    depends_on:
+      <<: *gluetun-depends-on
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Downloaders"
       - "homepage.name=FlareSolverr"
       - "homepage.icon=flaresolverr"
       - "homepage.description=Cloudflare Bypass"
+    profiles:
+      - arr
+      - downloaders
 
   bitmagnet:
+    <<: [*service-defaults, *resources-large]
     image: ghcr.io/bitmagnet-io/bitmagnet:latest
     container_name: bitmagnet
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
     environment:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
@@ -148,76 +146,54 @@ services:
       - --keys=http_server
       - --keys=queue_server
       - --keys=dht_crawler
-    depends_on:
-      gluetun:
-        condition: service_healthy
-      bitmagnet-postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3333"]
       interval: 1m
       timeout: 10s
       retries: 3
       start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
+    depends_on:
+      gluetun:
+        condition: service_healthy
+      bitmagnet-postgres:
+        condition: service_healthy
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Downloaders"
       - "homepage.name=Bitmagnet"
       - "homepage.icon=bittorrent"
       - "homepage.description=DHT Crawler"
+    profiles:
+      - arr
+      - downloaders
 
   bitmagnet-postgres:
+    <<: [*service-defaults, *resources-medium]
     image: postgres:16-alpine
     container_name: bitmagnet-postgres
-    restart: unless-stopped
-    network_mode: "service:gluetun"
-    security_opt:
-      - no-new-privileges:true
-    volumes:
-      - bitmagnet_postgres_data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
       POSTGRES_DB: bitmagnet
       PGUSER: postgres
       POSTGRES_INITDB_ARGS: "-c shared_buffers=256MB -c max_connections=200"
+    volumes:
+      - bitmagnet_postgres_data:/var/lib/postgresql/data
     shm_size: 1g
-    depends_on:
-      gluetun:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d bitmagnet"]
       start_period: 20s
       interval: 10s
       timeout: 5s
       retries: 5
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 1G
-        reservations:
-          memory: 256M
+    depends_on:
+      <<: *gluetun-depends-on
     labels:
       - "homepage.group=Downloaders"
       - "homepage.name=Bitmagnet DB"
       - "homepage.description=PostgreSQL"
+    profiles:
+      - arr
+      - downloaders
 
 volumes:
   bitmagnet_postgres_data:

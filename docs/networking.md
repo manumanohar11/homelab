@@ -183,19 +183,22 @@ radarr:
   # No ports defined here - Gluetun exposes them
 ```
 
-Gluetun exposes ports for all VPN-routed services:
+To keep existing URLs stable, Gluetun keeps exposing the current VPN-routed ports even though the optional services themselves are now controlled with profiles:
 
 ```yaml
 gluetun:
   ports:
+    - "8080:8080"   # qBittorrent
+    - "9696:9696"   # Prowlarr
     - "7878:7878"   # Radarr
     - "8989:8989"   # Sonarr
     - "8686:8686"   # Lidarr
     - "8787:8787"   # Readarr
     - "6767:6767"   # Bazarr
-    - "9696:9696"   # Prowlarr
-    - "8080:8080"   # qBittorrent
+    - "6969:6969"   # Whisparr
     - "8191:8191"   # FlareSolverr
+    - "9998:9998"   # Stash
+    - "3333:3333"   # Bitmagnet
 ```
 
 ### VPN-Routed Services
@@ -207,9 +210,12 @@ gluetun:
 | Lidarr | 8686 | `http://your-server:8686` |
 | Readarr | 8787 | `http://your-server:8787` |
 | Bazarr | 6767 | `http://your-server:6767` |
+| Whisparr | 6969 | `http://your-server:6969` |
 | Prowlarr | 9696 | `http://your-server:9696` |
 | qBittorrent | 8080 | `http://your-server:8080` |
 | FlareSolverr | 8191 | `http://your-server:8191` |
+| Stash | 9998 | `http://your-server:9998` |
+| Bitmagnet | 3333 | `http://your-server:3333` |
 
 ### Verify VPN Connection
 

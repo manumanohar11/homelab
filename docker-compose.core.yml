@@ -44,6 +44,25 @@ x-resources-medium: &resources-medium
       reservations:
         memory: 128M
 
+x-gluetun-ports: &gluetun-ports
+  # Keep the current exposed ports for compatibility.
+  # Optional services are profile-gated elsewhere, but their existing URLs stay stable here.
+  - "8080:8080"      # qBittorrent
+  - "9696:9696"      # Prowlarr
+  - "7878:7878"      # Radarr
+  - "8989:8989"      # Sonarr
+  - "6767:6767"      # Bazarr
+  - "6969:6969"      # Whisparr
+  - "8686:8686"      # Lidarr
+  - "8787:8787"      # Readarr
+  - "9998:9998"      # Stash
+  - "8191:8191"      # FlareSolverr
+  - "3333:3333"      # Bitmagnet API and Web UI
+  - "3334:3334/tcp"  # Bitmagnet BitTorrent TCP
+  - "3334:3334/udp"  # Bitmagnet BitTorrent UDP
+  - "6881:6881"      # qBittorrent BitTorrent TCP
+  - "6881:6881/udp"  # qBittorrent BitTorrent UDP
+
 services:
   # Docker Socket Proxy - Secure filtered access to Docker API
   # Instead of mounting docker.sock directly (security risk), services
@@ -124,25 +143,7 @@ services:
       TZ: ${TZ}
     networks:
       - media-stack
-    ports:
-      # Ports for services running through the VPN
-      - "8080:8080"   # qBittorrent
-      - "9696:9696"   # Prowlarr
-      - "7878:7878"   # Radarr
-      - "8989:8989"   # Sonarr
-      - "6767:6767"   # Bazarr
-      - "6969:6969"   # Whisparr
-      - "8686:8686"   # Lidarr
-      - "8787:8787"   # Readarr
-      - "9998:9998"   # Stash
-      - "8191:8191"   # Flaresolverr
-      # Bitmagnet ports
-      - "3333:3333"   # Bitmagnet API and WebUI
-      - "3334:3334/tcp"   # Bitmagnet BitTorrent TCP
-      - "3334:3334/udp"   # Bitmagnet BitTorrent UDP
-      # qBittorrent specific ports
-      - "6881:6881"
-      - "6881:6881/udp"
+    ports: *gluetun-ports
     healthcheck:
       test: ["CMD-SHELL", "/gluetun-entrypoint healthcheck"]
       interval: 30s

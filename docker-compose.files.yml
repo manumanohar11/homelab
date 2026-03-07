@@ -1,17 +1,37 @@
 # ~/media-stack/docker-compose.files.yml
-# Contains services for file management like Nextcloud.
+# Contains file-sharing services. Enable with the `files` profile.
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
 
 services:
   nextcloud:
+    <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/nextcloud:latest
     container_name: nextcloud
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
     environment:
-      PUID: ${PUID}
-      PGID: ${PGID}
-      TZ: ${TZ}
+      <<: *common-env
       NEXTCLOUD_TRUSTED_DOMAINS: cloud.${DOMAIN_NAME:-localhost}
     volumes:
       - ${DOCKER_BASE_DIR}/nextcloud:/config
@@ -26,18 +46,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 5m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          memory: 512M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Files"
@@ -45,3 +53,5 @@ services:
       - "homepage.icon=nextcloud"
       - "homepage.href=https://cloud.${DOMAIN_NAME:-localhost}:8443"
       - "homepage.description=File Sync & Share"
+    profiles:
+      - files
