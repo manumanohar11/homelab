@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   network_mode: "service:gluetun"
@@ -59,24 +60,36 @@ services:
     <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/qbittorrent:latest
     container_name: qbittorrent
+    init: false
     environment:
       <<: *common-env
       WEBUI_PORT: 8080
     volumes:
       - ${DOCKER_BASE_DIR}/qbittorrent:/config
       - ${DOCKER_MEDIA_DIR}/downloads:/downloads
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *gluetun-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Downloaders"
       - "homepage.name=qBittorrent"
       - "homepage.icon=qbittorrent"
+      - "homepage.href=https://${QBITTORRENT_SUBDOMAIN:-qbittorrent}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Torrent Client"
+      - "pangolin.public-resources.qbittorrent.name=qBittorrent"
+      - "pangolin.public-resources.qbittorrent.protocol=http"
+      - "pangolin.public-resources.qbittorrent.full-domain=${QBITTORRENT_SUBDOMAIN:-qbittorrent}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.qbittorrent.auth.sso-enabled=true"
+      - "pangolin.public-resources.qbittorrent.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.qbittorrent.targets[0].method=http"
+      - "pangolin.public-resources.qbittorrent.targets[0].port=8080"
+      - "pangolin.public-resources.qbittorrent.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.qbittorrent.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.qbittorrent.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.qbittorrent.targets[0].healthcheck.status=200"
     profiles:
       - arr
       - downloaders
@@ -85,22 +98,34 @@ services:
     <<: [*service-defaults, *resources-small]
     image: lscr.io/linuxserver/prowlarr:latest
     container_name: prowlarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/prowlarr:/config
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9696/ping"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *gluetun-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Downloaders"
       - "homepage.name=Prowlarr"
       - "homepage.icon=prowlarr"
+      - "homepage.href=https://${PROWLARR_SUBDOMAIN:-prowlarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Indexer Manager"
+      - "pangolin.public-resources.prowlarr.name=Prowlarr"
+      - "pangolin.public-resources.prowlarr.protocol=http"
+      - "pangolin.public-resources.prowlarr.full-domain=${PROWLARR_SUBDOMAIN:-prowlarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.prowlarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.prowlarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.prowlarr.targets[0].method=http"
+      - "pangolin.public-resources.prowlarr.targets[0].port=9696"
+      - "pangolin.public-resources.prowlarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.prowlarr.targets[0].healthcheck.port=9696"
+      - "pangolin.public-resources.prowlarr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.prowlarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
       - downloaders
@@ -136,7 +161,7 @@ services:
     environment:
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
-      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
+      POSTGRES_PASSWORD: "${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}"
       TMDB_API_KEY: ${TMDB_API_KEY}
     volumes:
       - ${DOCKER_BASE_DIR}/bitmagnet:/root/.config/bitmagnet
@@ -162,7 +187,19 @@ services:
       - "homepage.group=Downloaders"
       - "homepage.name=Bitmagnet"
       - "homepage.icon=bittorrent"
+      - "homepage.href=https://${BITMAGNET_SUBDOMAIN:-bitmagnet}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=DHT Crawler"
+      - "pangolin.public-resources.bitmagnet.name=Bitmagnet"
+      - "pangolin.public-resources.bitmagnet.protocol=http"
+      - "pangolin.public-resources.bitmagnet.full-domain=${BITMAGNET_SUBDOMAIN:-bitmagnet}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.bitmagnet.auth.sso-enabled=true"
+      - "pangolin.public-resources.bitmagnet.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.bitmagnet.targets[0].method=http"
+      - "pangolin.public-resources.bitmagnet.targets[0].port=3333"
+      - "pangolin.public-resources.bitmagnet.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.bitmagnet.targets[0].healthcheck.port=3333"
+      - "pangolin.public-resources.bitmagnet.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.bitmagnet.targets[0].healthcheck.status=200"
     profiles:
       - arr
       - downloaders
@@ -172,7 +209,7 @@ services:
     image: postgres:16-alpine
     container_name: bitmagnet-postgres
     environment:
-      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
+      POSTGRES_PASSWORD: "${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}"
       POSTGRES_DB: bitmagnet
       PGUSER: postgres
       POSTGRES_INITDB_ARGS: "-c shared_buffers=256MB -c max_connections=200"

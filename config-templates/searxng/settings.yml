@@ -1,0 +1,57 @@
+# SearXNG settings for a private instance that can also sit behind Pangolin.
+use_default_settings:
+  engines:
+    remove:
+      - wikidata
+      - currency
+      - lingva
+      - dictzone
+      - mymemory translated
+
+general:
+  instance_name: "Home Search"
+
+search:
+  autocomplete: "duckduckgo"
+  autocomplete_min: 3
+  default_lang: "auto"
+  formats:
+    - html
+
+server:
+  bind_address: "0.0.0.0"
+  port: 8080
+  base_url: false
+  limiter: true
+  public_instance: false
+  secret_key: "use-searxng-secret-env"
+  image_proxy: true
+  method: "GET"
+
+valkey:
+  url: false
+
+ui:
+  default_theme: simple
+  center_alignment: false
+  default_locale: ""
+  search_on_category_select: true
+  url_formatting: pretty
+
+outgoing:
+  request_timeout: 2.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+categories_as_tabs:
+  general:
+  images:
+  videos:
+  news:
+  map:
+  music:
+  it:
+  science:
+  files:
+  social media:

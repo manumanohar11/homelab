@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -45,6 +46,7 @@ services:
     <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/duplicati:latest
     container_name: duplicati
+    init: false
     environment:
       <<: *common-env
       SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
@@ -67,7 +69,7 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
 
   # Optional advanced repository endpoint for operators already using Restic clients
   restic-rest-server:
@@ -108,23 +110,33 @@ services:
       DB01_HOST: immich_postgres
       DB01_NAME: ${DB_DATABASE_NAME:-immich}
       DB01_USER: ${DB_USERNAME:-postgres}
-      DB01_PASS: ${DB_PASSWORD}
+      DB01_PASS: "${DB_PASSWORD:?set DB_PASSWORD in .env}"
       DB01_BACKUP_INTERVAL: 1440
       DB01_BACKUP_BEGIN: "0300"
+      # Joplin PostgreSQL
+      DB02_TYPE: pgsql
+      DB02_HOST: joplin-postgres
+      DB02_NAME: ${JOPLIN_DB_NAME:-joplin}
+      DB02_USER: ${JOPLIN_DB_USER:-joplin}
+      DB02_PASS: "${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}"
+      DB02_BACKUP_INTERVAL: 1440
+      DB02_BACKUP_BEGIN: "0315"
       # Bitmagnet PostgreSQL (when downloaders enabled)
-      # DB02_TYPE: pgsql
-      # DB02_HOST: bitmagnet-postgres
-      # DB02_NAME: bitmagnet
-      # DB02_USER: postgres
-      # DB02_PASS: ${BITMAGNET_POSTGRES_PASSWORD:-bitmagnet_secret}
-      # DB02_BACKUP_INTERVAL: 1440
-      # DB02_BACKUP_BEGIN: "0315"
+      # DB03_TYPE: pgsql
+      # DB03_HOST: bitmagnet-postgres
+      # DB03_NAME: bitmagnet
+      # DB03_USER: postgres
+      # DB03_PASS: ${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}
+      # DB03_BACKUP_INTERVAL: 1440
+      # DB03_BACKUP_BEGIN: "0330"
     volumes:
       - ${DOCKER_BASE_DIR}/db-backup:/backup
     networks:
       - media-stack
     depends_on:
       database:
+        condition: service_healthy
+      joplin-postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f db-backup || exit 1"]

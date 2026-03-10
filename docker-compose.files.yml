@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -30,9 +31,10 @@ services:
     <<: [*service-defaults, *resources-large]
     image: lscr.io/linuxserver/nextcloud:latest
     container_name: nextcloud
+    init: false
     environment:
       <<: *common-env
-      NEXTCLOUD_TRUSTED_DOMAINS: cloud.${DOMAIN_NAME:-localhost}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}
     volumes:
       - ${DOCKER_BASE_DIR}/nextcloud:/config
       - ${DOCKER_MEDIA_DIR}:/data
@@ -47,11 +49,18 @@ services:
       retries: 3
       start_period: 5m
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Files"
       - "homepage.name=Nextcloud"
       - "homepage.icon=nextcloud"
-      - "homepage.href=https://cloud.${DOMAIN_NAME:-localhost}:8443"
+      - "homepage.href=https://${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=File Sync & Share"
+      - "pangolin.public-resources.nextcloud.name=Nextcloud"
+      - "pangolin.public-resources.nextcloud.protocol=http"
+      - "pangolin.public-resources.nextcloud.full-domain=${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.nextcloud.auth.sso-enabled=true"
+      - "pangolin.public-resources.nextcloud.targets[0].hostname=nextcloud"
+      - "pangolin.public-resources.nextcloud.targets[0].method=https"
+      - "pangolin.public-resources.nextcloud.targets[0].port=443"
     profiles:
       - files

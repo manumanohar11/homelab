@@ -22,6 +22,7 @@ x-logging: &default-logging
 # --- Common Service Defaults ---
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging: *default-logging

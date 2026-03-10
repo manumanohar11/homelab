@@ -3,6 +3,7 @@
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -55,6 +56,13 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.portainer.name=Portainer"
+      - "pangolin.public-resources.portainer.protocol=http"
+      - "pangolin.public-resources.portainer.full-domain=${PORTAINER_SUBDOMAIN:-portainer}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.portainer.auth.sso-enabled=true"
+      - "pangolin.public-resources.portainer.targets[0].hostname=portainer"
+      - "pangolin.public-resources.portainer.targets[0].method=https"
+      - "pangolin.public-resources.portainer.targets[0].port=9443"
 
   watchtower:
     <<: [*service-defaults, *resources-small]
@@ -103,6 +111,17 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.glances.name=Glances"
+      - "pangolin.public-resources.glances.protocol=http"
+      - "pangolin.public-resources.glances.full-domain=${GLANCES_SUBDOMAIN:-glances}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.glances.auth.sso-enabled=true"
+      - "pangolin.public-resources.glances.targets[0].hostname=glances"
+      - "pangolin.public-resources.glances.targets[0].method=http"
+      - "pangolin.public-resources.glances.targets[0].port=61208"
+      - "pangolin.public-resources.glances.targets[0].healthcheck.hostname=glances"
+      - "pangolin.public-resources.glances.targets[0].healthcheck.port=61208"
+      - "pangolin.public-resources.glances.targets[0].healthcheck.path=/api/4/cpu"
+      - "pangolin.public-resources.glances.targets[0].healthcheck.status=200"
     profiles:
       - monitoring
 
@@ -131,5 +150,16 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.glance.name=Glance"
+      - "pangolin.public-resources.glance.protocol=http"
+      - "pangolin.public-resources.glance.full-domain=${GLANCE_SUBDOMAIN:-glance}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.glance.auth.sso-enabled=true"
+      - "pangolin.public-resources.glance.targets[0].hostname=glance-homepage"
+      - "pangolin.public-resources.glance.targets[0].method=http"
+      - "pangolin.public-resources.glance.targets[0].port=8080"
+      - "pangolin.public-resources.glance.targets[0].healthcheck.hostname=glance-homepage"
+      - "pangolin.public-resources.glance.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.glance.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.glance.targets[0].healthcheck.status=200"
     profiles:
       - dashboard

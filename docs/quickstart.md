@@ -137,8 +137,8 @@ Note your `uid` and `gid` (usually both 1000).
 ### Create Environment File
 
 ```bash
-# Copy the example file
-cp .env.example .env
+# Bootstrap .env and generate any missing required secrets
+make init-env
 
 # Edit with your favorite editor
 nano .env
@@ -170,8 +170,11 @@ DOCKER_MEDIA_DIR=/mnt/media
 # IMMICH (Photo Management) - REQUIRED
 # ============================================
 
-# CRITICAL: Set a secure password!
-DB_PASSWORD=change_this_to_a_secure_password_123!
+# `make init-env` generates these required secrets automatically when missing:
+DB_PASSWORD=<generated-secret>
+GRAFANA_ADMIN_PASSWORD=<generated-secret>
+JOPLIN_DB_PASSWORD=<generated-secret>
+BITMAGNET_POSTGRES_PASSWORD=<generated-secret>
 
 # Photo storage locations
 UPLOAD_LOCATION=/mnt/photos/upload
@@ -179,6 +182,8 @@ THUMB_LOCATION=/mnt/photos/thumbs
 ```
 
 ### Optional Settings
+
+`docker compose config` and `docker compose up -d` intentionally fail fast if any required secret above is missing, and `make init-env` fills those required values for first-time setup.
 
 ```bash
 # ============================================
@@ -190,12 +195,12 @@ OPENVPN_USER=your_mullvad_account_number
 SERVER_REGIONS=us
 
 # ============================================
-# API KEYS (For Homepage widgets)
+# HOMARR
 # ============================================
 
-PLEX_API_KEY=your_plex_token
-JELLYFIN_API_KEY=your_jellyfin_key
-TAUTULLI_API_KEY=your_tautulli_key
+# Required before first start. Generate with:
+# openssl rand -hex 32
+HOMARR_SECRET_ENCRYPTION_KEY=your_homarr_secret
 ```
 
 ---
@@ -214,7 +219,7 @@ sudo chown -R $USER:$USER /opt/media-stack
 
 ```bash
 # Create media library structure
-sudo mkdir -p /mnt/media/{Movies,TV,Music,Books,Comics,Downloads,Photos}
+sudo mkdir -p /mnt/media/{Movies,TV,Music,Books,Comics,Downloads,Photos,Sync}
 sudo chown -R $USER:$USER /mnt/media
 
 # Create photo directories for Immich
@@ -237,6 +242,7 @@ Expected:
 ├── Movies
 ├── Music
 ├── Photos
+├── Sync
 └── TV
 
 /mnt/photos
@@ -269,9 +275,10 @@ include:
   - docker-compose.management.yml       # ✅ Portainer, Watchtower
   - docker-compose.monitoring.yml       # ✅ Prometheus, Grafana
   - docker-compose.logging.yml          # ✅ Loki, Promtail
+  - docker-compose.productivity.yml     # ✅ FreshRSS, SearXNG, Syncthing, Joplin
   - docker-compose.files.yml            # Optional via `files` profile
   - docker-compose.automation.yml       # Optional via `automation` profile
-  - docker-compose.utilities.yml        # ✅ Homepage, Dozzle
+  - docker-compose.utilities.yml        # ✅ Homarr, Dozzle
   - docker-compose.backup.yml           # ✅ Duplicati
 
   # Keep this commented unless you need host-specific overrides:
@@ -320,6 +327,9 @@ docker compose up -d
 # Start with optional profiles
 docker compose --profile speedtest --profile scrutiny up -d
 
+# Add the optional Kasm workspace service
+docker compose --profile kasm up -d
+
 # Start the full *Arr stack with downloader dependencies
 docker compose --profile arr up -d
 
@@ -343,7 +353,7 @@ Expected output:
 NAMES               STATUS
 plex                Up 2 minutes (healthy)
 immich_server       Up 2 minutes (healthy)
-homepage            Up 2 minutes (healthy)
+homarr              Up 2 minutes (healthy)
 grafana             Up 2 minutes (healthy)
 ...
 ```
@@ -356,9 +366,13 @@ grafana             Up 2 minutes (healthy)
 
 | Service | URL | First-Time Setup |
 |:--------|:----|:-----------------|
-| **Homepage** | `http://your-server:3002` | Auto-configured |
+| **Homarr** | `http://your-server:3002` | Create owner account and boards |
 | **Plex** | `http://your-server:32400/web` | Plex account login |
 | **Immich** | `http://your-server:2283` | Create admin account |
+| **FreshRSS** | `http://your-server:8081` | Import feeds and create categories |
+| **SearXNG** | `http://your-server:8084` | Search immediately |
+| **Syncthing** | `http://your-server:8384` | Add devices and shared folders |
+| **Joplin** | `http://your-server:22300` | Connect desktop and mobile clients |
 | **Portainer** | `https://your-server:9443` | Create admin account |
 | **Grafana** | `http://your-server:3000` | admin / admin |
 
@@ -380,15 +394,29 @@ grafana             Up 2 minutes (healthy)
 3. Download mobile app
 4. Configure backup settings
 
-### Configure Homepage
+### Configure Joplin
 
-Homepage auto-discovers services via Docker labels. To add API widgets:
+1. Open `http://your-server:22300`
+2. Confirm the server is reachable locally
+3. Point Joplin clients at your configured `JOPLIN_BASE_URL`
+4. If you expose it remotely, update `.env` with the real URL first
 
-1. Edit `/opt/media-stack/data/homepage/services.yaml`
-2. Add API keys from `.env`
-3. Restart: `docker compose restart homepage`
+### Configure Homarr
 
-See [Configuration Guide](configuration.md) for detailed customization.
+Homarr is browser-managed. After the first login, you can apply the repo's curated starter board with:
+
+```bash
+python3 scripts/homarr_seed.py
+```
+
+After that:
+
+1. Review the generated `home` board at `http://your-server:3002`
+2. Create a private `ops` board for admin-only tools if you want a second admin-only view
+3. Tweak apps, sections, and appearance in the browser
+4. Keep `${DOCKER_BASE_DIR}/homarr/appdata` and `HOMARR_SECRET_ENCRYPTION_KEY` together when migrating to a new server
+
+See [Configuration Guide](configuration.md) for the recommended board layout.
 
 ---
 

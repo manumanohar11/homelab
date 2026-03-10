@@ -42,5 +42,16 @@ compactor:
   retention_delete_delay: 2h
   delete_request_store: filesystem
 
+ruler:
+  rule_path: /loki/rules-temp
+  storage:
+    type: local
+    local:
+      directory: /loki/rules
+  alertmanager_url: http://alertmanager:9093
+  ring:
+    kvstore:
+      store: inmemory
+
 analytics:
   reporting_enabled: false

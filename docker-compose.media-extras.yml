@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -37,6 +38,7 @@ services:
     <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/tautulli:latest
     container_name: tautulli
+    init: false
     environment:
       <<: *common-env
     volumes:
@@ -50,7 +52,18 @@ services:
       <<: *healthcheck-defaults
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.tautulli.name=Tautulli"
+      - "pangolin.public-resources.tautulli.protocol=http"
+      - "pangolin.public-resources.tautulli.full-domain=${TAUTULLI_SUBDOMAIN:-tautulli}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.tautulli.auth.sso-enabled=true"
+      - "pangolin.public-resources.tautulli.targets[0].hostname=tautulli"
+      - "pangolin.public-resources.tautulli.targets[0].method=http"
+      - "pangolin.public-resources.tautulli.targets[0].port=8181"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.hostname=tautulli"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.port=8181"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.path=/status"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.status=200"
 
   # Maintainerr - Automated media cleanup based on rules (requires *arr stack)
   maintainerr:
@@ -71,6 +84,17 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.maintainerr.name=Maintainerr"
+      - "pangolin.public-resources.maintainerr.protocol=http"
+      - "pangolin.public-resources.maintainerr.full-domain=${MAINTAINERR_SUBDOMAIN:-maintainerr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.maintainerr.auth.sso-enabled=true"
+      - "pangolin.public-resources.maintainerr.targets[0].hostname=maintainerr"
+      - "pangolin.public-resources.maintainerr.targets[0].method=http"
+      - "pangolin.public-resources.maintainerr.targets[0].port=6246"
+      - "pangolin.public-resources.maintainerr.targets[0].healthcheck.hostname=maintainerr"
+      - "pangolin.public-resources.maintainerr.targets[0].healthcheck.port=6246"
+      - "pangolin.public-resources.maintainerr.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.maintainerr.targets[0].healthcheck.status=200"
     profiles:
       - maintainerr
 
@@ -79,6 +103,7 @@ services:
     image: ghcr.io/haveagitgat/tdarr:latest
     container_name: tdarr
     restart: unless-stopped
+    init: true
     security_opt:
       - no-new-privileges:true
     environment:
@@ -130,5 +155,16 @@ services:
               capabilities: [gpu]
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.tdarr.name=Tdarr"
+      - "pangolin.public-resources.tdarr.protocol=http"
+      - "pangolin.public-resources.tdarr.full-domain=${TDARR_SUBDOMAIN:-tdarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.tdarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.tdarr.targets[0].hostname=tdarr"
+      - "pangolin.public-resources.tdarr.targets[0].method=http"
+      - "pangolin.public-resources.tdarr.targets[0].port=8265"
+      - "pangolin.public-resources.tdarr.targets[0].healthcheck.hostname=tdarr"
+      - "pangolin.public-resources.tdarr.targets[0].healthcheck.port=8265"
+      - "pangolin.public-resources.tdarr.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.tdarr.targets[0].healthcheck.status=200"
     profiles:
       - tdarr

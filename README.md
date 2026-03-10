@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen?style=for-the-badge)](https://github.com)
 
-*A complete, modular, production-ready Docker Compose setup for running your own media server, photo management, monitoring, and automation services.*
+*A complete, modular, production-ready Docker Compose setup for running your own media, photo, productivity, monitoring, and automation services.*
 
 [Quick Start](#-quick-start) •
 [Documentation](#-documentation) •
@@ -65,26 +65,27 @@ graph LR
 </td>
 <td width="33%">
 
-### 📊 Monitoring
-- Prometheus + Grafana
-- Uptime Kuma
-- Scrutiny (Disk Health)
-- Dozzle (Logs)
+### 🧠 Productivity
+- FreshRSS & SearXNG
+- Syncthing
+- Joplin Server
+- Optional Kasm
 
 </td>
 <td width="33%">
 
-### 🔧 Management
+### 🔧 Operations
 - Portainer
+- Prometheus + Grafana
 - Watchtower
-- Homepage Dashboard
+- Homarr Dashboard
 - Duplicati Backups
 
 </td>
 </tr>
 </table>
 
-> **45+ services** organized into modular compose files. Enable only what you need!
+> **50+ services** organized into modular compose files. Enable only what you need.
 
 ---
 
@@ -95,16 +96,26 @@ graph LR
 git clone https://github.com/yourusername/media-stack.git /opt/media-stack
 cd /opt/media-stack
 
-# 2. Configure environment
-cp .env.example .env
-nano .env  # Edit with your settings
+# 2. Bootstrap environment
+make init-env
+nano .env  # Edit host paths, domain, API keys, and optional settings
+
+# `make init-env` copies `.env.example` to `.env` when needed
+# and generates any missing required secrets automatically.
 
 # 3. Create directories
-sudo mkdir -p /opt/media-stack/data /mnt/media/{Movies,TV,Music,Photos}
+sudo mkdir -p /opt/media-stack/data /mnt/media/{Movies,TV,Music,Photos,Sync}
 sudo chown -R $USER:$USER /opt/media-stack /mnt/media
 
 # 4. Launch!
 docker compose up -d
+```
+
+The stack now fails fast during `docker compose config` and `docker compose up -d` if required secrets are unset, and `make init-env` fills those required secrets for first-time setup.
+
+```bash
+# Optional: discover the repo's common operator shortcuts
+make help
 ```
 
 > [!TIP]
@@ -118,7 +129,7 @@ docker compose up -d
 |:---------|:------------|
 | [🚀 Quick Start Guide](docs/quickstart.md) | First-time setup, prerequisites, installation |
 | [🏗️ Architecture](docs/architecture.md) | System diagrams, data flows, design decisions |
-| [📦 Services Catalog](docs/services.md) | Complete list of 45+ services with ports & status |
+| [📦 Services Catalog](docs/services.md) | Complete list of services with ports and status |
 | [⚙️ Configuration](docs/configuration.md) | Module system, profiles, environment variables |
 | [🌐 Networking](docs/networking.md) | Network topology, VPN routing, port reference |
 | [📊 Monitoring](docs/monitoring.md) | Prometheus, Grafana, alerting setup |
@@ -134,7 +145,7 @@ docker compose up -d
 ```
 .
 ├── docker-compose.yml          # Main orchestration (includes modules)
-├── docker-compose.*.yml        # Service modules (15 files)
+├── docker-compose.*.yml        # Service modules
 ├── docker-compose.local.example.yml # Host-specific override example
 ├── hwaccel.*.yml               # Hardware acceleration configs
 ├── .env.example                # Configuration template
@@ -157,11 +168,21 @@ docker compose up -d
 # Start with optional profiles
 docker compose --profile speedtest --profile scrutiny up -d
 
+# Start optional Kasm workspaces
+docker compose --profile kasm up -d
+
 # Stop everything
 docker compose down
 
 # Restart a service
 docker compose restart plex
+```
+
+```bash
+# Or use the Makefile wrappers
+make up PROFILES="speedtest scrutiny"
+make restart SERVICE=plex
+make logs SERVICE=plex
 ```
 
 </details>
@@ -175,7 +196,12 @@ docker compose pull && docker compose up -d
 
 # Update specific service
 docker compose pull plex && docker compose up -d plex
+
+# Validate stack consistency and config drift
+make check
 ```
+
+LinuxServer.io containers are intentionally opted out of Watchtower in this repo. Update those with `docker compose pull <service> && docker compose up -d <service>` after reviewing release notes.
 
 </details>
 
@@ -199,9 +225,11 @@ docker compose logs -f plex
 
 | Service | URL |
 |:--------|:----|
-| Homepage | `http://your-server:3002` |
+| Homarr | `http://your-server:3002` |
 | Plex | `http://your-server:32400/web` |
 | Immich | `http://your-server:2283` |
+| FreshRSS | `http://your-server:8081` |
+| Joplin | `http://your-server:22300` |
 | Grafana | `http://your-server:3000` |
 | Portainer | `https://your-server:9443` |
 

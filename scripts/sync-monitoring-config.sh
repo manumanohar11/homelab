@@ -59,6 +59,8 @@ DIR_MAPPINGS=(
 RUNTIME_DIRS=(
     "$DOCKER_BASE_DIR/loki/config"
     "$DOCKER_BASE_DIR/loki/data"
+    "$DOCKER_BASE_DIR/loki/data/rules"
+    "$DOCKER_BASE_DIR/loki/data/rules-temp"
     "$DOCKER_BASE_DIR/promtail/config"
     "$DOCKER_BASE_DIR/grafana/data"
     "$DOCKER_BASE_DIR/grafana/provisioning"

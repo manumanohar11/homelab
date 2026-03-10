@@ -42,6 +42,7 @@ include:
   - docker-compose.management.yml
   - docker-compose.monitoring.yml
   - docker-compose.logging.yml
+  - docker-compose.productivity.yml
   - docker-compose.files.yml
   - docker-compose.automation.yml
   - docker-compose.utilities.yml
@@ -61,15 +62,18 @@ include:
 | `media-servers.yml` | Media streaming | Plex, Jellyfin, Stash, Kavita, Navidrome |
 | `media-extras.yml` | Media utilities | Tautulli, Maintainerr, Tdarr |
 | `arr.yml` | Media automation | Radarr, Sonarr, Lidarr, Readarr, Bazarr |
-| `downloaders.yml` | Download clients | qBittorrent, Prowlarr, FlareSolverr |
+| `downloaders.yml` | Download clients | qBittorrent, Prowlarr, FlareSolverr, Bitmagnet |
 | `requests.yml` | Request portals | Overseerr, Jellyseerr |
 | `management.yml` | Container management | Portainer, Watchtower, Glances, Glance |
 | `monitoring.yml` | Monitoring stack | Prometheus, Grafana, AlertManager |
 | `logging.yml` | Container log aggregation | Loki, Promtail |
-| `utilities.yml` | Utility services | Homepage, Dozzle, Scrutiny, Speedtest |
+| `productivity.yml` | Productivity apps | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
+| `utilities.yml` | Utility services | Homarr, Dozzle, Scrutiny, Speedtest |
 | `backup.yml` | Backup services | Duplicati, Restic server, DB Backup |
 | `automation.yml` | Workflow automation | n8n |
 | `files.yml` | File sharing | Nextcloud |
+
+`docker-compose.productivity.yml` is included in the default stack. Only Kasm inside that module is profile-gated.
 
 ### Enable/Disable Modules
 
@@ -87,6 +91,9 @@ docker compose --profile files up -d
 
 # n8n
 docker compose --profile automation up -d
+
+# Kasm remote workspaces
+docker compose --profile kasm up -d
 ```
 
 Comment an include line only if you want to permanently remove an entire module from your personal install.
@@ -123,6 +130,7 @@ docker compose up -d
 | `stash` | Stash | media-servers.yml |
 | `tdarr` | Tdarr | media-extras.yml |
 | `automation` | n8n | automation.yml |
+| `kasm` | Kasm | productivity.yml |
 | `requests` | Overseerr | requests.yml |
 | `maintainerr` | Maintainerr | media-extras.yml |
 | `notifiarr` | Notifiarr | requests.yml |
@@ -132,6 +140,7 @@ docker compose up -d
 | `scrutiny` | Scrutiny | utilities.yml |
 | `speedtest` | Speedtest Tracker | utilities.yml |
 | `navidrome` | Navidrome | media-servers.yml |
+
 ### Profile Examples
 
 **Full monitoring setup:**
@@ -151,7 +160,7 @@ docker compose --profile jellyfin up -d
 
 **Optional apps:**
 ```bash
-docker compose --profile automation --profile files --profile kavita up -d
+docker compose --profile automation --profile files --profile kasm up -d
 ```
 
 ---
@@ -201,6 +210,23 @@ BACKUP_DESTINATION=/mnt/backup
 DUPLICATI_ENCRYPTION_KEY=your_generated_key
 ```
 
+### Productivity Settings
+
+```bash
+# ============================================
+# PRODUCTIVITY
+# ============================================
+
+SYNCTHING_DATA_DIR=/mnt/media/Sync
+
+JOPLIN_VERSION=latest
+JOPLIN_BASE_URL=http://localhost:22300
+JOPLIN_DB_NAME=joplin
+JOPLIN_DB_USER=joplin
+JOPLIN_DB_PASSWORD=<generate-with-openssl-rand-hex-32>
+JOPLIN_DB_DATA_LOCATION=/opt/media-stack/data/joplin-postgres
+```
+
 ### Database Settings
 
 ```bash
@@ -208,7 +234,7 @@ DUPLICATI_ENCRYPTION_KEY=your_generated_key
 # IMMICH DATABASE (PostgreSQL)
 # ============================================
 
-DB_PASSWORD=your_secure_password_here
+DB_PASSWORD=<generate-with-openssl-rand-hex-32>
 DB_USERNAME=postgres
 DB_DATABASE_NAME=immich
 DB_HOSTNAME=immich_postgres
@@ -217,7 +243,7 @@ DB_HOSTNAME=immich_postgres
 # BITMAGNET DATABASE (Optional)
 # ============================================
 
-BITMAGNET_POSTGRES_PASSWORD=another_secure_password
+BITMAGNET_POSTGRES_PASSWORD=<generate-with-openssl-rand-hex-32>
 ```
 
 ### Photo Storage
@@ -249,23 +275,16 @@ SERVER_REGIONS=us
 FIREWALL_OUTBOUND_SUBNETS=172.16.0.0/12,192.168.0.0/16
 ```
 
-### API Keys
+### Dashboard Secrets
 
 ```bash
 # ============================================
-# API KEYS (shared with Homepage widgets)
+# HOMARR
 # ============================================
 
-PLEX_API_KEY=your_plex_token
-JELLYFIN_API_KEY=your_jellyfin_key
-TAUTULLI_API_KEY=your_tautulli_key
-OVERSEERR_API_KEY=your_overseerr_key
-RADARR_API_KEY=your_radarr_key
-SONARR_API_KEY=your_sonarr_key
-IMMICH_API_KEY=your_immich_key
-PORTAINER_API_KEY=your_portainer_key
-QBITTORRENT_USERNAME=admin
-QBITTORRENT_PASSWORD=change_me
+# Required before first start. Generate with:
+# openssl rand -hex 32
+HOMARR_SECRET_ENCRYPTION_KEY=your_homarr_secret
 
 # ============================================
 # NOTIFICATIONS
@@ -424,29 +443,39 @@ immich_machine_learning:
 
 ## Service Configuration
 
-### Homepage Dashboard
+### Homarr Dashboard
 
-Homepage auto-discovers services via Docker labels. Customize in:
+Homarr is browser-managed rather than YAML-managed. Runtime data lives in:
 
 ```
-/opt/media-stack/data/homepage/
-├── settings.yaml     # Theme, layout, background
-├── services.yaml     # Service widgets
-├── widgets.yaml      # Top bar widgets
-└── bookmarks.yaml    # Quick links
+/opt/media-stack/data/homarr/appdata/
 ```
 
-**Example services.yaml:**
-```yaml
-- Media:
-    - Plex:
-        icon: plex.png
-        href: http://plex:32400/web
-        widget:
-          type: plex
-          url: http://plex:32400
-          key: {{HOMEPAGE_VAR_PLEX_API_KEY}}
+To move the dashboard to a new server, copy that `appdata` directory and keep the same `HOMARR_SECRET_ENCRYPTION_KEY` in `.env`. Homarr stores boards, apps, integrations, and appearance settings in that appdata path, and the encryption key is needed to decrypt the stored secrets again after migration.
+
+To recreate the curated starter board from this repo on a fresh Homarr install, run:
+
+```bash
+python3 scripts/homarr_seed.py
 ```
+
+Recommended first-run setup:
+
+1. Open `http://your-server:3002`
+2. Create a single owner/admin account
+3. Run `python3 scripts/homarr_seed.py` from the repo root to apply the starter board
+4. Create a private `ops` board for admin-only tools if you want a second admin-only view
+5. Adjust the board in the browser as needed
+
+Recommended `home` board sections:
+- Daily: Plex, Immich, Overseerr, Nextcloud, FreshRSS, SearXNG, Joplin, Syncthing
+- Media Ops: Radarr, Sonarr, Lidarr, Readarr, Bazarr, Prowlarr, qBittorrent
+- Automation / Admin: n8n, Portainer, Grafana, Uptime Kuma, Dozzle, Duplicati
+
+Recommended `ops` board sections:
+- Infrastructure: Portainer, Grafana, Uptime Kuma, Dozzle, Glances
+- Backup / maintenance: Duplicati, Scrutiny, Speedtest Tracker
+- Optional services: Jellyfin, Tdarr, Stash, Kasm, Navidrome, Glance
 
 ### Prometheus
 
@@ -496,11 +525,15 @@ Runtime configuration:
 
 ### Best Practices
 
-1. **Change default passwords**
+1. **Set required secrets before first start**
    ```bash
-   # In .env
-   DB_PASSWORD=use_a_strong_random_password
+   # Generate with: openssl rand -hex 32
+   DB_PASSWORD=<generated-secret>
+   GRAFANA_ADMIN_PASSWORD=<generated-secret>
+   JOPLIN_DB_PASSWORD=<generated-secret>
+   BITMAGNET_POSTGRES_PASSWORD=<generated-secret>
    ```
+   `docker compose config` intentionally fails if any required secret is unset.
 
 2. **Never expose ports directly to internet**
    - Use Pangolin/Newt tunnel
@@ -544,8 +577,9 @@ All containers run with:
 ```bash
 # .env is gitignored - never commit it!
 # Store sensitive values here:
-DB_PASSWORD=xxx
-PLEX_API_KEY=xxx
+DB_PASSWORD=<generated-secret>
+GRAFANA_ADMIN_PASSWORD=<generated-secret>
+HOMARR_SECRET_ENCRYPTION_KEY=<generated-secret>
 VPN_CREDENTIALS=xxx
 ```
 
@@ -571,6 +605,7 @@ VPN_CREDENTIALS=xxx
 │
 ├── config-templates/               # Git-tracked templates
 │   ├── alertmanager/
+│   ├── searxng/
 │   ├── prometheus/
 │   └── ...
 │

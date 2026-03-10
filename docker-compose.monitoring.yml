@@ -3,6 +3,7 @@
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -79,6 +80,17 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.prometheus.name=Prometheus"
+      - "pangolin.public-resources.prometheus.protocol=http"
+      - "pangolin.public-resources.prometheus.full-domain=${PROMETHEUS_SUBDOMAIN:-prometheus}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.prometheus.auth.sso-enabled=true"
+      - "pangolin.public-resources.prometheus.targets[0].hostname=prometheus"
+      - "pangolin.public-resources.prometheus.targets[0].method=http"
+      - "pangolin.public-resources.prometheus.targets[0].port=9090"
+      - "pangolin.public-resources.prometheus.targets[0].healthcheck.hostname=prometheus"
+      - "pangolin.public-resources.prometheus.targets[0].healthcheck.port=9090"
+      - "pangolin.public-resources.prometheus.targets[0].healthcheck.path=/-/healthy"
+      - "pangolin.public-resources.prometheus.targets[0].healthcheck.status=200"
 
   alertmanager:
     <<: [*service-defaults, *resources-small]
@@ -102,6 +114,17 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.alertmanager.name=Alertmanager"
+      - "pangolin.public-resources.alertmanager.protocol=http"
+      - "pangolin.public-resources.alertmanager.full-domain=${ALERTMANAGER_SUBDOMAIN:-alertmanager}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.alertmanager.auth.sso-enabled=true"
+      - "pangolin.public-resources.alertmanager.targets[0].hostname=alertmanager"
+      - "pangolin.public-resources.alertmanager.targets[0].method=http"
+      - "pangolin.public-resources.alertmanager.targets[0].port=9093"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.hostname=alertmanager"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.port=9093"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.path=/-/healthy"
+      - "pangolin.public-resources.alertmanager.targets[0].healthcheck.status=200"
 
   grafana:
     <<: [*service-defaults, *resources-large]
@@ -113,9 +136,9 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}"
       GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-clock-panel
-      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN_NAME:-localhost}
+      GF_SERVER_ROOT_URL: https://${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN_NAME:-localhost}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - ${DOCKER_BASE_DIR}/grafana/data:/var/lib/grafana
@@ -128,6 +151,17 @@ services:
       <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.grafana.name=Grafana"
+      - "pangolin.public-resources.grafana.protocol=http"
+      - "pangolin.public-resources.grafana.full-domain=${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.grafana.auth.sso-enabled=true"
+      - "pangolin.public-resources.grafana.targets[0].hostname=grafana"
+      - "pangolin.public-resources.grafana.targets[0].method=http"
+      - "pangolin.public-resources.grafana.targets[0].port=3000"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.hostname=grafana"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.port=3000"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.path=/api/health"
+      - "pangolin.public-resources.grafana.targets[0].healthcheck.status=200"
 
   node-exporter:
     <<: [*service-defaults, *resources-small]
@@ -173,3 +207,14 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.uptime-kuma.name=Uptime Kuma"
+      - "pangolin.public-resources.uptime-kuma.protocol=http"
+      - "pangolin.public-resources.uptime-kuma.full-domain=${UPTIME_KUMA_SUBDOMAIN:-uptime}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.uptime-kuma.auth.sso-enabled=true"
+      - "pangolin.public-resources.uptime-kuma.targets[0].hostname=uptime-kuma"
+      - "pangolin.public-resources.uptime-kuma.targets[0].method=http"
+      - "pangolin.public-resources.uptime-kuma.targets[0].port=3001"
+      - "pangolin.public-resources.uptime-kuma.targets[0].healthcheck.hostname=uptime-kuma"
+      - "pangolin.public-resources.uptime-kuma.targets[0].healthcheck.port=3001"
+      - "pangolin.public-resources.uptime-kuma.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.uptime-kuma.targets[0].healthcheck.status=200"

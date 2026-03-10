@@ -3,6 +3,7 @@
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -48,8 +49,10 @@ services:
     volumes:
       - ${DOCKER_BASE_DIR}/loki/config:/etc/loki
       - ${DOCKER_BASE_DIR}/loki/data:/loki
-    # Note: Loki's minimal image lacks wget/curl for healthchecks
-    # Promtail uses service_started dependency instead
+    # Loki's minimal image lacks wget/curl, so use the bundled binary for a lightweight readiness check.
+    healthcheck:
+      test: ["CMD", "loki", "-version"]
+      <<: *healthcheck-defaults
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
       - "homepage.group=Monitoring"

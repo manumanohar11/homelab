@@ -40,13 +40,14 @@ include:
   - docker-compose.logging.yml  # Loki/Promtail stack
 
   # Productivity
+  - docker-compose.productivity.yml
   - docker-compose.files.yml
   - docker-compose.automation.yml
 
   # Backup
   - docker-compose.backup.yml
 
-  # Utilities (Homepage, Speedtest, Scrutiny, Dozzle)
+  # Utilities (Homarr, Speedtest, Scrutiny, Dozzle)
   - docker-compose.utilities.yml
 
   # Media utilities (Tautulli, Maintainerr, Tdarr)
@@ -54,7 +55,7 @@ include:
 
 # --- Available Profiles ---
 # monitoring    - Glances system monitor
-# dashboard     - Glance Homepage alternative dashboard
+# dashboard     - Glance alternative dashboard
 # arr           - *Arr apps plus downloader stack
 # downloaders   - VPN-routed download services only
 # jellyfin      - Jellyfin and Jellyseerr
@@ -62,6 +63,7 @@ include:
 # stash         - Stash media organizer
 # tdarr         - Tdarr media transcoding
 # automation    - n8n workflow automation
+# kasm          - Kasm remote workspace
 # notifiarr     - Notifiarr unified notifications
 # restic        - Restic backup server
 # db-backup     - Database backup worker

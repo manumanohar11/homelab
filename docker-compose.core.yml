@@ -3,6 +3,7 @@
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -112,6 +113,7 @@ services:
       PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT:-}
       NEWT_ID: ${NEWT_ID}
       NEWT_SECRET: ${NEWT_SECRET}
+      DOCKER_SOCKET: /var/run/docker.sock
       TZ: ${TZ}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

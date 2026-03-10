@@ -1,0 +1,291 @@
+# ~/media-stack/docker-compose.productivity.yml
+# Contains productivity services: FreshRSS, SearXNG, Syncthing, Joplin, and optional Kasm.
+
+x-common-env: &common-env
+  PUID: ${PUID}
+  PGID: ${PGID}
+  TZ: ${TZ}
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 30s
+
+x-resources-small: &resources-small
+  deploy:
+    resources:
+      limits:
+        cpus: '0.5'
+        memory: 256M
+      reservations:
+        memory: 64M
+
+x-resources-medium: &resources-medium
+  deploy:
+    resources:
+      limits:
+        cpus: '1'
+        memory: 512M
+      reservations:
+        memory: 128M
+
+x-resources-large: &resources-large
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        memory: 512M
+
+services:
+  freshrss:
+    <<: [*service-defaults, *resources-small]
+    image: lscr.io/linuxserver/freshrss:latest
+    container_name: freshrss
+    init: false
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/freshrss:/config
+    networks:
+      - media-stack
+    ports:
+      - "8081:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/i/"]
+      <<: *healthcheck-defaults
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Productivity"
+      - "homepage.name=FreshRSS"
+      - "homepage.icon=freshrss"
+      - "homepage.href=https://${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=RSS Reader"
+      - "pangolin.public-resources.freshrss.name=FreshRSS"
+      - "pangolin.public-resources.freshrss.protocol=http"
+      - "pangolin.public-resources.freshrss.full-domain=${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.freshrss.auth.sso-enabled=true"
+      - "pangolin.public-resources.freshrss.targets[0].hostname=freshrss"
+      - "pangolin.public-resources.freshrss.targets[0].method=http"
+      - "pangolin.public-resources.freshrss.targets[0].port=80"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.hostname=freshrss"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.port=80"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.path=/i/"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.status=200"
+
+  searxng-valkey:
+    <<: [*service-defaults, *resources-small]
+    image: valkey/valkey:8-alpine
+    container_name: searxng-valkey
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      <<: *healthcheck-defaults
+
+  searxng:
+    <<: [*service-defaults, *resources-medium]
+    image: searxng/searxng:latest
+    container_name: searxng
+    environment:
+      TZ: ${TZ}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-https://${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}}
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-lan-only-change-before-exposing}
+      SEARXNG_VALKEY_URL: valkey://searxng-valkey:6379/0
+      SEARXNG_LIMITER: ${SEARXNG_LIMITER:-true}
+    volumes:
+      - ${DOCKER_GIT_CONFIG_DIR}/searxng/settings.yml:/etc/searxng/settings.yml:ro
+      - ${DOCKER_GIT_CONFIG_DIR}/searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    networks:
+      - media-stack
+    ports:
+      - "8084:8080"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')"
+      <<: *healthcheck-defaults
+      start_period: 60s
+    depends_on:
+      searxng-valkey:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Productivity"
+      - "homepage.name=SearXNG"
+      - "homepage.icon=searxng"
+      - "homepage.href=https://${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=Private Metasearch"
+      - "pangolin.public-resources.searxng.name=SearXNG"
+      - "pangolin.public-resources.searxng.protocol=http"
+      - "pangolin.public-resources.searxng.full-domain=${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.searxng.auth.sso-enabled=${SEARXNG_PANGOLIN_SSO_ENABLED:-true}"
+      - "pangolin.public-resources.searxng.targets[0].hostname=searxng"
+      - "pangolin.public-resources.searxng.targets[0].method=http"
+      - "pangolin.public-resources.searxng.targets[0].port=8080"
+      - "pangolin.public-resources.searxng.targets[0].healthcheck.hostname=searxng"
+      - "pangolin.public-resources.searxng.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.searxng.targets[0].healthcheck.path=/healthz"
+      - "pangolin.public-resources.searxng.targets[0].healthcheck.status=200"
+
+  syncthing:
+    <<: [*service-defaults, *resources-medium]
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    init: false
+    environment:
+      <<: *common-env
+    volumes:
+      - ${DOCKER_BASE_DIR}/syncthing:/config
+      - ${SYNCTHING_DATA_DIR:-${DOCKER_MEDIA_DIR}/Sync}:/sync
+    networks:
+      - media-stack
+    ports:
+      - "8384:8384"
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8384/rest/noauth/health"]
+      <<: *healthcheck-defaults
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Productivity"
+      - "homepage.name=Syncthing"
+      - "homepage.icon=syncthing"
+      - "homepage.href=https://${SYNCTHING_SUBDOMAIN:-syncthing}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=Continuous File Sync"
+      - "pangolin.public-resources.syncthing.name=Syncthing"
+      - "pangolin.public-resources.syncthing.protocol=http"
+      - "pangolin.public-resources.syncthing.full-domain=${SYNCTHING_SUBDOMAIN:-syncthing}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.syncthing.auth.sso-enabled=true"
+      - "pangolin.public-resources.syncthing.targets[0].hostname=syncthing"
+      - "pangolin.public-resources.syncthing.targets[0].method=http"
+      - "pangolin.public-resources.syncthing.targets[0].port=8384"
+      - "pangolin.public-resources.syncthing.targets[0].healthcheck.hostname=syncthing"
+      - "pangolin.public-resources.syncthing.targets[0].healthcheck.port=8384"
+      - "pangolin.public-resources.syncthing.targets[0].healthcheck.path=/rest/noauth/health"
+      - "pangolin.public-resources.syncthing.targets[0].healthcheck.status=200"
+
+  joplin-postgres:
+    <<: [*service-defaults, *resources-small]
+    image: postgres:16-alpine
+    container_name: joplin-postgres
+    environment:
+      POSTGRES_DB: ${JOPLIN_DB_NAME:-joplin}
+      POSTGRES_USER: ${JOPLIN_DB_USER:-joplin}
+      POSTGRES_PASSWORD: "${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}"
+    volumes:
+      - ${JOPLIN_DB_DATA_LOCATION:-${DOCKER_SSD_CONFIG_DIR}/joplin-postgres}:/var/lib/postgresql/data
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JOPLIN_DB_USER:-joplin} -d ${JOPLIN_DB_NAME:-joplin}"]
+      <<: *healthcheck-defaults
+
+  joplin:
+    <<: [*service-defaults, *resources-medium]
+    image: joplin/server:${JOPLIN_VERSION:-latest}
+    container_name: joplin
+    environment:
+      TZ: ${TZ}
+      APP_PORT: 22300
+      APP_BASE_URL: ${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}
+      DB_CLIENT: pg
+      POSTGRES_HOST: joplin-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${JOPLIN_DB_NAME:-joplin}
+      POSTGRES_USER: ${JOPLIN_DB_USER:-joplin}
+      POSTGRES_PASSWORD: "${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}"
+    networks:
+      - media-stack
+    ports:
+      - "22300:22300"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "const { URL } = require('url'); const base = new URL(process.env.APP_BASE_URL || 'http://localhost:22300'); const req = require('http').request({ host: '127.0.0.1', port: 22300, path: '/api/ping', headers: { Host: base.host, Origin: base.origin } }, (res) => process.exit(res.statusCode === 200 ? 0 : 1)); req.on('error', () => process.exit(1)); req.end();"
+      <<: *healthcheck-defaults
+      start_period: 60s
+    depends_on:
+      joplin-postgres:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "homepage.group=Productivity"
+      - "homepage.name=Joplin"
+      - "homepage.icon=joplin"
+      - "homepage.href=${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}"
+      - "homepage.description=Notes and Web Clipper"
+      - "pangolin.public-resources.joplin.name=Joplin"
+      - "pangolin.public-resources.joplin.protocol=http"
+      - "pangolin.public-resources.joplin.full-domain=${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.joplin.auth.sso-enabled=true"
+      - "pangolin.public-resources.joplin.targets[0].hostname=joplin"
+      - "pangolin.public-resources.joplin.targets[0].method=http"
+      - "pangolin.public-resources.joplin.targets[0].port=22300"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.hostname=joplin"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.port=22300"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.path=/api/ping"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.status=200"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.headers[0].name=Host"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.headers[0].value=${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.headers[1].name=Origin"
+      - "pangolin.public-resources.joplin.targets[0].healthcheck.headers[1].value=${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}"
+
+  kasm:
+    <<: [*service-defaults, *resources-large]
+    image: lscr.io/linuxserver/kasm:latest
+    container_name: kasm
+    init: false
+    privileged: true
+    environment:
+      <<: *common-env
+      KASM_PORT: 8444
+    volumes:
+      - ${DOCKER_BASE_DIR}/kasm/opt:/opt
+      - ${DOCKER_BASE_DIR}/kasm/profiles:/profiles
+    networks:
+      - media-stack
+    ports:
+      - "3003:3000"
+      - "8444:8444"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:3000"]
+      <<: *healthcheck-defaults
+      start_period: 2m
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Productivity"
+      - "homepage.name=Kasm"
+      - "homepage.icon=kasm"
+      - "homepage.href=https://${KASM_SUBDOMAIN:-kasm}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=Remote Workspaces"
+      - "pangolin.public-resources.kasm.name=Kasm"
+      - "pangolin.public-resources.kasm.protocol=http"
+      - "pangolin.public-resources.kasm.full-domain=${KASM_SUBDOMAIN:-kasm}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.kasm.auth.sso-enabled=true"
+      - "pangolin.public-resources.kasm.targets[0].hostname=kasm"
+      - "pangolin.public-resources.kasm.targets[0].method=https"
+      - "pangolin.public-resources.kasm.targets[0].port=8444"
+    profiles:
+      - kasm

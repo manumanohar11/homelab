@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md)
 
-Complete catalog of all 45+ services available in the Media Stack.
+Complete catalog of the services available in the Media Stack.
 
 ---
 
@@ -17,6 +17,7 @@ Complete catalog of all 45+ services available in the Media Stack.
 - [Request Management](#request-management)
 - [Monitoring & Observability](#monitoring--observability)
 - [Management & Utilities](#management--utilities)
+- [Productivity](#productivity)
 - [Backup Services](#backup-services)
 - [Automation](#automation)
 - [File Sharing](#file-sharing)
@@ -249,9 +250,9 @@ Container management and utility tools.
 |:--------|:----:|:------------|:------|:------:|
 | **Portainer** | 9443 | Container management UI | `portainer/portainer-ce` | ✅ |
 | **Watchtower** | - | Auto container updates | `containrrr/watchtower` | ✅ |
-| **Homepage** | 3002 | Customizable dashboard | `ghcr.io/gethomepage/homepage` | ✅ |
+| **Homarr** | 3002 | Browser-managed dashboard | `ghcr.io/homarr-labs/homarr` | ✅ |
 | **Dozzle** | 8889 | Real-time log viewer | `amir20/dozzle` | ✅ |
-| **Glance** | 8080 | Alternative dashboard | `glanceapp/glance` | 📦 `dashboard` |
+| **Glance** | 8088 | Alternative dashboard | `glanceapp/glance` | 📦 `dashboard` |
 
 ### Portainer
 
@@ -272,12 +273,66 @@ Automatic updates:
 
 **Excluded:** Immich (manual updates recommended)
 
-### Homepage
+### Homarr
 
-Customizable dashboard with:
-- Docker integration (auto-discovery)
-- Service widgets (stats, status)
-- Bookmarks and search
+Browser-managed dashboard with:
+- Drag-and-drop boards and app groups
+- Docker integration through the socket proxy
+- Multiple boards for daily use and admin views
+
+---
+
+## Productivity
+
+Daily-driver services for reading, search, sync, notes, and optional browser workspaces.
+
+| Service | Port | Description | Image | Status |
+|:--------|:----:|:------------|:------|:------:|
+| **FreshRSS** | 8081 | Self-hosted RSS reader | `lscr.io/linuxserver/freshrss` | ✅ |
+| **SearXNG** | 8084 | Private metasearch engine | `searxng/searxng` | ✅ |
+| **SearXNG Valkey** | 6379 | Internal cache and rate-limit backend | `valkey/valkey` | ✅ |
+| **Syncthing** | 8384 / 22000 / 21027 | Sync UI plus sync/discovery traffic | `lscr.io/linuxserver/syncthing` | ✅ |
+| **Joplin** | 22300 | Notes sync server and API | `joplin/server` | ✅ |
+| **Joplin PostgreSQL** | 5432 | Internal database for Joplin Server | `postgres:16-alpine` | ✅ |
+| **Kasm** | 3003 / 8444 | Browser workspaces and app streaming | `lscr.io/linuxserver/kasm` | 📦 `kasm` |
+
+### FreshRSS
+
+Runs with SQLite only for a lightweight default deployment.
+
+**Default URL:** `http://your-server:8081`
+
+### SearXNG
+
+Ships as a private search instance that is ready for Pangolin exposure:
+- keeps SearXNG in private mode while still setting a public base URL from `.env`
+- uses a Valkey-backed limiter so remote access does not run without bot protection
+- trims a few slow default general engines and lowers upstream wait time for faster everyday searches
+- lets you keep Pangolin SSO on by default, with an `.env` toggle if you intentionally want unauthenticated default-search access
+- exposes the limiter as an `.env` toggle in case your reverse proxy does not pass real client IP headers
+- uses the tracked templates at `config-templates/searxng/settings.yml` and `config-templates/searxng/limiter.toml`
+
+**Default URL:** `http://your-server:8084`
+
+### Syncthing
+
+Uses a dedicated sync root under `${SYNCTHING_DATA_DIR}` (default `${DOCKER_MEDIA_DIR}/Sync`) instead of the full media tree.
+
+**Default URL:** `http://your-server:8384`
+
+### Joplin
+
+Uses PostgreSQL by default and exposes the sync server on port `22300`.
+
+**Default URL:** `http://your-server:22300`
+
+### Kasm
+
+Optional profile for remote browser workspaces:
+- first boot wizard at `https://your-server:3003`
+- main UI at `https://your-server:8444` after setup
+
+**Enable:** `docker compose --profile kasm up -d`
 
 ---
 
@@ -306,7 +361,7 @@ It is the primary backup workflow for this repo and covers `${DOCKER_BASE_DIR}` 
 ### Database Backups
 
 Optional SQL dump worker:
-- focused on PostgreSQL containers
+- focused on the Immich and Joplin PostgreSQL containers
 - writes dumps to `${DOCKER_BASE_DIR}/db-backup`
 - those dumps are then picked up by Duplicati automatically
 
@@ -337,7 +392,7 @@ File sync and sharing services.
 
 | Service | Port | Description | Image | Status |
 |:--------|:----:|:------------|:------|:------:|
-| **Nextcloud** | 8080 | File sync & sharing | `nextcloud` | 📦 `files` |
+| **Nextcloud** | 8443 | File sync & sharing | `nextcloud` | 📦 `files` |
 
 ### Nextcloud
 
@@ -372,8 +427,10 @@ Centralized log aggregation.
 |:----:|:--------|:--------|
 | 32400 | Plex | Media streaming |
 | 2283 | Immich | Photo management |
+| 22300 | Joplin | Notes sync |
+| 8081 | FreshRSS | RSS reading |
 | 3000 | Grafana | Dashboards |
-| 3002 | Homepage | Dashboard |
+| 3002 | Homarr | Dashboard |
 | 9443 | Portainer | Container management |
 | 8889 | Dozzle | Log viewer |
 
@@ -385,6 +442,9 @@ docker compose --profile kavita --profile navidrome up -d
 
 # Monitoring extras
 docker compose --profile speedtest --profile scrutiny up -d
+
+# Productivity extras
+docker compose --profile kasm up -d
 
 # Jellyfin stack
 docker compose --profile jellyfin up -d

@@ -1,5 +1,5 @@
 # ~/media-stack/docker-compose.utilities.yml
-# Contains utility services: Homepage, Speedtest Tracker, Scrutiny, and Dozzle
+# Contains utility services: Homarr, Speedtest Tracker, Scrutiny, and Dozzle
 
 x-common-env: &common-env
   PUID: ${PUID}
@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -41,57 +42,49 @@ x-resources-medium: &resources-medium
         memory: 128M
 
 services:
-  # Homepage - Application dashboard with service integration
-  homepage:
+  # Homarr - Application dashboard with browser-managed boards
+  homarr:
     <<: [*service-defaults, *resources-small]
-    image: ghcr.io/gethomepage/homepage:latest
-    container_name: homepage
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
     environment:
-      <<: *common-env
-      # Allow access from all hosts (required for newer versions)
-      HOMEPAGE_ALLOWED_HOSTS: "*"
-      # Use Docker socket proxy instead of direct socket access
-      DOCKER_HOST: tcp://docker-socket-proxy:2375
-      # ---- API keys for Homepage service widgets ----
-      # *Arr Suite
-      HOMEPAGE_VAR_RADARR_API_KEY: ${RADARR_API_KEY:-}
-      HOMEPAGE_VAR_SONARR_API_KEY: ${SONARR_API_KEY:-}
-      HOMEPAGE_VAR_LIDARR_API_KEY: ${LIDARR_API_KEY:-}
-      HOMEPAGE_VAR_BAZARR_API_KEY: ${BAZARR_API_KEY:-}
-      HOMEPAGE_VAR_PROWLARR_API_KEY: ${PROWLARR_API_KEY:-}
-      # Download Clients
-      HOMEPAGE_VAR_QBITTORRENT_USER: ${QBITTORRENT_USERNAME:-admin}
-      HOMEPAGE_VAR_QBITTORRENT_PASS: ${QBITTORRENT_PASSWORD:-}
-      # Media Servers
-      HOMEPAGE_VAR_PLEX_API_KEY: ${PLEX_API_KEY:-}
-      HOMEPAGE_VAR_JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
-      HOMEPAGE_VAR_TAUTULLI_API_KEY: ${TAUTULLI_API_KEY:-}
-      HOMEPAGE_VAR_OVERSEERR_API_KEY: ${OVERSEERR_API_KEY:-}
-      # Other Services
-      HOMEPAGE_VAR_IMMICH_API_KEY: ${IMMICH_API_KEY:-}
-      HOMEPAGE_VAR_PORTAINER_API_KEY: ${PORTAINER_API_KEY:-}
+      TZ: ${TZ}
+      SECRET_ENCRYPTION_KEY: ${HOMARR_SECRET_ENCRYPTION_KEY}
+      DOCKER_HOSTNAMES: docker-socket-proxy
+      DOCKER_PORTS: 2375
     volumes:
-      - ${DOCKER_BASE_DIR}/homepage:/app/config
-      - ${DOCKER_MEDIA_DIR}:/mnt/media:ro
+      - ${DOCKER_BASE_DIR}/homarr/appdata:/appdata
     networks:
       - media-stack
     ports:
-      - "3002:3000"
+      - "3002:7575"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7575/"]
+      <<: *healthcheck-defaults
+      start_period: 30s
     depends_on:
       docker-socket-proxy:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
-      <<: *healthcheck-defaults
-      start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.homepage.name=Homarr"
+      - "pangolin.public-resources.homepage.protocol=http"
+      - "pangolin.public-resources.homepage.full-domain=${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.homepage.auth.sso-enabled=true"
+      - "pangolin.public-resources.homepage.targets[0].hostname=homarr"
+      - "pangolin.public-resources.homepage.targets[0].method=http"
+      - "pangolin.public-resources.homepage.targets[0].port=7575"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.hostname=homarr"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.port=7575"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.status=200"
 
   # Speedtest Tracker - Track internet speed over time
   speedtest-tracker:
     <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/speedtest-tracker:latest
     container_name: speedtest-tracker
+    init: false
     environment:
       <<: *common-env
       DB_CONNECTION: sqlite
@@ -108,7 +101,18 @@ services:
       <<: *healthcheck-defaults
       start_period: 60s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.speedtest-tracker.name=Speedtest Tracker"
+      - "pangolin.public-resources.speedtest-tracker.protocol=http"
+      - "pangolin.public-resources.speedtest-tracker.full-domain=${SPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.speedtest-tracker.auth.sso-enabled=true"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].hostname=speedtest-tracker"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].method=http"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].port=80"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.hostname=speedtest-tracker"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.port=80"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.path=/api/healthcheck"
+      - "pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.status=200"
     profiles:
       - speedtest
 
@@ -138,6 +142,17 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.scrutiny.name=Scrutiny"
+      - "pangolin.public-resources.scrutiny.protocol=http"
+      - "pangolin.public-resources.scrutiny.full-domain=${SCRUTINY_SUBDOMAIN:-scrutiny}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.scrutiny.auth.sso-enabled=true"
+      - "pangolin.public-resources.scrutiny.targets[0].hostname=scrutiny"
+      - "pangolin.public-resources.scrutiny.targets[0].method=http"
+      - "pangolin.public-resources.scrutiny.targets[0].port=8080"
+      - "pangolin.public-resources.scrutiny.targets[0].healthcheck.hostname=scrutiny"
+      - "pangolin.public-resources.scrutiny.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.scrutiny.targets[0].healthcheck.path=/api/health"
+      - "pangolin.public-resources.scrutiny.targets[0].healthcheck.status=200"
     profiles:
       - scrutiny
 
@@ -172,3 +187,14 @@ services:
           memory: 32M
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.dozzle.name=Dozzle"
+      - "pangolin.public-resources.dozzle.protocol=http"
+      - "pangolin.public-resources.dozzle.full-domain=${DOZZLE_SUBDOMAIN:-dozzle}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.dozzle.auth.sso-enabled=true"
+      - "pangolin.public-resources.dozzle.targets[0].hostname=dozzle"
+      - "pangolin.public-resources.dozzle.targets[0].method=http"
+      - "pangolin.public-resources.dozzle.targets[0].port=8080"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.hostname=dozzle"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.status=200"

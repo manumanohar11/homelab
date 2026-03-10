@@ -54,7 +54,7 @@ flowchart TB
             Jellyfin["Jellyfin"]
             Immich["Immich"]
             Grafana["Grafana"]
-            Homepage["Homepage"]
+            Homarr["Homarr"]
         end
     end
 
@@ -104,6 +104,7 @@ flowchart LR
 |:-------------|:------|:---------|
 | **Download Traffic** | Through VPN tunnel | *Arr stack, qBittorrent, Prowlarr |
 | **Streaming Traffic** | Direct to internet | Plex, Jellyfin |
+| **Productivity Traffic** | Direct to LAN/clients | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
 | **Local Traffic** | Docker network only | Databases, Redis |
 | **Monitoring Traffic** | Direct | Prometheus, Grafana |
 
@@ -129,7 +130,7 @@ networks:
 ```mermaid
 graph LR
     subgraph DOCKER_NET["Docker Network"]
-        A["Container A<br/>(plex)"] <-->|"http://plex:32400"| B["Container B<br/>(homepage)"]
+        A["Container A<br/>(plex)"] <-->|"http://plex:32400"| B["Container B<br/>(homarr)"]
         B <-->|"http://grafana:3000"| C["Container C<br/>(grafana)"]
         A <-->|"http://immich:2283"| D["Container D<br/>(immich)"]
     end
@@ -256,7 +257,7 @@ gluetun:
 |:----:|:--------|:--------:|:-------|
 | 3000 | Grafana | HTTP | Direct |
 | 3001 | Uptime Kuma | HTTP | Direct |
-| 3002 | Homepage | HTTP | Direct |
+| 3002 | Homarr | HTTP | Direct |
 | 8889 | Dozzle | HTTP | Direct |
 | 9443 | Portainer | HTTPS | Direct |
 
@@ -277,6 +278,19 @@ gluetun:
 | 2283 | Immich | HTTP | Direct |
 | 5432 | PostgreSQL | TCP | Internal |
 | 6379 | Redis | TCP | Internal |
+
+#### Productivity
+
+| Port | Service | Protocol | Access |
+|:----:|:--------|:--------:|:-------|
+| 8081 | FreshRSS | HTTP | Direct |
+| 8084 | SearXNG | HTTP | Direct |
+| 8384 | Syncthing GUI | HTTP | Direct |
+| 22000 | Syncthing Sync | TCP / UDP | Direct |
+| 21027 | Syncthing Discovery | UDP | Direct |
+| 22300 | Joplin | HTTP | Direct |
+| 3003 | Kasm Wizard | HTTPS | Direct, `kasm` profile only |
+| 8444 | Kasm UI | HTTPS | Direct, `kasm` profile only |
 
 #### *Arr Stack (VPN-Routed)
 
@@ -324,7 +338,7 @@ gluetun:
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
-| 3002 | Homepage | HTTP | Direct |
+| 3002 | Homarr | HTTP | Direct |
 | 8088 | Glance | HTTP | Direct |
 | 8889 | Dozzle | HTTP | Direct |
 | 8200 | Duplicati | HTTP | Direct |
@@ -494,7 +508,7 @@ docker compose ps
 sudo netstat -tlnp | grep 8080
 
 # Check from inside network
-docker exec homepage curl http://plex:32400
+docker exec homarr curl http://plex:32400
 ```
 
 ### Container DNS Issues
@@ -535,7 +549,7 @@ docker network inspect media-stack
 docker inspect --format='{{.NetworkSettings.Networks}}' plex
 
 # Test connectivity between containers
-docker exec homepage ping -c 3 plex
+docker exec homarr ping -c 3 plex
 ```
 
 ---

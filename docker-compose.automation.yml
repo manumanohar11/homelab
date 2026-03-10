@@ -3,6 +3,7 @@
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -56,5 +57,16 @@ services:
       - "homepage.icon=n8n"
       - "homepage.href=https://${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Workflow Automation"
+      - "pangolin.public-resources.n8n.name=n8n"
+      - "pangolin.public-resources.n8n.protocol=http"
+      - "pangolin.public-resources.n8n.full-domain=${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.n8n.auth.sso-enabled=true"
+      - "pangolin.public-resources.n8n.targets[0].hostname=n8n"
+      - "pangolin.public-resources.n8n.targets[0].method=http"
+      - "pangolin.public-resources.n8n.targets[0].port=5678"
+      - "pangolin.public-resources.n8n.targets[0].healthcheck.hostname=n8n"
+      - "pangolin.public-resources.n8n.targets[0].healthcheck.port=5678"
+      - "pangolin.public-resources.n8n.targets[0].healthcheck.path=/healthz"
+      - "pangolin.public-resources.n8n.targets[0].healthcheck.status=200"
     profiles:
       - automation

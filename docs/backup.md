@@ -11,14 +11,14 @@ Simple backup guidance for this homelab.
 This repo now treats backups in three layers:
 
 - `Duplicati` is the main backup tool and is enabled by default
-- `db-backup` is an optional PostgreSQL dump worker for Immich
+- `db-backup` is an optional PostgreSQL dump worker for Immich and Joplin
 - `restic-rest-server` is an optional advanced endpoint, not the default workflow
 
 For a beginner setup, the easiest mental model is:
 
 1. Duplicati backs up `${DOCKER_BASE_DIR}`
 2. `db-backup` writes SQL dumps into `${DOCKER_BASE_DIR}/db-backup`
-3. That means database dumps are automatically included in your main Duplicati backups once the `db-backup` profile is enabled
+3. That means Immich and Joplin database dumps are automatically included in your main Duplicati backups once the `db-backup` profile is enabled
 
 ---
 
@@ -35,7 +35,8 @@ The `duplicati` service mounts these sources:
 
 ### Important Notes
 
-- `${DOCKER_BASE_DIR}` already includes service config for Grafana, Prometheus, Homepage, Uptime Kuma, Plex, Immich, and the rest of the stack
+- `${DOCKER_BASE_DIR}` already includes service config for Grafana, Prometheus, Homarr, Uptime Kuma, Plex, Immich, and the rest of the stack
+- Homarr customizations live under `${DOCKER_BASE_DIR}/homarr/appdata`; keep that directory and the matching `HOMARR_SECRET_ENCRYPTION_KEY` together when moving to a new server
 - if you enable `db-backup`, its dumps appear under `${DOCKER_BASE_DIR}/db-backup`, so they are already covered by `/source/docker-configs`
 - media libraries and original photo libraries should use a separate large-data backup strategy
 
@@ -90,7 +91,7 @@ docker compose --profile db-backup up -d
 
 What it does:
 
-- connects to the Immich PostgreSQL service
+- connects to the Immich and Joplin PostgreSQL services
 - creates compressed dumps on a schedule
 - stores them in `${DOCKER_BASE_DIR}/db-backup`
 
@@ -102,6 +103,7 @@ That output is already inside the main Duplicati source tree.
 docker compose ps db-backup
 docker compose logs db-backup --tail 50
 ls -la ${DOCKER_BASE_DIR}/db-backup
+find ${DOCKER_BASE_DIR}/db-backup -maxdepth 2 -type f | grep -E 'immich|joplin'
 ```
 
 ---
@@ -152,13 +154,19 @@ tar -czvf media-stack-configs-$(date +%Y%m%d).tar.gz /opt/media-stack/data
 gunzip -c immich_backup_YYYYMMDD.sql.gz | docker exec -i immich_postgres psql -U postgres immich
 ```
 
+### Restore Joplin Database Dump
+
+```bash
+gunzip -c joplin_backup_YYYYMMDD.sql.gz | docker exec -i joplin-postgres psql -U joplin joplin
+```
+
 ---
 
 ## Beginner Checklist
 
 - Duplicati opens at `http://your-server:8200`
 - one encrypted backup job exists for `/source/docker-configs` and `/source/project/.env`
-- `db-backup` is enabled if you want scheduled PostgreSQL dumps
+- `db-backup` is enabled if you want scheduled Immich and Joplin PostgreSQL dumps
 - `${BACKUP_DESTINATION}` has enough free space
 - media files follow a separate backup plan
 

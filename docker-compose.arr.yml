@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   network_mode: "service:gluetun"
@@ -63,23 +64,35 @@ services:
     <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/radarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7878/ping"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *arr-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Media Management"
       - "homepage.name=Radarr"
       - "homepage.icon=radarr"
+      - "homepage.href=https://${RADARR_SUBDOMAIN:-radarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Movie Management"
+      - "pangolin.public-resources.radarr.name=Radarr"
+      - "pangolin.public-resources.radarr.protocol=http"
+      - "pangolin.public-resources.radarr.full-domain=${RADARR_SUBDOMAIN:-radarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.radarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.radarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.radarr.targets[0].method=http"
+      - "pangolin.public-resources.radarr.targets[0].port=7878"
+      - "pangolin.public-resources.radarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.radarr.targets[0].healthcheck.port=7878"
+      - "pangolin.public-resources.radarr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.radarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 
@@ -87,23 +100,35 @@ services:
     <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/sonarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8989/ping"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *arr-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Media Management"
       - "homepage.name=Sonarr"
       - "homepage.icon=sonarr"
+      - "homepage.href=https://${SONARR_SUBDOMAIN:-sonarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=TV Show Management"
+      - "pangolin.public-resources.sonarr.name=Sonarr"
+      - "pangolin.public-resources.sonarr.protocol=http"
+      - "pangolin.public-resources.sonarr.full-domain=${SONARR_SUBDOMAIN:-sonarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.sonarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.sonarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.sonarr.targets[0].method=http"
+      - "pangolin.public-resources.sonarr.targets[0].port=8989"
+      - "pangolin.public-resources.sonarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.sonarr.targets[0].healthcheck.port=8989"
+      - "pangolin.public-resources.sonarr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.sonarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 
@@ -111,24 +136,36 @@ services:
     <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/lidarr:/config
       - ${DOCKER_MEDIA_DIR}/Songs:/music_library
       - ${DOCKER_BASE_DIR}/downloads:/downloads
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8686/ping"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *arr-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Media Management"
       - "homepage.name=Lidarr"
       - "homepage.icon=lidarr"
+      - "homepage.href=https://${LIDARR_SUBDOMAIN:-lidarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Music Management"
+      - "pangolin.public-resources.lidarr.name=Lidarr"
+      - "pangolin.public-resources.lidarr.protocol=http"
+      - "pangolin.public-resources.lidarr.full-domain=${LIDARR_SUBDOMAIN:-lidarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.lidarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.lidarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.lidarr.targets[0].method=http"
+      - "pangolin.public-resources.lidarr.targets[0].port=8686"
+      - "pangolin.public-resources.lidarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.lidarr.targets[0].healthcheck.port=8686"
+      - "pangolin.public-resources.lidarr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.lidarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 
@@ -136,24 +173,36 @@ services:
     <<: [*service-defaults, *resources-arr]
     image: lscr.io/linuxserver/readarr:develop
     container_name: readarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/readarr:/config
       - ${DOCKER_MEDIA_DIR}/Books:/books
       - ${DOCKER_BASE_DIR}/downloads:/downloads
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8787/ping"]
       <<: *healthcheck-defaults
     depends_on:
       <<: *arr-depends-on
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Media Management"
       - "homepage.name=Readarr"
       - "homepage.icon=readarr"
+      - "homepage.href=https://${READARR_SUBDOMAIN:-readarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Book Management"
+      - "pangolin.public-resources.readarr.name=Readarr"
+      - "pangolin.public-resources.readarr.protocol=http"
+      - "pangolin.public-resources.readarr.full-domain=${READARR_SUBDOMAIN:-readarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.readarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.readarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.readarr.targets[0].method=http"
+      - "pangolin.public-resources.readarr.targets[0].port=8787"
+      - "pangolin.public-resources.readarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.readarr.targets[0].healthcheck.port=8787"
+      - "pangolin.public-resources.readarr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.readarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 
@@ -161,12 +210,12 @@ services:
     <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/bazarr:latest
     container_name: bazarr
+    init: false
     environment:
       <<: *common-env
     volumes:
       - ${DOCKER_BASE_DIR}/bazarr:/config
       - ${DOCKER_MEDIA_DIR}:/data
-    user: "${PUID}:${PGID}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6767"]
       <<: *healthcheck-defaults
@@ -178,11 +227,23 @@ services:
       sonarr:
         condition: service_healthy
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "homepage.group=Media Management"
       - "homepage.name=Bazarr"
       - "homepage.icon=bazarr"
+      - "homepage.href=https://${BAZARR_SUBDOMAIN:-bazarr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Subtitle Management"
+      - "pangolin.public-resources.bazarr.name=Bazarr"
+      - "pangolin.public-resources.bazarr.protocol=http"
+      - "pangolin.public-resources.bazarr.full-domain=${BAZARR_SUBDOMAIN:-bazarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.bazarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.bazarr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.bazarr.targets[0].method=http"
+      - "pangolin.public-resources.bazarr.targets[0].port=6767"
+      - "pangolin.public-resources.bazarr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.bazarr.targets[0].healthcheck.port=6767"
+      - "pangolin.public-resources.bazarr.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.bazarr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 
@@ -205,7 +266,19 @@ services:
       - "homepage.group=Media Management"
       - "homepage.name=Whisparr"
       - "homepage.icon=whisparr"
+      - "homepage.href=https://${WHISPARR_SUBDOMAIN:-whisparr}.${DOMAIN_NAME:-localhost}"
       - "homepage.description=Adult Content Management"
+      - "pangolin.public-resources.whisparr.name=Whisparr"
+      - "pangolin.public-resources.whisparr.protocol=http"
+      - "pangolin.public-resources.whisparr.full-domain=${WHISPARR_SUBDOMAIN:-whisparr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.whisparr.auth.sso-enabled=true"
+      - "pangolin.public-resources.whisparr.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.whisparr.targets[0].method=http"
+      - "pangolin.public-resources.whisparr.targets[0].port=6969"
+      - "pangolin.public-resources.whisparr.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.whisparr.targets[0].healthcheck.port=6969"
+      - "pangolin.public-resources.whisparr.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.whisparr.targets[0].healthcheck.status=200"
     profiles:
       - arr
 

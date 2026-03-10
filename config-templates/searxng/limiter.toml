@@ -1,0 +1,25 @@
+[botdetection]
+
+# Trust requests forwarded by containers on the shared media-stack bridge.
+trusted_proxies = [
+  '127.0.0.0/8',
+  '::1',
+  '172.20.0.0/16',
+]
+
+[botdetection.ip_limit]
+
+# Keep LAN users unrestricted while still rate-limiting public internet clients.
+filter_link_local = false
+link_token = false
+
+[botdetection.ip_lists]
+
+pass_ip = [
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  'fd00::/8',
+]
+
+pass_searxng_org = true

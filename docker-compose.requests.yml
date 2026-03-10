@@ -9,6 +9,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -47,6 +48,7 @@ services:
     <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/overseerr:latest
     container_name: overseerr
+    init: false
     environment:
       <<: *common-env
     volumes:
@@ -60,7 +62,18 @@ services:
       <<: *healthcheck-defaults
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.overseerr.name=Overseerr"
+      - "pangolin.public-resources.overseerr.protocol=http"
+      - "pangolin.public-resources.overseerr.full-domain=${OVERSEERR_SUBDOMAIN:-overseerr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.overseerr.auth.sso-enabled=true"
+      - "pangolin.public-resources.overseerr.targets[0].hostname=overseerr"
+      - "pangolin.public-resources.overseerr.targets[0].method=http"
+      - "pangolin.public-resources.overseerr.targets[0].port=5055"
+      - "pangolin.public-resources.overseerr.targets[0].healthcheck.hostname=overseerr"
+      - "pangolin.public-resources.overseerr.targets[0].healthcheck.port=5055"
+      - "pangolin.public-resources.overseerr.targets[0].healthcheck.path=/api/v1/status"
+      - "pangolin.public-resources.overseerr.targets[0].healthcheck.status=200"
     profiles:
       - requests
 
@@ -84,6 +97,17 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.jellyseerr.name=Jellyseerr"
+      - "pangolin.public-resources.jellyseerr.protocol=http"
+      - "pangolin.public-resources.jellyseerr.full-domain=${JELLYSEERR_SUBDOMAIN:-jellyseerr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.jellyseerr.auth.sso-enabled=true"
+      - "pangolin.public-resources.jellyseerr.targets[0].hostname=jellyseerr"
+      - "pangolin.public-resources.jellyseerr.targets[0].method=http"
+      - "pangolin.public-resources.jellyseerr.targets[0].port=5055"
+      - "pangolin.public-resources.jellyseerr.targets[0].healthcheck.hostname=jellyseerr"
+      - "pangolin.public-resources.jellyseerr.targets[0].healthcheck.port=5055"
+      - "pangolin.public-resources.jellyseerr.targets[0].healthcheck.path=/api/v1/status"
+      - "pangolin.public-resources.jellyseerr.targets[0].healthcheck.status=200"
     profiles:
       - jellyfin
 
@@ -109,5 +133,16 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.notifiarr.name=Notifiarr"
+      - "pangolin.public-resources.notifiarr.protocol=http"
+      - "pangolin.public-resources.notifiarr.full-domain=${NOTIFIARR_SUBDOMAIN:-notifiarr}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.notifiarr.auth.sso-enabled=true"
+      - "pangolin.public-resources.notifiarr.targets[0].hostname=notifiarr"
+      - "pangolin.public-resources.notifiarr.targets[0].method=http"
+      - "pangolin.public-resources.notifiarr.targets[0].port=5454"
+      - "pangolin.public-resources.notifiarr.targets[0].healthcheck.hostname=notifiarr"
+      - "pangolin.public-resources.notifiarr.targets[0].healthcheck.port=5454"
+      - "pangolin.public-resources.notifiarr.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.notifiarr.targets[0].healthcheck.status=200"
     profiles:
       - notifiarr

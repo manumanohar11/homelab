@@ -8,6 +8,7 @@ x-common-env: &common-env
 
 x-service-defaults: &service-defaults
   restart: unless-stopped
+  init: true
   security_opt:
     - no-new-privileges:true
   logging:
@@ -45,6 +46,7 @@ services:
     <<: *service-defaults
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
+    init: false
     environment:
       <<: *common-env
       VERSION: docker
@@ -54,10 +56,19 @@ services:
     volumes:
       - ${DOCKER_SSD_CONFIG_DIR}/plex:/config
       - ${DOCKER_MEDIA_DIR}:/data
+      # Set Plex's Transcoder temporary directory to /transcode in the Plex UI to keep temp I/O on faster storage.
+      - ${PLEX_TRANSCODE_DIR:-${DOCKER_SSD_CONFIG_DIR}/plex-transcode}:/transcode
     networks:
       - media-stack
     ports:
       - "32400:32400"
+      - "8324:8324"
+      - "32469:32469"
+      - "1900:1900/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
       interval: 1m
@@ -66,24 +77,43 @@ services:
       start_period: 60s
     deploy:
       resources:
+        limits:
+          cpus: '4'
+          memory: 4G
         reservations:
+          memory: 1G
           devices:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.plex.name=Plex"
+      - "pangolin.public-resources.plex.protocol=http"
+      - "pangolin.public-resources.plex.full-domain=${PLEX_SUBDOMAIN:-plex}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.plex.auth.sso-enabled=true"
+      - "pangolin.public-resources.plex.targets[0].hostname=plex"
+      - "pangolin.public-resources.plex.targets[0].method=http"
+      - "pangolin.public-resources.plex.targets[0].port=32400"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.hostname=plex"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.port=32400"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.path=/identity"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.status=200"
 
   jellyfin:
     <<: *service-defaults
     image: lscr.io/linuxserver/jellyfin:latest
     container_name: jellyfin
+    init: false
     environment:
       <<: *common-env
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      JELLYFIN_PublishedServerUrl: ${JELLYFIN_PUBLISHED_SERVER_URL:-}
     volumes:
       - ${DOCKER_BASE_DIR}/jellyfin:/config
+      # Jellyfin defaults transcodes under /config, so keep that subdirectory on faster storage.
+      - ${JELLYFIN_TRANSCODE_DIR:-${DOCKER_SSD_CONFIG_DIR}/jellyfin-transcodes}:/config/transcodes
       - ${JELLYFIN_MEDIA_DIR}:/data
     networks:
       - media-stack
@@ -107,7 +137,18 @@ services:
               count: 1
               capabilities: [gpu]
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.jellyfin.name=Jellyfin"
+      - "pangolin.public-resources.jellyfin.protocol=http"
+      - "pangolin.public-resources.jellyfin.full-domain=${JELLYFIN_SUBDOMAIN:-jellyfin}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.jellyfin.auth.sso-enabled=true"
+      - "pangolin.public-resources.jellyfin.targets[0].hostname=jellyfin"
+      - "pangolin.public-resources.jellyfin.targets[0].method=http"
+      - "pangolin.public-resources.jellyfin.targets[0].port=8096"
+      - "pangolin.public-resources.jellyfin.targets[0].healthcheck.hostname=jellyfin"
+      - "pangolin.public-resources.jellyfin.targets[0].healthcheck.port=8096"
+      - "pangolin.public-resources.jellyfin.targets[0].healthcheck.path=/health"
+      - "pangolin.public-resources.jellyfin.targets[0].healthcheck.status=200"
     profiles:
       - jellyfin
 
@@ -140,7 +181,18 @@ services:
       gluetun:
         condition: service_healthy
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.stash.name=Stash"
+      - "pangolin.public-resources.stash.protocol=http"
+      - "pangolin.public-resources.stash.full-domain=${STASH_SUBDOMAIN:-stash}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.stash.auth.sso-enabled=true"
+      - "pangolin.public-resources.stash.targets[0].hostname=gluetun"
+      - "pangolin.public-resources.stash.targets[0].method=http"
+      - "pangolin.public-resources.stash.targets[0].port=9998"
+      - "pangolin.public-resources.stash.targets[0].healthcheck.hostname=gluetun"
+      - "pangolin.public-resources.stash.targets[0].healthcheck.port=9998"
+      - "pangolin.public-resources.stash.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.stash.targets[0].healthcheck.status=200"
     profiles:
       - stash
 
@@ -149,6 +201,7 @@ services:
     <<: [*service-defaults, *resources-medium]
     image: lscr.io/linuxserver/kavita:latest
     container_name: kavita
+    init: false
     environment:
       <<: *common-env
     volumes:
@@ -164,7 +217,18 @@ services:
       <<: *healthcheck-defaults
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.kavita.name=Kavita"
+      - "pangolin.public-resources.kavita.protocol=http"
+      - "pangolin.public-resources.kavita.full-domain=${KAVITA_SUBDOMAIN:-kavita}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.kavita.auth.sso-enabled=true"
+      - "pangolin.public-resources.kavita.targets[0].hostname=kavita"
+      - "pangolin.public-resources.kavita.targets[0].method=http"
+      - "pangolin.public-resources.kavita.targets[0].port=5000"
+      - "pangolin.public-resources.kavita.targets[0].healthcheck.hostname=kavita"
+      - "pangolin.public-resources.kavita.targets[0].healthcheck.port=5000"
+      - "pangolin.public-resources.kavita.targets[0].healthcheck.path=/api/health"
+      - "pangolin.public-resources.kavita.targets[0].healthcheck.status=200"
     profiles:
       - kavita
 
@@ -197,5 +261,16 @@ services:
       start_period: 30s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.navidrome.name=Navidrome"
+      - "pangolin.public-resources.navidrome.protocol=http"
+      - "pangolin.public-resources.navidrome.full-domain=${NAVIDROME_SUBDOMAIN:-navidrome}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.navidrome.auth.sso-enabled=true"
+      - "pangolin.public-resources.navidrome.targets[0].hostname=navidrome"
+      - "pangolin.public-resources.navidrome.targets[0].method=http"
+      - "pangolin.public-resources.navidrome.targets[0].port=4533"
+      - "pangolin.public-resources.navidrome.targets[0].healthcheck.hostname=navidrome"
+      - "pangolin.public-resources.navidrome.targets[0].healthcheck.port=4533"
+      - "pangolin.public-resources.navidrome.targets[0].healthcheck.path=/ping"
+      - "pangolin.public-resources.navidrome.targets[0].healthcheck.status=200"
     profiles:
       - navidrome

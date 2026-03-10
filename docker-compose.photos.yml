@@ -7,6 +7,9 @@ services:
     container_name: immich_server
     image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
     extends:
       file: hwaccel.transcoding.yml
       service: nvenc # set to one of [nvenc, quicksync, rkmpp, vaapi, vaapi-wsl] for accelerated transcoding
@@ -53,11 +56,25 @@ services:
     labels:
       # Immich recommends manual updates - disable Watchtower
       - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.immich.name=Immich"
+      - "pangolin.public-resources.immich.protocol=http"
+      - "pangolin.public-resources.immich.full-domain=${IMMICH_SUBDOMAIN:-photos}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.immich.auth.sso-enabled=false"
+      - "pangolin.public-resources.immich.targets[0].hostname=immich-server"
+      - "pangolin.public-resources.immich.targets[0].method=http"
+      - "pangolin.public-resources.immich.targets[0].port=2283"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.hostname=immich-server"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.port=2283"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.path=/api/server/ping"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.status=200"
 
   immich-machine-learning:
     container_name: immich_machine_learning
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
     restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
     extends:
       file: hwaccel.ml.yml
       service: cuda # set to one of [armnn, cuda, rocm, openvino, openvino-wsl, rknn] for accelerated inference
@@ -93,6 +110,7 @@ services:
     container_name: immich_redis
     image: docker.io/valkey/valkey:8-alpine@sha256:3c3ccc8571d4866ec5ac5ffb2519b6b6a1fdbf6b5ff5fdab075413026fbff273
     restart: unless-stopped
+    init: true
     security_opt:
       - no-new-privileges:true
     networks:
@@ -118,12 +136,13 @@ services:
     container_name: immich_postgres
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     restart: unless-stopped
+    init: true
     security_opt:
       - no-new-privileges:true
     networks:
       - media-stack
     environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?set DB_PASSWORD in .env}"
       POSTGRES_USER: ${DB_USERNAME}
       POSTGRES_DB: ${DB_DATABASE_NAME}
       POSTGRES_INITDB_ARGS: '--data-checksums'

@@ -84,7 +84,7 @@ graph TB
     end
 
     subgraph UTILITIES["🧰 Utilities"]
-        Homepage[Homepage]
+        Homarr[Homarr]
         Dozzle[Dozzle]
         Glance[Glance]
     end
@@ -114,7 +114,7 @@ graph TB
 | **Backup** | Data protection | Duplicati, Restic Server, DB Backup |
 | **Management** | Container operations | Portainer, Watchtower, Glances |
 | **Requests** | User request portals | Overseerr, Maintainerr |
-| **Utilities** | Tools & dashboards | Homepage, Dozzle, Glance |
+| **Utilities** | Tools & dashboards | Homarr, Dozzle, Glance |
 
 ---
 
@@ -154,7 +154,7 @@ graph TB
             Jellyfin["Jellyfin<br/>:8096"]
             Immich["Immich<br/>:2283"]
             Grafana["Grafana<br/>:3000"]
-            Homepage["Homepage<br/>:3002"]
+            Homarr["Homarr<br/>:3002"]
         end
     end
 
@@ -314,12 +314,12 @@ graph TB
     end
 
     subgraph MANAGEMENT_LAYER["🛠️ Management Layer"]
-        Homepage[Homepage]
+        Homarr[Homarr]
         Dozzle[Dozzle]
         Portainer[Portainer]
     end
 
-    DockerProxy --> Homepage
+    DockerProxy --> Homarr
     DockerProxy --> Dozzle
     DockerProxy --> Portainer
 ```
