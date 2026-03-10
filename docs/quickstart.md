@@ -337,8 +337,8 @@ docker compose --profile kasm up -d
 # Start the full *Arr stack with downloader dependencies
 docker compose --profile arr up -d
 
-# Start the document and knowledge apps
-docker compose --profile paperless --profile stirling --profile karakeep --profile docmost up -d
+# Documents and knowledge apps are included in the default startup
+docker compose up -d
 
 # Watch startup logs
 docker compose logs -f
@@ -382,10 +382,10 @@ grafana             Up 2 minutes (healthy)
 | **Joplin** | `http://your-server:22300` | Connect desktop and mobile clients |
 | **Portainer** | `https://your-server:9443` | Create admin account |
 | **Grafana** | `http://your-server:3000` | admin / admin |
-| **Paperless-ngx** | `http://your-server:8010` | Optional: enable `paperless` profile, then create your first user |
-| **Stirling PDF** | `http://your-server:8085` | Optional: enable `stirling` profile |
-| **Karakeep** | `http://your-server:3005` | Optional: enable `karakeep` profile, then create your account |
-| **Docmost** | `http://your-server:3004` | Optional: enable `docmost` profile, then create your workspace admin |
+| **Paperless-ngx** | `http://your-server:8010` | Create your first user |
+| **Stirling PDF** | `http://your-server:8085` | Access the PDF toolbox |
+| **Karakeep** | `http://your-server:3005` | Create your account |
+| **Docmost** | `http://your-server:3004` | Create your workspace admin |
 
 ### Configure Plex
 

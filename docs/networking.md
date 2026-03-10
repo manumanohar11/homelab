@@ -297,10 +297,10 @@ gluetun:
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
-| 8010 | Paperless-ngx | HTTP | Direct, `paperless` profile only |
-| 8085 | Stirling PDF | HTTP | Direct, `stirling` profile only |
-| 3004 | Docmost | HTTP | Direct, `docmost` profile only |
-| 3005 | Karakeep | HTTP | Direct, `karakeep` profile only |
+| 8010 | Paperless-ngx | HTTP | Direct |
+| 8085 | Stirling PDF | HTTP | Direct |
+| 3004 | Docmost | HTTP | Direct |
+| 3005 | Karakeep | HTTP | Direct |
 
 #### *Arr Stack (VPN-Routed)
 

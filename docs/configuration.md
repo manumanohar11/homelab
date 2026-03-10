@@ -98,11 +98,8 @@ docker compose --profile automation up -d
 # Kasm remote workspaces
 docker compose --profile kasm up -d
 
-# Document archive plus PDF tools
-docker compose --profile paperless --profile stirling up -d
-
-# Knowledge tools
-docker compose --profile karakeep --profile docmost up -d
+# Documents and knowledge tools are part of the default stack
+docker compose up -d
 ```
 
 Comment an include line only if you want to permanently remove an entire module from your personal install.
@@ -140,10 +137,6 @@ docker compose up -d
 | `tdarr` | Tdarr | media-extras.yml |
 | `automation` | n8n | automation.yml |
 | `kasm` | Kasm | productivity.yml |
-| `paperless` | Paperless-ngx, PostgreSQL, Redis, Gotenberg, Tika | documents.yml |
-| `stirling` | Stirling-PDF | documents.yml |
-| `karakeep` | Karakeep, Meilisearch, Chrome | documents.yml |
-| `docmost` | Docmost, PostgreSQL, Redis | documents.yml |
 | `requests` | Overseerr | requests.yml |
 | `maintainerr` | Maintainerr | media-extras.yml |
 | `notifiarr` | Notifiarr | requests.yml |
@@ -176,10 +169,7 @@ docker compose --profile jellyfin up -d
 docker compose --profile automation --profile files --profile kasm up -d
 ```
 
-**Documents and knowledge apps:**
-```bash
-docker compose --profile paperless --profile stirling --profile karakeep --profile docmost up -d
-```
+Documents and knowledge apps are included in the default `docker compose up -d` startup path.
 
 ---
 
