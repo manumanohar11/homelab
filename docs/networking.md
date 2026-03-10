@@ -105,6 +105,7 @@ flowchart LR
 | **Download Traffic** | Through VPN tunnel | *Arr stack, qBittorrent, Prowlarr |
 | **Streaming Traffic** | Direct to internet | Plex, Jellyfin |
 | **Productivity Traffic** | Direct to LAN/clients | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
+| **Documents & Knowledge Traffic** | Direct to LAN/clients | Paperless-ngx, Stirling-PDF, Karakeep, Docmost |
 | **Local Traffic** | Docker network only | Databases, Redis |
 | **Monitoring Traffic** | Direct | Prometheus, Grafana |
 
@@ -291,6 +292,15 @@ gluetun:
 | 22300 | Joplin | HTTP | Direct |
 | 3003 | Kasm Wizard | HTTPS | Direct, `kasm` profile only |
 | 8444 | Kasm UI | HTTPS | Direct, `kasm` profile only |
+
+#### Documents & Knowledge
+
+| Port | Service | Protocol | Access |
+|:----:|:--------|:--------:|:-------|
+| 8010 | Paperless-ngx | HTTP | Direct, `paperless` profile only |
+| 8085 | Stirling PDF | HTTP | Direct, `stirling` profile only |
+| 3004 | Docmost | HTTP | Direct, `docmost` profile only |
+| 3005 | Karakeep | HTTP | Direct, `karakeep` profile only |
 
 #### *Arr Stack (VPN-Routed)
 

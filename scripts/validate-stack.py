@@ -29,7 +29,6 @@ FORBIDDEN_DOC_TERMS = {
     "nettest": [REPO_ROOT / "README.md", REPO_ROOT / "docs"],
     "cAdvisor": [REPO_ROOT / "docs"],
     "IT-Tools": [REPO_ROOT / "docs"],
-    "Stirling PDF": [REPO_ROOT / "docs"],
     "SQLite Backup Service": [REPO_ROOT / "docs" / "backup.md"],
 }
 
@@ -44,8 +43,14 @@ TRACKED_ARTIFACT_PATTERNS = [
 REQUIRED_SECRET_VARS = {
     "BITMAGNET_POSTGRES_PASSWORD",
     "DB_PASSWORD",
+    "DOCMOST_APP_SECRET",
+    "DOCMOST_DB_PASSWORD",
     "GRAFANA_ADMIN_PASSWORD",
     "JOPLIN_DB_PASSWORD",
+    "KARAKEEP_MEILI_MASTER_KEY",
+    "KARAKEEP_NEXTAUTH_SECRET",
+    "PAPERLESS_DB_PASSWORD",
+    "PAPERLESS_SECRET_KEY",
 }
 
 WEAK_SECRET_FALLBACKS = {

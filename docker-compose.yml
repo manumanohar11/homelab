@@ -41,6 +41,7 @@ include:
 
   # Productivity
   - docker-compose.productivity.yml
+  - docker-compose.documents.yml
   - docker-compose.files.yml
   - docker-compose.automation.yml
 
@@ -64,6 +65,10 @@ include:
 # tdarr         - Tdarr media transcoding
 # automation    - n8n workflow automation
 # kasm          - Kasm remote workspace
+# paperless     - Paperless-ngx document archive plus OCR sidecars
+# stirling      - Stirling-PDF toolbox
+# karakeep      - Karakeep bookmark and read-later stack
+# docmost       - Docmost collaborative wiki
 # notifiarr     - Notifiarr unified notifications
 # restic        - Restic backup server
 # db-backup     - Database backup worker

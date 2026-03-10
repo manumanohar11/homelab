@@ -220,6 +220,7 @@ sudo chown -R $USER:$USER /opt/media-stack
 ```bash
 # Create media library structure
 sudo mkdir -p /mnt/media/{Movies,TV,Music,Books,Comics,Downloads,Photos,Sync}
+sudo mkdir -p /mnt/media/Documents/consume
 sudo chown -R $USER:$USER /mnt/media
 
 # Create photo directories for Immich
@@ -239,6 +240,8 @@ Expected:
 ├── Books
 ├── Comics
 ├── Downloads
+├── Documents
+│   └── consume
 ├── Movies
 ├── Music
 ├── Photos
@@ -276,6 +279,7 @@ include:
   - docker-compose.monitoring.yml       # ✅ Prometheus, Grafana
   - docker-compose.logging.yml          # ✅ Loki, Promtail
   - docker-compose.productivity.yml     # ✅ FreshRSS, SearXNG, Syncthing, Joplin
+  - docker-compose.documents.yml        # Optional via app-specific document profiles
   - docker-compose.files.yml            # Optional via `files` profile
   - docker-compose.automation.yml       # Optional via `automation` profile
   - docker-compose.utilities.yml        # ✅ Homarr, Dozzle
@@ -333,6 +337,9 @@ docker compose --profile kasm up -d
 # Start the full *Arr stack with downloader dependencies
 docker compose --profile arr up -d
 
+# Start the document and knowledge apps
+docker compose --profile paperless --profile stirling --profile karakeep --profile docmost up -d
+
 # Watch startup logs
 docker compose logs -f
 # Press Ctrl+C to stop watching (services keep running)
@@ -375,6 +382,10 @@ grafana             Up 2 minutes (healthy)
 | **Joplin** | `http://your-server:22300` | Connect desktop and mobile clients |
 | **Portainer** | `https://your-server:9443` | Create admin account |
 | **Grafana** | `http://your-server:3000` | admin / admin |
+| **Paperless-ngx** | `http://your-server:8010` | Optional: enable `paperless` profile, then create your first user |
+| **Stirling PDF** | `http://your-server:8085` | Optional: enable `stirling` profile |
+| **Karakeep** | `http://your-server:3005` | Optional: enable `karakeep` profile, then create your account |
+| **Docmost** | `http://your-server:3004` | Optional: enable `docmost` profile, then create your workspace admin |
 
 ### Configure Plex
 

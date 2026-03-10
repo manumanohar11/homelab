@@ -43,6 +43,7 @@ include:
   - docker-compose.monitoring.yml
   - docker-compose.logging.yml
   - docker-compose.productivity.yml
+  - docker-compose.documents.yml
   - docker-compose.files.yml
   - docker-compose.automation.yml
   - docker-compose.utilities.yml
@@ -68,12 +69,14 @@ include:
 | `monitoring.yml` | Monitoring stack | Prometheus, Grafana, AlertManager |
 | `logging.yml` | Container log aggregation | Loki, Promtail |
 | `productivity.yml` | Productivity apps | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
+| `documents.yml` | Document and knowledge apps | Paperless-ngx, Stirling-PDF, Karakeep, Docmost |
 | `utilities.yml` | Utility services | Homarr, Dozzle, Scrutiny, Speedtest |
 | `backup.yml` | Backup services | Duplicati, Restic server, DB Backup |
 | `automation.yml` | Workflow automation | n8n |
 | `files.yml` | File sharing | Nextcloud |
 
 `docker-compose.productivity.yml` is included in the default stack. Only Kasm inside that module is profile-gated.
+`docker-compose.documents.yml` is also included by default, with each app enabled through its own profile.
 
 ### Enable/Disable Modules
 
@@ -94,6 +97,12 @@ docker compose --profile automation up -d
 
 # Kasm remote workspaces
 docker compose --profile kasm up -d
+
+# Document archive plus PDF tools
+docker compose --profile paperless --profile stirling up -d
+
+# Knowledge tools
+docker compose --profile karakeep --profile docmost up -d
 ```
 
 Comment an include line only if you want to permanently remove an entire module from your personal install.
@@ -131,6 +140,10 @@ docker compose up -d
 | `tdarr` | Tdarr | media-extras.yml |
 | `automation` | n8n | automation.yml |
 | `kasm` | Kasm | productivity.yml |
+| `paperless` | Paperless-ngx, PostgreSQL, Redis, Gotenberg, Tika | documents.yml |
+| `stirling` | Stirling-PDF | documents.yml |
+| `karakeep` | Karakeep, Meilisearch, Chrome | documents.yml |
+| `docmost` | Docmost, PostgreSQL, Redis | documents.yml |
 | `requests` | Overseerr | requests.yml |
 | `maintainerr` | Maintainerr | media-extras.yml |
 | `notifiarr` | Notifiarr | requests.yml |
@@ -161,6 +174,11 @@ docker compose --profile jellyfin up -d
 **Optional apps:**
 ```bash
 docker compose --profile automation --profile files --profile kasm up -d
+```
+
+**Documents and knowledge apps:**
+```bash
+docker compose --profile paperless --profile stirling --profile karakeep --profile docmost up -d
 ```
 
 ---
@@ -225,6 +243,35 @@ JOPLIN_DB_NAME=joplin
 JOPLIN_DB_USER=joplin
 JOPLIN_DB_PASSWORD=<generate-with-openssl-rand-hex-32>
 JOPLIN_DB_DATA_LOCATION=/opt/media-stack/data/joplin-postgres
+```
+
+### Documents & Knowledge Settings
+
+```bash
+# ============================================
+# DOCUMENTS & KNOWLEDGE
+# ============================================
+
+PAPERLESS_SUBDOMAIN=paperless
+PAPERLESS_URL=https://${PAPERLESS_SUBDOMAIN}.${DOMAIN_NAME}
+PAPERLESS_SECRET_KEY=<generate-with-openssl-rand-hex-32>
+PAPERLESS_DB_PASSWORD=<generate-with-openssl-rand-hex-32>
+PAPERLESS_DB_DATA_LOCATION=/opt/media-stack/data/paperless-postgres
+PAPERLESS_CONSUME_DIR=/mnt/media/Documents/consume
+PAPERLESS_OCR_LANGUAGE=eng
+
+STIRLING_SUBDOMAIN=pdf
+
+KARAKEEP_SUBDOMAIN=karakeep
+KARAKEEP_BASE_URL=https://${KARAKEEP_SUBDOMAIN}.${DOMAIN_NAME}
+KARAKEEP_NEXTAUTH_SECRET=<generate-with-openssl-rand-hex-32>
+KARAKEEP_MEILI_MASTER_KEY=<generate-with-openssl-rand-hex-32>
+
+DOCMOST_SUBDOMAIN=docs
+DOCMOST_BASE_URL=https://${DOCMOST_SUBDOMAIN}.${DOMAIN_NAME}
+DOCMOST_APP_SECRET=<generate-with-openssl-rand-hex-32>
+DOCMOST_DB_PASSWORD=<generate-with-openssl-rand-hex-32>
+DOCMOST_DB_DATA_LOCATION=/opt/media-stack/data/docmost-postgres
 ```
 
 ### Database Settings

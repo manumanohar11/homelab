@@ -4,7 +4,7 @@ Guidelines for AI agents working in this Docker-based homelab infrastructure rep
 
 ## Repository Overview
 
-Modular Docker Compose infrastructure for self-hosted services: media management (*Arr suite), media servers (Plex/Jellyfin/Tdarr), photo management (Immich), monitoring (Prometheus/Grafana/Loki), tunnel proxy (Pangolin/Newt), backup (Duplicati), requests (Overseerr), and automation (n8n).
+Modular Docker Compose infrastructure for self-hosted services: media management (*Arr suite), media servers (Plex/Jellyfin/Tdarr), photo management (Immich), monitoring (Prometheus/Grafana/Loki), tunnel proxy (Pangolin/Newt), backup (Duplicati), requests (Overseerr), automation (n8n), and document/knowledge tools (Paperless-ngx, Stirling-PDF, Karakeep, Docmost).
 
 ## Commands Reference
 
@@ -42,6 +42,7 @@ docker-compose.management.yml   # Portainer, Watchtower, Glances
 docker-compose.monitoring.yml   # Prometheus, Grafana, Alertmanager, Uptime Kuma
 docker-compose.logging.yml      # Loki and Promtail
 docker-compose.photos.yml       # Immich stack
+docker-compose.documents.yml    # Paperless-ngx, Stirling-PDF, Karakeep, Docmost
 docker-compose.files.yml        # Nextcloud
 docker-compose.automation.yml   # n8n
 docker-compose.requests.yml     # Overseerr, Jellyseerr, Notifiarr
@@ -106,6 +107,14 @@ configs/                        # Application configs (tracked in git)
 | Alertmanager | 9093 | Alert management |
 | Loki | 3100 | Log aggregation |
 | Uptime Kuma | 3001 | Uptime monitoring |
+
+### Documents & Knowledge
+| Service | Port | Purpose |
+|---------|------|---------|
+| Paperless-ngx | 8010 | Document archive and OCR |
+| Stirling-PDF | 8085 | PDF toolbox |
+| Karakeep | 3005 | Bookmark and read-later manager |
+| Docmost | 3004 | Collaborative wiki |
 
 ### Management
 | Service | Port | Purpose |

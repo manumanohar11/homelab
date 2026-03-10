@@ -18,6 +18,7 @@ Complete catalog of the services available in the Media Stack.
 - [Monitoring & Observability](#monitoring--observability)
 - [Management & Utilities](#management--utilities)
 - [Productivity](#productivity)
+- [Documents & Knowledge](#documents--knowledge)
 - [Backup Services](#backup-services)
 - [Automation](#automation)
 - [File Sharing](#file-sharing)
@@ -333,6 +334,56 @@ Optional profile for remote browser workspaces:
 - main UI at `https://your-server:8444` after setup
 
 **Enable:** `docker compose --profile kasm up -d`
+
+---
+
+## Documents & Knowledge
+
+Document workflows, PDF utilities, bookmarks, and internal wiki tools.
+
+| Service | Port | Description | Image | Status |
+|:--------|:----:|:------------|:------|:------:|
+| **Paperless-ngx** | 8010 | Document archive with OCR and automation | `ghcr.io/paperless-ngx/paperless-ngx` | 📦 `paperless` |
+| **Paperless PostgreSQL** | 5432 | Internal database for Paperless-ngx | `postgres:18-alpine` | 📦 `paperless` |
+| **Paperless Redis** | 6379 | Internal broker/cache for Paperless-ngx | `redis:8-alpine` | 📦 `paperless` |
+| **Stirling PDF** | 8085 | Self-hosted PDF toolbox | `docker.stirlingpdf.com/stirlingtools/stirling-pdf` | 📦 `stirling` |
+| **Karakeep** | 3005 | Bookmarking and read-later app | `ghcr.io/karakeep-app/karakeep` | 📦 `karakeep` |
+| **Karakeep Meilisearch** | 7700 | Internal search backend for Karakeep | `getmeili/meilisearch` | 📦 `karakeep` |
+| **Docmost** | 3004 | Collaborative wiki and documentation space | `docmost/docmost` | 📦 `docmost` |
+| **Docmost PostgreSQL** | 5432 | Internal database for Docmost | `postgres:18-alpine` | 📦 `docmost` |
+| **Docmost Redis** | 6379 | Internal cache for Docmost | `redis:8-alpine` | 📦 `docmost` |
+
+### Paperless-ngx
+
+Runs with PostgreSQL, Redis, Gotenberg, and Tika sidecars for OCR and Office document ingestion.
+
+**Enable:** `docker compose --profile paperless up -d`
+
+**Default URL:** `http://your-server:8010`
+
+### Stirling PDF
+
+Adds a local PDF toolbox for merge, split, convert, OCR, and other document utilities.
+
+**Enable:** `docker compose --profile stirling up -d`
+
+**Default URL:** `http://your-server:8085`
+
+### Karakeep
+
+Runs with Meilisearch and a headless Chrome sidecar to support search, screenshots, and richer captures.
+
+**Enable:** `docker compose --profile karakeep up -d`
+
+**Default URL:** `http://your-server:3005`
+
+### Docmost
+
+Uses PostgreSQL and Redis to provide a shared internal wiki for runbooks, homelab notes, and operational docs.
+
+**Enable:** `docker compose --profile docmost up -d`
+
+**Default URL:** `http://your-server:3004`
 
 ---
 

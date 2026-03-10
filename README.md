@@ -9,7 +9,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 [![Maintained](https://img.shields.io/badge/Maintained-Yes-brightgreen?style=for-the-badge)](https://github.com)
 
-*A complete, modular, production-ready Docker Compose setup for running your own media, photo, productivity, monitoring, and automation services.*
+*A complete, modular, production-ready Docker Compose setup for running your own media, photo, productivity, document, knowledge, monitoring, and automation services.*
 
 [Quick Start](#-quick-start) •
 [Documentation](#-documentation) •
@@ -69,6 +69,7 @@ graph LR
 - FreshRSS & SearXNG
 - Syncthing
 - Joplin Server
+- Paperless, Karakeep & Docmost
 - Optional Kasm
 
 </td>
@@ -105,6 +106,7 @@ nano .env  # Edit host paths, domain, API keys, and optional settings
 
 # 3. Create directories
 sudo mkdir -p /opt/media-stack/data /mnt/media/{Movies,TV,Music,Photos,Sync}
+sudo mkdir -p /mnt/media/Documents/consume
 sudo chown -R $USER:$USER /opt/media-stack /mnt/media
 
 # 4. Launch!

@@ -48,6 +48,13 @@ graph TB
         UptimeKuma[Uptime Kuma]
     end
 
+    subgraph KNOWLEDGE["🗂️ Documents & Knowledge"]
+        Paperless[Paperless-ngx]
+        Stirling[Stirling PDF]
+        Karakeep[Karakeep]
+        Docmost[Docmost]
+    end
+
     subgraph VPN["🔒 VPN & Network"]
         Gluetun[Gluetun VPN]
     end
@@ -90,6 +97,7 @@ graph TB
     end
 
     Newt --> MEDIA
+    Newt --> KNOWLEDGE
     Gluetun --> ARR
     ARR --> DOWNLOAD
     DOWNLOAD --> MEDIA
@@ -108,6 +116,7 @@ graph TB
 | **Media Servers** | Content streaming | Plex, Jellyfin, Kavita, Navidrome |
 | **Photos** | Photo management & ML | Immich, PostgreSQL, Redis |
 | **Monitoring** | Metrics & alerting | Prometheus, Grafana, AlertManager, Uptime Kuma |
+| **Documents & Knowledge** | Docs, PDF tools, bookmarks, wiki | Paperless-ngx, Stirling-PDF, Karakeep, Docmost |
 | **VPN** | Privacy & network routing | Gluetun |
 | **\*Arr Stack** | Media automation | Radarr, Sonarr, Lidarr, Readarr |
 | **Downloaders** | Content acquisition | qBittorrent, Prowlarr |
@@ -155,6 +164,7 @@ graph TB
             Immich["Immich<br/>:2283"]
             Grafana["Grafana<br/>:3000"]
             Homarr["Homarr<br/>:3002"]
+            Paperless["Paperless<br/>:8010"]
         end
     end
 
@@ -171,7 +181,7 @@ graph TB
 | Zone | Traffic Type | Services |
 |:-----|:-------------|:---------|
 | **VPN-Routed** | All traffic through VPN tunnel | *Arr stack, qBittorrent, Prowlarr |
-| **Direct Access** | Normal network access | Media servers, monitoring, utilities |
+| **Direct Access** | Normal network access | Media servers, monitoring, utilities, documents |
 | **Internal Only** | Container-to-container only | Databases, Redis, internal APIs |
 
 ---
