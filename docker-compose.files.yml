@@ -34,7 +34,7 @@ services:
     init: false
     environment:
       <<: *common-env
-      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}}
     volumes:
       - ${DOCKER_BASE_DIR}/nextcloud:/config
       - ${DOCKER_MEDIA_DIR}:/data

@@ -3,256 +3,247 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import subprocess
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
-import re
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ENV_PATH = REPO_ROOT / ".env"
 BOARD_ID = "seed-home-board"
-LAYOUT_ID = "seed-home-layout-base"
 BOARD_NAME = "home"
 ICON_BASE = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@master/svg"
 FALLBACK_ICON = f"{ICON_BASE}/homarr.svg"
+SEED_APP_PREFIX = "seed-app-"
+SEED_ITEM_PREFIX = "seed-item-"
+
+PANGOLIN_LABEL = re.compile(r"^pangolin\.public-resources\.([^.]+)\.(.+)$")
+ENV_VAR_PATTERN = re.compile(r"\$\{([^}:]+)(:-([^}]*))?\}")
 
 
 @dataclass(frozen=True)
-class AppSpec:
+class LayoutSpec:
+    id: str
+    name: str
+    column_count: int
+    breakpoint: int
+
+
+@dataclass(frozen=True)
+class ServiceOverride:
+    name: str | None = None
+    description: str | None = None
+    section: str | None = None
+    icon_slug: str | None = None
+    href: str | None = None
+    ping_url: str | None = None
+    order: int = 500
+    include: bool = True
+
+
+@dataclass(frozen=True)
+class ServiceCard:
     item_id: str
     app_id: str
     service: str
     name: str
     description: str
     section: str
-    env_var: str
-    default_subdomain: str
     icon_slug: str
-    ping_url: str | None = None
+    href: str
+    ping_url: str | None
+    order: int
 
 
-SECTIONS: OrderedDict[str, str] = OrderedDict(
-    [
-        ("daily", "Every Day"),
-        ("media", "Media Room"),
-        ("control", "Lab Control"),
-    ]
+LAYOUT_SPECS: tuple[LayoutSpec, ...] = (
+    LayoutSpec("seed-home-layout-small", "Small", 4, 0),
+    LayoutSpec("seed-home-layout-medium", "Medium", 8, 800),
+    LayoutSpec("seed-home-layout-large", "Large", 12, 1400),
 )
 
 
-APP_SPECS: tuple[AppSpec, ...] = (
-    AppSpec(
-        item_id="seed-item-plex",
-        app_id="seed-app-plex",
-        service="plex",
-        name="Plex",
-        description="Watch",
-        section="daily",
-        env_var="PLEX_SUBDOMAIN",
-        default_subdomain="plex",
-        icon_slug="plex",
-        ping_url="http://plex:32400/identity",
+SECTION_ORDER: dict[str, int] = {
+    "Overview": 0,
+    "Dashboards": 10,
+    "Productivity": 20,
+    "Documents": 30,
+    "Knowledge": 40,
+    "Files": 50,
+    "Automation": 60,
+    "Media Servers": 70,
+    "Media Management": 80,
+    "Downloaders": 90,
+    "Requests": 100,
+    "Monitoring": 110,
+    "Backups": 120,
+}
+
+
+SECTION_FAMILIES: dict[str, tuple[str, str]] = {
+    "Dashboards": ("cluster-control", "#2dd4bf"),
+    "Productivity": ("cluster-daily", "#fb923c"),
+    "Documents": ("cluster-daily", "#fb923c"),
+    "Knowledge": ("cluster-daily", "#fb923c"),
+    "Files": ("cluster-daily", "#fb923c"),
+    "Automation": ("cluster-control", "#2dd4bf"),
+    "Media Servers": ("cluster-media", "#60a5fa"),
+    "Media Management": ("cluster-media", "#60a5fa"),
+    "Downloaders": ("cluster-media", "#60a5fa"),
+    "Requests": ("cluster-media", "#60a5fa"),
+    "Monitoring": ("cluster-control", "#2dd4bf"),
+    "Backups": ("cluster-control", "#2dd4bf"),
+}
+
+
+SERVICE_OVERRIDES: dict[str, ServiceOverride] = {
+    "alertmanager": ServiceOverride(
+        description="Alert routing",
+        section="Monitoring",
+        icon_slug="alertmanager",
     ),
-    AppSpec(
-        item_id="seed-item-immich",
-        app_id="seed-app-immich",
-        service="immich-server",
+    "dozzle": ServiceOverride(
+        description="Live logs",
+        section="Monitoring",
+        icon_slug="dozzle",
+    ),
+    "glance-homepage": ServiceOverride(
+        name="Glance",
+        description="Alt dashboard",
+        section="Dashboards",
+        icon_slug="glance",
+        order=20,
+    ),
+    "glances": ServiceOverride(
+        description="System monitor",
+        section="Monitoring",
+        icon_slug="glances",
+    ),
+    "grafana": ServiceOverride(
+        description="Dashboards",
+        section="Dashboards",
+        icon_slug="grafana",
+        order=40,
+    ),
+    "homarr": ServiceOverride(
+        description="Service portal",
+        section="Dashboards",
+        icon_slug="homarr",
+        order=10,
+    ),
+    "immich-server": ServiceOverride(
         name="Immich",
-        description="Photos",
-        section="daily",
-        env_var="IMMICH_SUBDOMAIN",
-        default_subdomain="photos",
+        description="Photo library",
+        section="Media Servers",
         icon_slug="immich",
-        ping_url="http://immich-server:2283/api/server/ping",
+        order=20,
     ),
-    AppSpec(
-        item_id="seed-item-freshrss",
-        app_id="seed-app-freshrss",
-        service="freshrss",
-        name="FreshRSS",
-        description="Feeds",
-        section="daily",
-        env_var="FRESHRSS_SUBDOMAIN",
-        default_subdomain="freshrss",
-        icon_slug="freshrss",
-        ping_url="http://freshrss/",
-    ),
-    AppSpec(
-        item_id="seed-item-searxng",
-        app_id="seed-app-searxng",
-        service="searxng",
-        name="SearXNG",
-        description="Search",
-        section="daily",
-        env_var="SEARXNG_SUBDOMAIN",
-        default_subdomain="search",
-        icon_slug="searxng",
-        ping_url="http://searxng:8080/",
-    ),
-    AppSpec(
-        item_id="seed-item-joplin",
-        app_id="seed-app-joplin",
-        service="joplin",
-        name="Joplin",
-        description="Notes",
-        section="daily",
-        env_var="JOPLIN_SUBDOMAIN",
-        default_subdomain="joplin",
-        icon_slug="joplin",
-        ping_url="http://joplin:22300/api/ping",
-    ),
-    AppSpec(
-        item_id="seed-item-syncthing",
-        app_id="seed-app-syncthing",
-        service="syncthing",
-        name="Syncthing",
-        description="Sync",
-        section="daily",
-        env_var="SYNCTHING_SUBDOMAIN",
-        default_subdomain="syncthing",
-        icon_slug="syncthing",
-        ping_url="http://syncthing:8384/",
-    ),
-    AppSpec(
-        item_id="seed-item-jellyfin",
-        app_id="seed-app-jellyfin",
-        service="jellyfin",
-        name="Jellyfin",
-        description="Alt Media",
-        section="media",
-        env_var="JELLYFIN_SUBDOMAIN",
-        default_subdomain="jellyfin",
+    "jellyfin": ServiceOverride(
+        description="Media streaming",
+        section="Media Servers",
         icon_slug="jellyfin",
     ),
-    AppSpec(
-        item_id="seed-item-kavita",
-        app_id="seed-app-kavita",
-        service="kavita",
-        name="Kavita",
-        description="Reading",
-        section="media",
-        env_var="KAVITA_SUBDOMAIN",
-        default_subdomain="kavita",
-        icon_slug="kavita",
-        ping_url="http://kavita:5000/api/health",
+    "jellyseerr": ServiceOverride(
+        description="Media requests",
+        section="Requests",
+        icon_slug="jellyseerr",
     ),
-    AppSpec(
-        item_id="seed-item-tautulli",
-        app_id="seed-app-tautulli",
-        service="tautulli",
-        name="Tautulli",
-        description="Plex Stats",
-        section="media",
-        env_var="TAUTULLI_SUBDOMAIN",
-        default_subdomain="tautulli",
+    "kavita": ServiceOverride(
+        description="Reading library",
+        section="Media Servers",
+        icon_slug="kavita",
+    ),
+    "maintainerr": ServiceOverride(
+        description="Library cleanup",
+        section="Requests",
+        icon_slug="maintainerr",
+    ),
+    "navidrome": ServiceOverride(
+        description="Music streaming",
+        section="Media Servers",
+        icon_slug="navidrome",
+    ),
+    "notifiarr": ServiceOverride(
+        description="Notifications",
+        section="Requests",
+        icon_slug="notifiarr",
+    ),
+    "overseerr": ServiceOverride(
+        description="Media requests",
+        section="Requests",
+        icon_slug="overseerr",
+    ),
+    "plex": ServiceOverride(
+        description="Media streaming",
+        section="Media Servers",
+        icon_slug="plex",
+        order=10,
+    ),
+    "portainer": ServiceOverride(
+        description="Container control",
+        section="Dashboards",
+        icon_slug="portainer",
+        order=30,
+    ),
+    "prometheus": ServiceOverride(
+        description="Metrics store",
+        section="Monitoring",
+        icon_slug="prometheus",
+    ),
+    "scrutiny": ServiceOverride(
+        description="Disk health",
+        section="Monitoring",
+        icon_slug="scrutiny",
+    ),
+    "speedtest-tracker": ServiceOverride(
+        name="Speedtest Tracker",
+        description="Internet trends",
+        section="Monitoring",
+        icon_slug="speedtest-tracker",
+    ),
+    "stash": ServiceOverride(
+        description="Media organizer",
+        section="Media Servers",
+        icon_slug="stash",
+    ),
+    "tautulli": ServiceOverride(
+        description="Plex analytics",
+        section="Media Servers",
         icon_slug="tautulli",
     ),
-    AppSpec(
-        item_id="seed-item-portainer",
-        app_id="seed-app-portainer",
-        service="portainer",
-        name="Portainer",
-        description="Containers",
-        section="control",
-        env_var="PORTAINER_SUBDOMAIN",
-        default_subdomain="portainer",
-        icon_slug="portainer",
+    "tdarr": ServiceOverride(
+        description="Transcode farm",
+        section="Media Servers",
+        icon_slug="tdarr",
     ),
-    AppSpec(
-        item_id="seed-item-prometheus",
-        app_id="seed-app-prometheus",
-        service="prometheus",
-        name="Prometheus",
-        description="Metrics",
-        section="control",
-        env_var="PROMETHEUS_SUBDOMAIN",
-        default_subdomain="prometheus",
-        icon_slug="prometheus",
-        ping_url="http://prometheus:9090/-/healthy",
-    ),
-    AppSpec(
-        item_id="seed-item-grafana",
-        app_id="seed-app-grafana",
-        service="grafana",
-        name="Grafana",
-        description="Dashboards",
-        section="control",
-        env_var="GRAFANA_SUBDOMAIN",
-        default_subdomain="grafana",
-        icon_slug="grafana",
-        ping_url="http://grafana:3000/api/health",
-    ),
-    AppSpec(
-        item_id="seed-item-alertmanager",
-        app_id="seed-app-alertmanager",
-        service="alertmanager",
-        name="Alertmanager",
-        description="Alerts",
-        section="control",
-        env_var="ALERTMANAGER_SUBDOMAIN",
-        default_subdomain="alertmanager",
-        icon_slug="alertmanager",
-        ping_url="http://alertmanager:9093/-/healthy",
-    ),
-    AppSpec(
-        item_id="seed-item-uptime-kuma",
-        app_id="seed-app-uptime-kuma",
-        service="uptime-kuma",
-        name="Uptime Kuma",
-        description="Status",
-        section="control",
-        env_var="UPTIME_KUMA_SUBDOMAIN",
-        default_subdomain="uptime",
+    "uptime-kuma": ServiceOverride(
+        description="Status checks",
+        section="Monitoring",
         icon_slug="uptime-kuma",
-        ping_url="http://uptime-kuma:3001/",
     ),
-    AppSpec(
-        item_id="seed-item-dozzle",
-        app_id="seed-app-dozzle",
-        service="dozzle",
-        name="Dozzle",
-        description="Logs",
-        section="control",
-        env_var="DOZZLE_SUBDOMAIN",
-        default_subdomain="dozzle",
-        icon_slug="dozzle",
-        ping_url="http://dozzle:8080/",
-    ),
-    AppSpec(
-        item_id="seed-item-duplicati",
-        app_id="seed-app-duplicati",
-        service="duplicati",
-        name="Duplicati",
-        description="Backups",
-        section="control",
-        env_var="DUPLICATI_SUBDOMAIN",
-        default_subdomain="duplicati",
-        icon_slug="duplicati",
-        ping_url="http://duplicati:8200/",
-    ),
-)
+}
 
 
 def load_env(env_path: Path) -> dict[str, str]:
     env: dict[str, str] = {}
     if not env_path.exists():
         return env
+
     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
         env[key.strip()] = value.strip().strip("'\"")
-    pattern = re.compile(r"\$\{([^}:]+)(:-([^}]*))?\}")
+
     for _ in range(5):
         changed = False
         for key, value in list(env.items()):
-            expanded = pattern.sub(
+            expanded = ENV_VAR_PATTERN.sub(
                 lambda match: env.get(match.group(1), match.group(3) or ""),
                 value,
             )
@@ -261,6 +252,7 @@ def load_env(env_path: Path) -> dict[str, str]:
                 changed = True
         if not changed:
             break
+
     return env
 
 
@@ -271,28 +263,42 @@ def resolve_db_path(env: dict[str, str]) -> Path:
     return REPO_ROOT / "data" / "homarr" / "appdata" / "db" / "db.sqlite"
 
 
-def detect_running_services() -> set[str]:
-    try:
-        result = subprocess.run(
-            ["docker", "compose", "ps", "--services", "--status", "running"],
-            cwd=REPO_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return set()
-    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+def load_compose_services() -> dict[str, dict[str, Any]]:
+    commands = (
+        ["docker", "compose", "--profile", "*", "config", "--format", "json"],
+        ["docker", "compose", "config", "--format", "json"],
+    )
+    last_error = "docker compose config did not run"
+
+    for command in commands:
+        try:
+            result = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+            last_error = str(exc)
+            continue
+
+        config = json.loads(result.stdout)
+        return config.get("services", {})
+
+    raise RuntimeError(f"Unable to load docker compose config: {last_error}")
+
+
+def slugify(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
 def icon_url(icon_slug: str) -> str:
+    if not icon_slug:
+        return FALLBACK_ICON
+    if icon_slug.startswith("http://") or icon_slug.startswith("https://"):
+        return icon_slug
     return f"{ICON_BASE}/{icon_slug}.svg"
-
-
-def build_public_url(env: dict[str, str], app: AppSpec) -> str:
-    domain = env.get("DOMAIN_NAME", "localhost")
-    subdomain = env.get(app.env_var, app.default_subdomain)
-    return f"https://{subdomain}.{domain}"
 
 
 def superjson(payload: dict[str, Any] | None = None) -> str:
@@ -432,28 +438,180 @@ main img,
 main svg {
   filter: drop-shadow(0 12px 20px rgba(15, 23, 42, 0.22));
 }
+
+@media (max-width: 48em) {
+  main h1,
+  main h2,
+  main h3,
+  [data-board-section-title] {
+    letter-spacing: 0.08em;
+  }
+
+  .mantine-Card-root:hover,
+  .mantine-Paper-root:hover {
+    transform: none;
+  }
+}
 """.strip()
 
 
-def section_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for y_offset, (section_key, section_name) in enumerate(SECTIONS.items()):
-        if any(app.section == section_key for app in apps) or section_key == "daily":
-            rows.append(
-                {
-                    "id": f"seed-section-{section_key}",
-                    "board_id": BOARD_ID,
-                    "kind": "category",
-                    "x_offset": 0,
-                    "y_offset": y_offset,
-                    "name": section_name,
-                    "options": superjson(),
-                }
+def humanize_service_name(service: str) -> str:
+    parts = service.replace("_", "-").split("-")
+    return " ".join(part.upper() if part.isupper() else part.capitalize() for part in parts)
+
+
+def extract_pangolin_resource(labels: dict[str, str]) -> dict[str, str]:
+    resources: dict[str, dict[str, str]] = defaultdict(dict)
+    for key, value in labels.items():
+        match = PANGOLIN_LABEL.match(key)
+        if not match:
+            continue
+        resource_name, suffix = match.groups()
+        resources[resource_name][suffix] = value
+    if not resources:
+        return {}
+
+    resource_keys = sorted(resources)
+    return resources[resource_keys[0]]
+
+
+def build_pangolin_href(resource: dict[str, str]) -> str | None:
+    full_domain = resource.get("full-domain")
+    if not full_domain:
+        return None
+    return f"https://{full_domain}"
+
+
+def build_pangolin_ping_url(resource: dict[str, str]) -> str | None:
+    host = resource.get("targets[0].healthcheck.hostname")
+    port = resource.get("targets[0].healthcheck.port")
+    path = resource.get("targets[0].healthcheck.path", "/")
+    scheme = resource.get("targets[0].healthcheck.method") or resource.get("targets[0].method") or "http"
+
+    if not host or not port:
+        return None
+    if not path.startswith("/"):
+        path = f"/{path}"
+    return f"{scheme}://{host}:{port}{path}"
+
+
+def section_sort_key(section: str) -> tuple[int, str]:
+    return (SECTION_ORDER.get(section, 999), section.lower())
+
+
+def section_id(section: str) -> str:
+    return f"seed-section-{slugify(section)}"
+
+
+def service_ids(service: str) -> tuple[str, str]:
+    service_slug = slugify(service)
+    return (f"{SEED_ITEM_PREFIX}{service_slug}", f"{SEED_APP_PREFIX}{service_slug}")
+
+
+def choose_section(labels: dict[str, str], override: ServiceOverride) -> str | None:
+    if override.section:
+        return override.section
+    return labels.get("homepage.group")
+
+
+def choose_name(service: str, labels: dict[str, str], resource: dict[str, str], override: ServiceOverride) -> str:
+    return (
+        override.name
+        or labels.get("homepage.name")
+        or resource.get("name")
+        or humanize_service_name(service)
+    )
+
+
+def choose_description(labels: dict[str, str], override: ServiceOverride) -> str | None:
+    return override.description or labels.get("homepage.description")
+
+
+def choose_href(labels: dict[str, str], resource: dict[str, str], override: ServiceOverride) -> str | None:
+    if override.href:
+        return override.href
+    if labels.get("homepage.href"):
+        return labels["homepage.href"]
+    return build_pangolin_href(resource)
+
+
+def choose_ping_url(resource: dict[str, str], override: ServiceOverride) -> str | None:
+    if override.ping_url:
+        return override.ping_url
+    return build_pangolin_ping_url(resource)
+
+
+def choose_icon_slug(service: str, labels: dict[str, str], override: ServiceOverride) -> str:
+    return override.icon_slug or labels.get("homepage.icon") or service
+
+
+def build_service_cards() -> list[ServiceCard]:
+    services = load_compose_services()
+    cards: list[ServiceCard] = []
+
+    for service_name, service in services.items():
+        override = SERVICE_OVERRIDES.get(service_name, ServiceOverride())
+        if not override.include:
+            continue
+
+        labels = service.get("labels", {}) or {}
+        resource = extract_pangolin_resource(labels)
+        section = choose_section(labels, override)
+        href = choose_href(labels, resource, override)
+        description = choose_description(labels, override)
+
+        if not section or not href or not description:
+            continue
+
+        item_id, app_id = service_ids(service_name)
+        cards.append(
+            ServiceCard(
+                item_id=item_id,
+                app_id=app_id,
+                service=service_name,
+                name=choose_name(service_name, labels, resource, override),
+                description=description,
+                section=section,
+                icon_slug=choose_icon_slug(service_name, labels, override),
+                href=href,
+                ping_url=choose_ping_url(resource, override),
+                order=override.order,
             )
+        )
+
+    cards.sort(key=lambda card: (section_sort_key(card.section), card.order, card.name.lower()))
+    return cards
+
+
+def section_rows(cards: list[ServiceCard]) -> list[dict[str, Any]]:
+    sections = OrderedDict()
+    sections["Overview"] = "Overview"
+    for card in cards:
+        sections.setdefault(card.section, card.section)
+
+    rows: list[dict[str, Any]] = []
+    for y_offset, section_name in enumerate(
+        sorted(sections.values(), key=section_sort_key)
+    ):
+        rows.append(
+            {
+                "id": section_id(section_name),
+                "board_id": BOARD_ID,
+                "kind": "category",
+                "x_offset": 0,
+                "y_offset": y_offset,
+                "name": section_name,
+                "options": superjson(),
+            }
+        )
     return rows
 
 
-def item_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
+def section_style(section_name: str) -> tuple[str, str]:
+    return SECTION_FAMILIES.get(section_name, ("cluster-control", "#2dd4bf"))
+
+
+def item_rows(cards: list[ServiceCard]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = [
         {
             "id": "seed-item-clock",
@@ -477,24 +635,20 @@ def item_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
             ),
         }
     ]
-    section_classes = {
-        "daily": ("cluster-daily", "#fb923c"),
-        "media": ("cluster-media", "#60a5fa"),
-        "control": ("cluster-control", "#2dd4bf"),
-    }
-    for app in apps:
-        custom_class, border_color = section_classes[app.section]
+
+    for card in cards:
+        css_class, border_color = section_style(card.section)
         rows.append(
             {
-                "id": app.item_id,
+                "id": card.item_id,
                 "board_id": BOARD_ID,
                 "kind": "app",
                 "options": superjson(
                     {
-                        "appId": app.app_id,
+                        "appId": card.app_id,
                         "openInNewTab": True,
                         "showTitle": True,
-                        "pingEnabled": bool(app.ping_url),
+                        "pingEnabled": bool(card.ping_url),
                         "layout": "column",
                         "descriptionDisplayMode": "normal",
                     }
@@ -502,7 +656,7 @@ def item_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
                 "advanced_options": superjson(
                     {
                         "title": None,
-                        "customCssClasses": [custom_class],
+                        "customCssClasses": [css_class],
                         "borderColor": border_color,
                     }
                 ),
@@ -511,89 +665,101 @@ def item_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
     return rows
 
 
-def app_rows(apps: list[AppSpec], env: dict[str, str]) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    for app in apps:
-        rows.append(
-            {
-                "id": app.app_id,
-                "name": app.name,
-                "description": app.description,
-                "icon_url": icon_url(app.icon_slug),
-                "href": build_public_url(env, app),
-                "ping_url": app.ping_url,
-            }
-        )
-    return rows
+def app_rows(cards: list[ServiceCard]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": card.app_id,
+            "name": card.name,
+            "description": card.description,
+            "icon_url": icon_url(card.icon_slug),
+            "href": card.href,
+            "ping_url": card.ping_url,
+        }
+        for card in cards
+    ]
 
 
-def item_layout_rows(apps: list[AppSpec]) -> list[dict[str, Any]]:
-    explicit_layouts: dict[str, tuple[int, int, int, int]] = {
-        "seed-item-clock": (0, 0, 5, 3),
-        "seed-item-plex": (5, 0, 3, 3),
-        "seed-item-immich": (8, 0, 4, 3),
-        "seed-item-freshrss": (0, 3, 3, 1),
-        "seed-item-searxng": (3, 3, 3, 1),
-        "seed-item-joplin": (6, 3, 3, 1),
-        "seed-item-syncthing": (9, 3, 3, 1),
-        "seed-item-jellyfin": (0, 0, 4, 2),
-        "seed-item-kavita": (4, 0, 4, 2),
-        "seed-item-tautulli": (8, 0, 4, 2),
-        "seed-item-portainer": (0, 0, 3, 2),
-        "seed-item-grafana": (3, 0, 3, 2),
-        "seed-item-uptime-kuma": (6, 0, 3, 2),
-        "seed-item-dozzle": (9, 0, 3, 2),
-        "seed-item-duplicati": (0, 2, 4, 1),
-        "seed-item-prometheus": (4, 2, 4, 1),
-        "seed-item-alertmanager": (8, 2, 4, 1),
-    }
+def cards_by_section(cards: list[ServiceCard]) -> OrderedDict[str, list[ServiceCard]]:
+    grouped: OrderedDict[str, list[ServiceCard]] = OrderedDict()
+    for section_name in sorted({card.section for card in cards}, key=section_sort_key):
+        grouped[section_name] = [
+            card for card in cards if card.section == section_name
+        ]
+    return grouped
+
+
+def card_dimensions(column_count: int, card_count: int) -> tuple[int, int]:
+    if column_count <= 4:
+        return (column_count, 1)
+    if column_count <= 8:
+        return (8, 1) if card_count == 1 else (4, 1)
+    if card_count == 1:
+        return (6, 1)
+    if card_count == 2:
+        return (6, 1)
+    if card_count == 3:
+        return (4, 1)
+    return (3, 1)
+
+
+def item_layout_rows(cards: list[ServiceCard]) -> list[dict[str, Any]]:
     layouts: list[dict[str, Any]] = []
-    for item_id, section_key in [("seed-item-clock", "daily")]:
-        x_offset, y_offset, width, height = explicit_layouts[item_id]
+    grouped = cards_by_section(cards)
+
+    for layout_spec in LAYOUT_SPECS:
+        hero_height = 2 if layout_spec.column_count <= 8 else 3
         layouts.append(
             {
-                "item_id": item_id,
-                "section_id": f"seed-section-{section_key}",
-                "layout_id": LAYOUT_ID,
-                "x_offset": x_offset,
-                "y_offset": y_offset,
-                "width": width,
-                "height": height,
+                "item_id": "seed-item-clock",
+                "section_id": section_id("Overview"),
+                "layout_id": layout_spec.id,
+                "x_offset": 0,
+                "y_offset": 0,
+                "width": layout_spec.column_count,
+                "height": hero_height,
             }
         )
 
-    for app in apps:
-        x_offset, y_offset, width, height = explicit_layouts.get(app.item_id, (0, 0, 3, 1))
-        layouts.append(
-            {
-                "item_id": app.item_id,
-                "section_id": f"seed-section-{app.section}",
-                "layout_id": LAYOUT_ID,
-                "x_offset": x_offset,
-                "y_offset": y_offset,
-                "width": width,
-                "height": height,
-            }
-        )
+        for section_name, section_cards in grouped.items():
+            card_width, card_height = card_dimensions(layout_spec.column_count, len(section_cards))
+            cards_per_row = max(1, layout_spec.column_count // card_width)
+            for index, card in enumerate(section_cards):
+                layouts.append(
+                    {
+                        "item_id": card.item_id,
+                        "section_id": section_id(section_name),
+                        "layout_id": layout_spec.id,
+                        "x_offset": (index % cards_per_row) * card_width,
+                        "y_offset": index // cards_per_row,
+                        "width": card_width,
+                        "height": card_height,
+                    }
+                )
+
     return layouts
 
 
-def select_apps(env: dict[str, str]) -> list[AppSpec]:
-    running_services = detect_running_services()
-    apps = [app for app in APP_SPECS if not running_services or app.service in running_services]
-    if not apps:
-        apps = list(APP_SPECS[:10])
-    return apps
+def layout_rows() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": layout_spec.id,
+            "name": layout_spec.name,
+            "board_id": BOARD_ID,
+            "column_count": layout_spec.column_count,
+            "breakpoint": layout_spec.breakpoint,
+        }
+        for layout_spec in LAYOUT_SPECS
+    ]
 
 
 def update_server_setting(conn: sqlite3.Connection) -> None:
     row = conn.execute(
         "SELECT value FROM serverSetting WHERE setting_key = 'board'"
     ).fetchone()
-    if row is None:
-        payload = {"json": {}}
-    else:
+    payload = {"json": {}}
+    if row is not None:
         payload = json.loads(row[0])
+
     settings = payload.setdefault("json", {})
     settings["homeBoardId"] = BOARD_ID
     settings["mobileHomeBoardId"] = BOARD_ID
@@ -655,11 +821,14 @@ def reset_section_collapse_states(
         )
 
 
-def seed_board(db_path: Path, env: dict[str, str]) -> list[str]:
+def seed_board(db_path: Path) -> list[str]:
     if not db_path.exists():
         raise FileNotFoundError(f"Homarr database not found at {db_path}")
 
-    apps = select_apps(env)
+    cards = build_service_cards()
+    if not cards:
+        raise RuntimeError("No routable services were discovered for the Homarr board.")
+
     conn = sqlite3.connect(db_path)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
@@ -670,10 +839,11 @@ def seed_board(db_path: Path, env: dict[str, str]) -> list[str]:
     if owner is None:
         raise RuntimeError("Homarr has no user yet. Complete the first user setup before seeding.")
 
-    section_data = section_rows(apps)
-    item_data = item_rows(apps)
-    app_data = app_rows(apps, env)
-    layout_data = item_layout_rows(apps)
+    section_data = section_rows(cards)
+    item_data = item_rows(cards)
+    app_data = app_rows(cards)
+    layout_data = item_layout_rows(cards)
+    board_layouts = layout_rows()
     section_ids = [row["id"] for row in section_data]
 
     with conn:
@@ -719,28 +889,28 @@ def seed_board(db_path: Path, env: dict[str, str]) -> list[str]:
         )
 
         conn.execute(
-            """
-            INSERT INTO layout (id, name, board_id, column_count, breakpoint)
-            VALUES (?, 'Base', ?, 12, 0)
-            ON CONFLICT(id) DO UPDATE SET
-              name = excluded.name,
-              board_id = excluded.board_id,
-              column_count = excluded.column_count,
-              breakpoint = excluded.breakpoint
-            """,
-            (LAYOUT_ID, BOARD_ID),
-        )
-        conn.execute(
             "DELETE FROM item_layout WHERE item_id IN (SELECT id FROM item WHERE board_id = ?)",
             (BOARD_ID,),
         )
-        conn.execute("DELETE FROM item WHERE board_id = ?", (BOARD_ID,))
         conn.execute(
             "DELETE FROM section_layout WHERE section_id IN (SELECT id FROM section WHERE board_id = ?)",
             (BOARD_ID,),
         )
+        conn.execute("DELETE FROM layout WHERE board_id = ?", (BOARD_ID,))
+        conn.execute("DELETE FROM item WHERE board_id = ?", (BOARD_ID,))
         conn.execute("DELETE FROM section WHERE board_id = ?", (BOARD_ID,))
+        conn.execute(
+            "DELETE FROM app WHERE id LIKE ?",
+            (f"{SEED_APP_PREFIX}%",),
+        )
 
+        conn.executemany(
+            """
+            INSERT INTO layout (id, name, board_id, column_count, breakpoint)
+            VALUES (:id, :name, :board_id, :column_count, :breakpoint)
+            """,
+            board_layouts,
+        )
         conn.executemany(
             """
             INSERT INTO section (id, board_id, kind, x_offset, y_offset, name, options)
@@ -789,13 +959,13 @@ def seed_board(db_path: Path, env: dict[str, str]) -> list[str]:
         update_server_setting(conn)
 
     conn.close()
-    return [app.name for app in apps]
+    return [card.name for card in cards]
 
 
 def main() -> int:
     env = load_env(ENV_PATH)
     db_path = resolve_db_path(env)
-    included_apps = seed_board(db_path, env)
+    included_apps = seed_board(db_path)
     print(f"Seeded Homarr board at {db_path}")
     print("Included apps:")
     for app_name in included_apps:

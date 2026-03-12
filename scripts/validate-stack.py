@@ -46,6 +46,11 @@ REQUIRED_SECRET_VARS = {
     "DOCMOST_APP_SECRET",
     "DOCMOST_DB_PASSWORD",
     "GRAFANA_ADMIN_PASSWORD",
+    "JITSI_AUTH_PASSWORD",
+    "JITSI_JICOFO_AUTH_PASSWORD",
+    "JITSI_JICOFO_COMPONENT_SECRET",
+    "JITSI_JVB_AUTH_PASSWORD",
+    "JITSI_TURN_CREDENTIALS",
     "JOPLIN_DB_PASSWORD",
     "KARAKEEP_MEILI_MASTER_KEY",
     "KARAKEEP_NEXTAUTH_SECRET",
@@ -53,11 +58,27 @@ REQUIRED_SECRET_VARS = {
     "PAPERLESS_SECRET_KEY",
 }
 
+REQUIRED_CONFIG_VARS = {
+    "JITSI_CLOUDFLARE_API_TOKEN",
+    "JITSI_MEDIA_PUBLIC_HOSTNAME",
+    "JITSI_MEDIA_SUBDOMAIN",
+    "JITSI_TURN_MAX_PORT",
+    "JITSI_TURN_MIN_PORT",
+}
+
+STALE_ENV_VARS = {
+    "JITSI_EDGE_PUBLIC_IP",
+}
+
 WEAK_SECRET_FALLBACKS = {
     "admin",
     "bitmagnet_secret",
     "change_me",
 }
+
+MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
+MARKDOWN_LINK_PATTERN = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
+URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 
 def read_text(path: Path) -> str:
@@ -156,6 +177,26 @@ def tracked_artifacts() -> list[str]:
     return offenders
 
 
+def stale_var_scan_files() -> list[Path]:
+    files: list[Path] = [
+        ENV_EXAMPLE,
+        REPO_ROOT / "README.md",
+    ]
+    files.extend(sorted(REPO_ROOT.glob("docker-compose*.yml")))
+    files.extend(sorted((REPO_ROOT / "config-templates").rglob("*")))
+    files.extend(sorted((REPO_ROOT / "docs").rglob("*.md")))
+
+    unique_files: list[Path] = []
+    seen: set[Path] = set()
+    for path in files:
+        if not path.is_file() or path in seen:
+            continue
+        seen.add(path)
+        unique_files.append(path)
+
+    return unique_files
+
+
 def find_forbidden_terms() -> list[str]:
     errors: list[str] = []
     for term, roots in FORBIDDEN_DOC_TERMS.items():
@@ -166,6 +207,21 @@ def find_forbidden_terms() -> list[str]:
                 text = read_text(path)
                 if pattern.search(text):
                     errors.append(f"stale term '{term}' found in {path.relative_to(REPO_ROOT)}")
+    return errors
+
+
+def find_stale_variable_references() -> list[str]:
+    errors: list[str] = []
+    for path in stale_var_scan_files():
+        try:
+            text = read_text(path)
+        except UnicodeDecodeError:
+            continue
+        for variable in sorted(STALE_ENV_VARS):
+            if variable in text:
+                errors.append(
+                    f"stale variable '{variable}' found in {path.relative_to(REPO_ROOT)}"
+                )
     return errors
 
 
@@ -190,6 +246,123 @@ def find_weak_secret_fallbacks() -> list[str]:
                     )
 
     return errors
+
+
+def markdown_files() -> list[Path]:
+    files = [REPO_ROOT / "README.md", REPO_ROOT / "scripts" / "README.md"]
+    docs_root = REPO_ROOT / "docs"
+    if docs_root.exists():
+        files.extend(sorted(docs_root.rglob("*.md")))
+    return [path for path in files if path.exists()]
+
+
+def markdown_anchor_slug(text: str) -> str:
+    slug = text.rstrip().lower()
+    slug = re.sub(r"[^\w\- ]", "", slug)
+    slug = slug.replace(" ", "-")
+    slug = re.sub(r"-{3,}", "--", slug)
+    slug = slug.rstrip("-")
+    return slug
+
+
+def markdown_anchors(path: Path) -> set[str]:
+    anchors: set[str] = set()
+    seen: dict[str, int] = {}
+
+    for match in MARKDOWN_HEADING_PATTERN.finditer(read_text(path)):
+        heading = match.group(2).strip()
+        base = markdown_anchor_slug(heading)
+        if not base:
+            continue
+
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        anchors.add(base if count == 0 else f"{base}-{count}")
+
+    return anchors
+
+
+def split_link_target(target: str) -> tuple[str, str]:
+    value = target.strip()
+    if value.startswith("<") and value.endswith(">"):
+        value = value[1:-1].strip()
+    path_part, anchor = (value.split("#", 1) + [""])[:2]
+    return path_part, anchor
+
+
+def is_external_target(target: str) -> bool:
+    if not target:
+        return False
+    return bool(
+        URI_SCHEME_PATTERN.match(target)
+        or target.startswith("//")
+        or target.startswith("mailto:")
+        or target.startswith("tel:")
+    )
+
+
+def validate_markdown_links() -> list[str]:
+    errors: list[str] = []
+    anchor_cache: dict[Path, set[str]] = {}
+
+    for path in markdown_files():
+        text = read_text(path)
+        for match in MARKDOWN_LINK_PATTERN.finditer(text):
+            target = match.group(1).strip()
+            if not target or is_external_target(target):
+                continue
+
+            path_part, anchor = split_link_target(target)
+            if not path_part:
+                resolved = path
+            else:
+                resolved = (path.parent / path_part).resolve()
+                if not resolved.exists():
+                    errors.append(
+                        f"broken markdown link in {path.relative_to(REPO_ROOT)} -> {target}"
+                    )
+                    continue
+
+            if anchor:
+                if resolved.suffix.lower() != ".md":
+                    errors.append(
+                        f"markdown anchor target is not a markdown file in "
+                        f"{path.relative_to(REPO_ROOT)} -> {target}"
+                    )
+                    continue
+
+                anchors = anchor_cache.setdefault(resolved, markdown_anchors(resolved))
+                if anchor not in anchors:
+                    errors.append(
+                        f"missing markdown anchor in {path.relative_to(REPO_ROOT)} -> {target}"
+                    )
+
+    return errors
+
+
+def validate_docmost_bundle() -> list[str]:
+    command = [sys.executable, str(REPO_ROOT / "scripts" / "build-docmost-space.py"), "--check"]
+    try:
+        subprocess.check_output(
+            command,
+            cwd=REPO_ROOT,
+            text=True,
+            stderr=subprocess.STDOUT,
+        )
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.output or "").strip()
+        if not detail:
+            return ["docmost bundle check failed"]
+        cleaned: list[str] = []
+        for line in detail.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped == "docmost bundle check failed:":
+                continue
+            if stripped.startswith("- "):
+                stripped = stripped[2:]
+            cleaned.append(f"docmost bundle: {stripped}")
+        return cleaned or ["docmost bundle check failed"]
+    return []
 
 
 def validate_service_defaults(services: dict[str, dict]) -> list[str]:
@@ -230,12 +403,12 @@ def validate_service_defaults(services: dict[str, dict]) -> list[str]:
     return errors
 
 
-def validate_required_secret_vars() -> list[str]:
+def validate_required_env_vars() -> list[str]:
     declared = declared_env_vars(ENV_EXAMPLE)
-    missing = sorted(REQUIRED_SECRET_VARS - declared)
+    missing = sorted((REQUIRED_SECRET_VARS | REQUIRED_CONFIG_VARS) - declared)
     if not missing:
         return []
-    return [".env.example missing required secret vars: " + ", ".join(missing)]
+    return [".env.example missing required vars: " + ", ".join(missing)]
 
 
 def main() -> int:
@@ -284,8 +457,11 @@ def main() -> int:
         errors.append("tracked local artifacts:\n  - " + "\n  - ".join(offenders[:20]))
 
     errors.extend(find_forbidden_terms())
+    errors.extend(find_stale_variable_references())
     errors.extend(find_weak_secret_fallbacks())
-    errors.extend(validate_required_secret_vars())
+    errors.extend(validate_markdown_links())
+    errors.extend(validate_docmost_bundle())
+    errors.extend(validate_required_env_vars())
     if compose_loaded:
         errors.extend(validate_service_defaults(services))
 

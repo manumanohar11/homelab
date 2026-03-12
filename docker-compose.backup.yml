@@ -121,14 +121,30 @@ services:
       DB02_PASS: "${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}"
       DB02_BACKUP_INTERVAL: 1440
       DB02_BACKUP_BEGIN: "0315"
+      # Paperless PostgreSQL
+      DB03_TYPE: pgsql
+      DB03_HOST: paperless-db
+      DB03_NAME: ${PAPERLESS_DB_NAME:-paperless}
+      DB03_USER: ${PAPERLESS_DB_USER:-paperless}
+      DB03_PASS: "${PAPERLESS_DB_PASSWORD:?set PAPERLESS_DB_PASSWORD in .env}"
+      DB03_BACKUP_INTERVAL: 1440
+      DB03_BACKUP_BEGIN: "0330"
+      # Docmost PostgreSQL
+      DB04_TYPE: pgsql
+      DB04_HOST: docmost-db
+      DB04_NAME: ${DOCMOST_DB_NAME:-docmost}
+      DB04_USER: ${DOCMOST_DB_USER:-docmost}
+      DB04_PASS: "${DOCMOST_DB_PASSWORD:?set DOCMOST_DB_PASSWORD in .env}"
+      DB04_BACKUP_INTERVAL: 1440
+      DB04_BACKUP_BEGIN: "0345"
       # Bitmagnet PostgreSQL (when downloaders enabled)
-      # DB03_TYPE: pgsql
-      # DB03_HOST: bitmagnet-postgres
-      # DB03_NAME: bitmagnet
-      # DB03_USER: postgres
-      # DB03_PASS: ${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}
-      # DB03_BACKUP_INTERVAL: 1440
-      # DB03_BACKUP_BEGIN: "0330"
+      # DB05_TYPE: pgsql
+      # DB05_HOST: bitmagnet-postgres
+      # DB05_NAME: bitmagnet
+      # DB05_USER: postgres
+      # DB05_PASS: ${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}
+      # DB05_BACKUP_INTERVAL: 1440
+      # DB05_BACKUP_BEGIN: "0400"
     volumes:
       - ${DOCKER_BASE_DIR}/db-backup:/backup
     networks:
@@ -137,6 +153,10 @@ services:
       database:
         condition: service_healthy
       joplin-postgres:
+        condition: service_healthy
+      paperless-db:
+        condition: service_healthy
+      docmost-db:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f db-backup || exit 1"]

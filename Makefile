@@ -1,4 +1,4 @@
-.PHONY: help init-env up down pull restart logs ps config validate check sync-config
+.PHONY: help init-env up down pull restart logs ps config validate check sync-config docs-build
 
 PROFILES ?=
 SERVICE ?=
@@ -16,6 +16,7 @@ help:
 		'  make logs SERVICE=plex TAIL=200' \
 		'  make ps' \
 		'  make config PROFILES="arr monitoring"' \
+		'  make docs-build' \
 		'  make validate' \
 		'  make check' \
 		'  make sync-config'
@@ -50,6 +51,9 @@ validate:
 check:
 	./scripts/sync-monitoring-config.sh --check
 	python3 scripts/validate-stack.py
+
+docs-build:
+	python3 scripts/build-docmost-space.py
 
 sync-config:
 	./scripts/sync-monitoring-config.sh

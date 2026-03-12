@@ -47,10 +47,12 @@ services:
     image: lscr.io/linuxserver/plex:latest
     container_name: plex
     init: false
+    network_mode: host
     environment:
       <<: *common-env
       VERSION: docker
       PLEX_CLAIM: ${PLEX_CLAIM:-}
+      ADVERTISE_IP: ${PLEX_ADVERTISE_IP:-}
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
     volumes:
@@ -58,17 +60,6 @@ services:
       - ${DOCKER_MEDIA_DIR}:/data
       # Set Plex's Transcoder temporary directory to /transcode in the Plex UI to keep temp I/O on faster storage.
       - ${PLEX_TRANSCODE_DIR:-${DOCKER_SSD_CONFIG_DIR}/plex-transcode}:/transcode
-    networks:
-      - media-stack
-    ports:
-      - "32400:32400"
-      - "8324:8324"
-      - "32469:32469"
-      - "1900:1900/udp"
-      - "32410:32410/udp"
-      - "32412:32412/udp"
-      - "32413:32413/udp"
-      - "32414:32414/udp"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
       interval: 1m
@@ -92,10 +83,10 @@ services:
       - "pangolin.public-resources.plex.protocol=http"
       - "pangolin.public-resources.plex.full-domain=${PLEX_SUBDOMAIN:-plex}.${DOMAIN_NAME:-localhost}"
       - "pangolin.public-resources.plex.auth.sso-enabled=true"
-      - "pangolin.public-resources.plex.targets[0].hostname=plex"
+      - "pangolin.public-resources.plex.targets[0].hostname=${LOCAL_LAN_IP}"
       - "pangolin.public-resources.plex.targets[0].method=http"
       - "pangolin.public-resources.plex.targets[0].port=32400"
-      - "pangolin.public-resources.plex.targets[0].healthcheck.hostname=plex"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.hostname=${LOCAL_LAN_IP}"
       - "pangolin.public-resources.plex.targets[0].healthcheck.port=32400"
       - "pangolin.public-resources.plex.targets[0].healthcheck.path=/identity"
       - "pangolin.public-resources.plex.targets[0].healthcheck.status=200"
