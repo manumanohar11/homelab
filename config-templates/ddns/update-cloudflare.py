@@ -17,13 +17,27 @@ from typing import Any
 
 
 API_BASE = "https://api.cloudflare.com/client/v4"
-COMMENT = "Managed by media-stack jitsi-ddns"
 REQUEST_TIMEOUT_SECONDS = 20
-STATUS_PATH = Path("/tmp/jitsi-ddns-status.json")
 TRACE_URL = "https://one.one.one.one/cdn-cgi/trace"
 UPDATE_INTERVAL_SECONDS = 300
-USER_AGENT = "media-stack-jitsi-ddns/1.0"
 STOP_EVENT = threading.Event()
+
+
+def env_required(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    raise RuntimeError(f"{name} is required")
+
+
+def env_optional(name: str, default: str) -> str:
+    value = os.getenv(name, "").strip()
+    return value or default
+
+
+COMMENT = env_optional("DDNS_COMMENT", "Managed by media-stack ddns")
+STATUS_PATH = Path(env_optional("DDNS_STATUS_PATH", "/tmp/ddns-status.json"))
+USER_AGENT = env_optional("DDNS_USER_AGENT", "media-stack-ddns/1.0")
 
 
 def log(message: str) -> None:
@@ -44,6 +58,7 @@ def load_status() -> dict[str, Any]:
 def write_status(**updates: Any) -> None:
     status = load_status()
     status.update(updates)
+    STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
     STATUS_PATH.write_text(
         json.dumps(status, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",
@@ -150,13 +165,6 @@ def ensure_record(token: str, zone_id: str, fqdn: str, ipv4_address: str) -> str
     return "updated"
 
 
-def env_required(name: str) -> str:
-    value = os.getenv(name, "").strip()
-    if value:
-        return value
-    raise RuntimeError(f"{name} is required")
-
-
 def handle_signal(signum: int, _frame: Any) -> None:
     log(f"received signal {signum}, stopping")
     STOP_EVENT.set()
@@ -184,8 +192,8 @@ def main() -> int:
 
     try:
         zone_name = env_required("DOMAIN_NAME")
-        fqdn = env_required("JITSI_MEDIA_PUBLIC_HOSTNAME")
-        token = env_required("JITSI_CLOUDFLARE_API_TOKEN")
+        fqdn = env_required("DDNS_HOSTNAME")
+        token = env_required("DDNS_API_TOKEN")
     except RuntimeError as exc:
         log(str(exc))
         return 1

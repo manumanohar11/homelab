@@ -3,6 +3,8 @@
 config.p2p = {
   ...(config.p2p || {}),
   enabled: true,
+  // Favor hardware-friendly mobile codecs for phones/tablets.
+  mobileCodecPreferenceOrder: ["H264", "VP8", "VP9", "AV1"],
 };
 
 config.webrtcIceUdpDisable = false;
@@ -17,6 +19,17 @@ config.constraints = {
 };
 
 config.maxFullResolutionParticipants = 2;
+
+// Prefer quality over aggressive client-side downshifting for 1:1 calls.
+config.videoQuality = {
+  ...(config.videoQuality || {}),
+  codecPreferenceOrder: ["AV1", "VP9", "VP8", "H264"],
+  mobileCodecPreferenceOrder: ["H264", "VP8", "VP9", "AV1"],
+  enableAdaptiveMode: false,
+};
+
+// For a 1:1 quality-first setup, send one strong stream instead of layers.
+config.disableSimulcast = true;
 
 config.lobby = {
   ...(config.lobby || {}),
