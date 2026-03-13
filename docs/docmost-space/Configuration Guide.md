@@ -77,31 +77,18 @@ include:
 | `automation.yml` | Workflow automation | n8n |
 | `files.yml` | File sharing | Nextcloud |
 
-`docker-compose.productivity.yml` is included in the default stack. Only Kasm inside that module is profile-gated.
-`docker-compose.documents.yml` is also included in the default stack, so Paperless-ngx, Stirling PDF, Karakeep, and Docmost come up with a normal `docker compose up -d`.
+In the current checked-in `docker-compose.yml`, the `arr`, `downloaders`, `requests`, `productivity`, `documents`, `files`, and `automation` includes are commented out. Uncomment those include lines locally before trying to use those modules.
 
 ### Enable/Disable Modules
 
 The normal way to turn optional parts of the stack on is with profiles, not by editing `docker-compose.yml`.
 
 ```bash
-# *Arr apps plus downloader stack
-docker compose --profile arr up -d
-
-# Downloaders only
-docker compose --profile downloaders up -d
-
-# Nextcloud
-docker compose --profile files up -d
-
-# n8n
-docker compose --profile automation up -d
-
 # Jitsi Meet private calling
 docker compose --profile jitsi up -d
 
-# Documents and knowledge tools are part of the default stack
-docker compose up -d
+# Jellyfin stack
+docker compose --profile jellyfin up -d
 ```
 
 Comment an include line only if you want to permanently remove an entire module from your personal install.
@@ -133,20 +120,14 @@ docker compose up -d
 |:--------|:---------|:-------------|
 | `monitoring` | Glances | management.yml |
 | `dashboard` | Glance | management.yml |
-| `arr` | *Arr apps plus downloader stack | arr.yml, downloaders.yml |
-| `downloaders` | qBittorrent, Prowlarr, FlareSolverr, Bitmagnet | downloaders.yml |
 | `jellyfin` | Jellyfin, Jellyseerr | media-servers.yml, requests.yml |
 | `kavita` | Kavita | media-servers.yml |
 | `stash` | Stash | media-servers.yml |
 | `tdarr` | Tdarr | media-extras.yml |
-| `automation` | n8n | automation.yml |
 | `jitsi` | Jitsi Meet, Prosody, Jicofo, JVB, coturn, jitsi-ddns | communication.yml |
-| `requests` | Overseerr | requests.yml |
 | `maintainerr` | Maintainerr | media-extras.yml |
-| `notifiarr` | Notifiarr | requests.yml |
 | `restic` | Restic Server | backup.yml |
 | `db-backup` | DB Backup | backup.yml |
-| `files` | Nextcloud | files.yml |
 | `scrutiny` | Scrutiny | utilities.yml |
 | `speedtest` | Speedtest Tracker | utilities.yml |
 | `navidrome` | Navidrome | media-servers.yml |
@@ -158,22 +139,15 @@ docker compose up -d
 docker compose --profile monitoring --profile speedtest --profile scrutiny up -d
 ```
 
-**Full media automation:**
-```bash
-docker compose --profile arr --profile requests up -d
-```
-
-**Jellyfin with requests:**
+**Jellyfin stack:**
 ```bash
 docker compose --profile jellyfin up -d
 ```
 
 **Optional apps:**
 ```bash
-docker compose --profile automation --profile files --profile jitsi up -d
+docker compose --profile jitsi --profile speedtest --profile scrutiny up -d
 ```
-
-Documents and knowledge apps are included in the default `docker compose up -d` startup path.
 
 ---
 

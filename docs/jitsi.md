@@ -55,7 +55,7 @@ Do not create Pangolin raw resources, Gerbil mappings, or Traefik UDP/TCP entryp
 - Tracked runtime templates:
   - `config-templates/jitsi/web/custom-config.js`
   - `config-templates/jitsi/jvb/bootstrap.sh`
-  - `config-templates/jitsi/ddns/update-cloudflare.py`
+  - `config-templates/ddns/update-cloudflare.py`
   - `config-templates/coturn/bootstrap.sh`
   - `config-templates/coturn/turnserver.conf`
 

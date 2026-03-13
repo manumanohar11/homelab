@@ -424,6 +424,7 @@ If you must expose ports directly:
 |:--------|:-----------------|
 | Plex | 32400/tcp |
 | Jellyfin | 8096/tcp |
+| Jitsi Meet | `10000/udp`, `3478/tcp`, `3478/udp`, `20000-20100/udp` |
 
 ---
 

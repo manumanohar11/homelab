@@ -200,13 +200,16 @@ services:
     environment:
       TZ: ${TZ}
       DOMAIN_NAME: ${DOMAIN_NAME}
-      JITSI_MEDIA_PUBLIC_HOSTNAME: ${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}
-      JITSI_CLOUDFLARE_API_TOKEN: ${JITSI_CLOUDFLARE_API_TOKEN:-}
+      DDNS_HOSTNAME: ${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}
+      DDNS_API_TOKEN: ${JITSI_CLOUDFLARE_API_TOKEN:-}
+      DDNS_COMMENT: Managed by media-stack jitsi-ddns
+      DDNS_STATUS_PATH: /tmp/jitsi-ddns-status.json
+      DDNS_USER_AGENT: media-stack-jitsi-ddns/1.0
     command:
       - python3
-      - /opt/jitsi-ddns/update-cloudflare.py
+      - /opt/ddns/update-cloudflare.py
     volumes:
-      - ${DOCKER_GIT_CONFIG_DIR}/jitsi/ddns/update-cloudflare.py:/opt/jitsi-ddns/update-cloudflare.py:ro
+      - ${DOCKER_GIT_CONFIG_DIR}/ddns/update-cloudflare.py:/opt/ddns/update-cloudflare.py:ro
     user: "${PUID}:${PGID}"
     networks:
       - media-stack
