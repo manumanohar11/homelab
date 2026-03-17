@@ -1,0 +1,472 @@
+# /mnt/g/docker/docker-compose.ops.yml
+# Optional ops bundle: monitoring, logging, diagnostics, and advanced backups.
+services:
+  glances:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: nicolargo/glances:latest-full
+    container_name: glances
+    environment:
+      GLANCES_OPT: -w
+      TZ: ${TZ}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+    - ${DOCKER_BASE_DIR}/glances:/glances/conf
+    networks:
+    - media-stack
+    ports:
+    - 61208:61208
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:61208/api/4/cpu
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    pid: host
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.glances.name=Glances
+    - pangolin.public-resources.glances.protocol=http
+    - pangolin.public-resources.glances.full-domain=${GLANCES_SUBDOMAIN:-glances}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.glances.auth.sso-enabled=true
+    - pangolin.public-resources.glances.targets[0].hostname=glances
+    - pangolin.public-resources.glances.targets[0].method=http
+    - pangolin.public-resources.glances.targets[0].port=61208
+    - pangolin.public-resources.glances.targets[0].healthcheck.hostname=glances
+    - pangolin.public-resources.glances.targets[0].healthcheck.port=61208
+    - pangolin.public-resources.glances.targets[0].healthcheck.path=/api/4/cpu
+    - pangolin.public-resources.glances.targets[0].healthcheck.status=200
+    profiles:
+    - monitoring
+  glance-homepage:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: glanceapp/glance:latest
+    container_name: glance-homepage
+    environment:
+      GLANCE_UID: ${PUID}
+      GLANCE_GID: ${PGID}
+      TZ: ${TZ}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+    - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/config:/app/config
+    - ${DOCKER_GIT_CONFIG_DIR}/glance-homepage/assets:/app/assets
+    networks:
+    - media-stack
+    ports:
+    - 8088:8080
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:8080
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.glance.name=Glance
+    - pangolin.public-resources.glance.protocol=http
+    - pangolin.public-resources.glance.full-domain=${GLANCE_SUBDOMAIN:-glance}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.glance.auth.sso-enabled=true
+    - pangolin.public-resources.glance.targets[0].hostname=glance-homepage
+    - pangolin.public-resources.glance.targets[0].method=http
+    - pangolin.public-resources.glance.targets[0].port=8080
+    - pangolin.public-resources.glance.targets[0].healthcheck.hostname=glance-homepage
+    - pangolin.public-resources.glance.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.glance.targets[0].healthcheck.path=/
+    - pangolin.public-resources.glance.targets[0].healthcheck.status=200
+    profiles:
+    - dashboard
+  prometheus:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+    - ${DOCKER_BASE_DIR}/prometheus/config:/etc/prometheus
+    - ${DOCKER_BASE_DIR}/prometheus/data:/prometheus
+    networks:
+    - media-stack
+    ports:
+    - 9090:9090
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:9090/-/healthy
+    extra_hosts:
+    - host.docker.internal:host-gateway
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=30d
+    - --web.console.libraries=/usr/share/prometheus/console_libraries
+    - --web.console.templates=/usr/share/prometheus/consoles
+    - --web.enable-lifecycle
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.prometheus.name=Prometheus
+    - pangolin.public-resources.prometheus.protocol=http
+    - pangolin.public-resources.prometheus.full-domain=${PROMETHEUS_SUBDOMAIN:-prometheus}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.prometheus.auth.sso-enabled=true
+    - pangolin.public-resources.prometheus.targets[0].hostname=prometheus
+    - pangolin.public-resources.prometheus.targets[0].method=http
+    - pangolin.public-resources.prometheus.targets[0].port=9090
+    - pangolin.public-resources.prometheus.targets[0].healthcheck.hostname=prometheus
+    - pangolin.public-resources.prometheus.targets[0].healthcheck.port=9090
+    - pangolin.public-resources.prometheus.targets[0].healthcheck.path=/-/healthy
+    - pangolin.public-resources.prometheus.targets[0].healthcheck.status=200
+  alertmanager:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+    - ${DOCKER_BASE_DIR}/alertmanager/config:/etc/alertmanager
+    - ${DOCKER_BASE_DIR}/alertmanager/data:/alertmanager
+    networks:
+    - media-stack
+    ports:
+    - 9093:9093
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:9093/-/healthy
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    command:
+    - --config.file=/etc/alertmanager/alertmanager.yml
+    - --storage.path=/alertmanager
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.alertmanager.name=Alertmanager
+    - pangolin.public-resources.alertmanager.protocol=http
+    - pangolin.public-resources.alertmanager.full-domain=${ALERTMANAGER_SUBDOMAIN:-alertmanager}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.alertmanager.auth.sso-enabled=true
+    - pangolin.public-resources.alertmanager.targets[0].hostname=alertmanager
+    - pangolin.public-resources.alertmanager.targets[0].method=http
+    - pangolin.public-resources.alertmanager.targets[0].port=9093
+    - pangolin.public-resources.alertmanager.targets[0].healthcheck.hostname=alertmanager
+    - pangolin.public-resources.alertmanager.targets[0].healthcheck.port=9093
+    - pangolin.public-resources.alertmanager.targets[0].healthcheck.path=/-/healthy
+    - pangolin.public-resources.alertmanager.targets[0].healthcheck.status=200
+  grafana:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel,grafana-clock-panel
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN_NAME:-localhost}}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+    - ${DOCKER_BASE_DIR}/grafana/data:/var/lib/grafana
+    - ${DOCKER_BASE_DIR}/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+    - media-stack
+    ports:
+    - 3000:3000
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:3000/api/health
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.grafana.name=Grafana
+    - pangolin.public-resources.grafana.protocol=http
+    - pangolin.public-resources.grafana.full-domain=${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.grafana.auth.sso-enabled=true
+    - pangolin.public-resources.grafana.targets[0].hostname=grafana
+    - pangolin.public-resources.grafana.targets[0].method=http
+    - pangolin.public-resources.grafana.targets[0].port=3000
+    - pangolin.public-resources.grafana.targets[0].healthcheck.hostname=grafana
+    - pangolin.public-resources.grafana.targets[0].healthcheck.port=3000
+    - pangolin.public-resources.grafana.targets[0].healthcheck.path=/api/health
+    - pangolin.public-resources.grafana.targets[0].healthcheck.status=200
+  node-exporter:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    volumes:
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
+    networks:
+    - media-stack
+    ports:
+    - 9100:9100
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:9100/metrics
+    command:
+    - --path.procfs=/host/proc
+    - --path.sysfs=/host/sys
+    - --path.rootfs=/rootfs
+    - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+  uptime-kuma:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    environment:
+      TZ: ${TZ}
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    volumes:
+    - ${DOCKER_BASE_DIR}/uptime-kuma:/app/data
+    networks:
+    - media-stack
+    ports:
+    - 3001:3001
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - /app/extra/healthcheck.js
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.uptime-kuma.name=Uptime Kuma
+    - pangolin.public-resources.uptime-kuma.protocol=http
+    - pangolin.public-resources.uptime-kuma.full-domain=${UPTIME_KUMA_SUBDOMAIN:-uptime}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.uptime-kuma.auth.sso-enabled=true
+    - pangolin.public-resources.uptime-kuma.targets[0].hostname=uptime-kuma
+    - pangolin.public-resources.uptime-kuma.targets[0].method=http
+    - pangolin.public-resources.uptime-kuma.targets[0].port=3001
+    - pangolin.public-resources.uptime-kuma.targets[0].healthcheck.hostname=uptime-kuma
+    - pangolin.public-resources.uptime-kuma.targets[0].healthcheck.port=3001
+    - pangolin.public-resources.uptime-kuma.targets[0].healthcheck.path=/
+    - pangolin.public-resources.uptime-kuma.targets[0].healthcheck.status=200
+  loki:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: grafana/loki:latest
+    container_name: loki
+    volumes:
+    - ${DOCKER_BASE_DIR}/loki/config:/etc/loki
+    - ${DOCKER_BASE_DIR}/loki/data:/loki
+    networks:
+    - media-stack
+    ports:
+    - 3100:3100
+    healthcheck:
+      test:
+      - CMD
+      - loki
+      - -version
+    command: -config.file=/etc/loki/local-config.yaml
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Monitoring
+    - homepage.name=Loki
+    - homepage.icon=loki
+    - homepage.description=Log Aggregation
+  promtail:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+    - ${DOCKER_BASE_DIR}/promtail/config:/etc/promtail
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+    - media-stack
+    healthcheck:
+      start_period: 10s
+      test:
+      - CMD-SHELL
+      - cat /proc/1/status || exit 1
+    depends_on:
+      loki:
+        condition: service_started
+    command: -config.file=/etc/promtail/config.yml
+    labels:
+    - homepage.group=Monitoring
+    - homepage.name=Promtail
+    - homepage.description=Log Collector
+  speedtest-tracker:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-medium
+    image: lscr.io/linuxserver/speedtest-tracker:latest
+    container_name: speedtest-tracker
+    environment:
+      DB_CONNECTION: sqlite
+      SPEEDTEST_SCHEDULE: 0 */4 * * *
+      PRUNE_RESULTS_OLDER_THAN: 365
+    volumes:
+    - ${DOCKER_BASE_DIR}/speedtest-tracker:/config
+    networks:
+    - media-stack
+    ports:
+    - 8765:80
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:80/api/healthcheck
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - pangolin.public-resources.speedtest-tracker.name=Speedtest Tracker
+    - pangolin.public-resources.speedtest-tracker.protocol=http
+    - pangolin.public-resources.speedtest-tracker.full-domain=${SPEEDTEST_SUBDOMAIN:-speedtest}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.speedtest-tracker.auth.sso-enabled=true
+    - pangolin.public-resources.speedtest-tracker.targets[0].hostname=speedtest-tracker
+    - pangolin.public-resources.speedtest-tracker.targets[0].method=http
+    - pangolin.public-resources.speedtest-tracker.targets[0].port=80
+    - pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.hostname=speedtest-tracker
+    - pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.port=80
+    - pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.path=/api/healthcheck
+    - pangolin.public-resources.speedtest-tracker.targets[0].healthcheck.status=200
+    profiles:
+    - speedtest
+  scrutiny:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: ghcr.io/analogj/scrutiny:master-omnibus
+    container_name: scrutiny
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - ${DOCKER_BASE_DIR}/scrutiny:/opt/scrutiny/config
+    - ${DOCKER_BASE_DIR}/scrutiny/influxdb:/opt/scrutiny/influxdb
+    - /run/udev:/run/udev:ro
+    networks:
+    - media-stack
+    ports:
+    - 8082:8080
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080/api/health
+      interval: 1m
+    cap_add:
+    - SYS_RAWIO
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.scrutiny.name=Scrutiny
+    - pangolin.public-resources.scrutiny.protocol=http
+    - pangolin.public-resources.scrutiny.full-domain=${SCRUTINY_SUBDOMAIN:-scrutiny}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.scrutiny.auth.sso-enabled=true
+    - pangolin.public-resources.scrutiny.targets[0].hostname=scrutiny
+    - pangolin.public-resources.scrutiny.targets[0].method=http
+    - pangolin.public-resources.scrutiny.targets[0].port=8080
+    - pangolin.public-resources.scrutiny.targets[0].healthcheck.hostname=scrutiny
+    - pangolin.public-resources.scrutiny.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.scrutiny.targets[0].healthcheck.path=/api/health
+    - pangolin.public-resources.scrutiny.targets[0].healthcheck.status=200
+    profiles:
+    - scrutiny
+  restic-rest-server:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: restic/rest-server:latest
+    container_name: restic-rest-server
+    environment:
+      OPTIONS: --prometheus --prometheus-no-auth
+      DISABLE_AUTHENTICATION: 'false'
+    volumes:
+    - ${DOCKER_BASE_DIR}/restic-server/data:/data
+    - ${DOCKER_BASE_DIR}/restic-server/.htpasswd:/data/.htpasswd:ro
+    networks:
+    - media-stack
+    ports:
+    - 8000:8000
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:8000
+    profiles:
+    - restic
+  db-backup:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: tiredofit/db-backup:latest
+    container_name: db-backup
+    environment:
+      TIMEZONE: ${TZ}
+      CONTAINER_ENABLE_MONITORING: 'false'
+      DEFAULT_CHECKSUM: SHA1
+      DEFAULT_COMPRESSION: ZSTD
+      DEFAULT_BACKUP_INTERVAL: 1440
+      DEFAULT_BACKUP_BEGIN: '0300'
+      DEFAULT_CLEANUP_TIME: 8640
+      DB01_TYPE: pgsql
+      DB01_HOST: immich_postgres
+      DB01_NAME: ${DB_DATABASE_NAME:-immich}
+      DB01_USER: ${DB_USERNAME:-postgres}
+      DB01_PASS: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      DB01_BACKUP_INTERVAL: 1440
+      DB01_BACKUP_BEGIN: '0300'
+    volumes:
+    - ${DOCKER_BASE_DIR}/db-backup:/backup
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pgrep -f db-backup || exit 1
+      interval: 1m
+    depends_on:
+      database:
+        condition: service_healthy
+    profiles:
+    - db-backup

@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "docs" / "docmost-space"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "build" / "docmost-space"
 INLINE_LINK_PATTERN = re.compile(r"(?P<prefix>!?)\[(?P<label>[^\]]+)\]\((?P<target>[^)]+)\)")
 BACK_LINK_PATTERN = re.compile(
     r"^\[← Back to README\]\((?:\.\./README\.md|Home\.md)\)\s*$",
@@ -65,8 +65,8 @@ def bundle_documents() -> list[SourceDocument]:
         )
     ]
 
-    for path in sorted((REPO_ROOT / "docs").glob("*.md")):
-        if path.parent.name == "docmost-space":
+    for path in sorted((REPO_ROOT / "docs").rglob("*.md")):
+        if "docmost-space" in path.parts:
             continue
         title = heading_title(path)
         documents.append(

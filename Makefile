@@ -1,55 +1,62 @@
-.PHONY: help init-env up down pull restart logs ps config validate check sync-config docs-build
+.PHONY: help init init-env up down pull restart logs ps config validate check sync-config docs-build
 
+BUNDLES ?=
 PROFILES ?=
 SERVICE ?=
 TAIL ?= 200
+
+BUNDLE_ARGS := -f docker-compose.yml $(foreach bundle,$(BUNDLES),-f docker-compose.$(bundle).yml)
 PROFILE_ARGS := $(foreach profile,$(PROFILES),--profile $(profile))
+INIT_BUNDLE_ARGS := $(foreach bundle,$(BUNDLES),--bundle $(bundle))
 
 help:
 	@printf '%s\n' \
-		'Common targets:' \
-		'  make up PROFILES="arr monitoring" SERVICE=plex' \
-		'  make init-env' \
-		'  make down' \
-		'  make pull SERVICE=plex' \
-		'  make restart SERVICE=plex' \
-		'  make logs SERVICE=plex TAIL=200' \
-		'  make ps' \
-		'  make config PROFILES="arr monitoring"' \
-		'  make docs-build' \
+		'Starter path:' \
+		'  make init' \
+		'  docker compose up -d' \
+		'' \
+		'Bundle-aware commands:' \
+		'  make init BUNDLES="media apps"' \
+		'  make up BUNDLES="media" PROFILES="arr jellyfin"' \
+		'  make config BUNDLES="ops" PROFILES="monitoring"' \
+		'  make pull BUNDLES="access" PROFILES="jitsi"' \
+		'' \
+		'Maintainer commands:' \
 		'  make validate' \
 		'  make check' \
+		'  make docs-build' \
 		'  make sync-config'
 
-init-env:
-	python3 scripts/init-env.py
+init:
+	python3 scripts/init-env.py $(INIT_BUNDLE_ARGS)
+
+init-env: init
 
 up:
-	docker compose $(PROFILE_ARGS) up -d $(SERVICE)
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) up -d $(SERVICE)
 
 down:
-	docker compose down
+	docker compose $(BUNDLE_ARGS) down
 
 pull:
-	docker compose $(PROFILE_ARGS) pull $(SERVICE)
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) pull $(SERVICE)
 
 restart:
-	docker compose restart $(SERVICE)
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) restart $(SERVICE)
 
 logs:
-	docker compose logs -f --tail=$(TAIL) $(SERVICE)
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) logs -f --tail=$(TAIL) $(SERVICE)
 
 ps:
-	docker compose ps
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) ps
 
 config:
-	docker compose $(PROFILE_ARGS) config
+	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) config
 
 validate:
 	python3 scripts/validate-stack.py
 
 check:
-	./scripts/sync-monitoring-config.sh --check
 	python3 scripts/validate-stack.py
 
 docs-build:

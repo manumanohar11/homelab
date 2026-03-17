@@ -11,14 +11,14 @@ Simple backup guidance for this homelab.
 This repo now treats backups in three layers:
 
 - `Duplicati` is the main backup tool and is enabled by default
-- `db-backup` is an optional PostgreSQL dump worker for Immich, Joplin, Paperless, and Docmost
+- `db-backup` is an optional PostgreSQL dump worker for the starter Immich database
 - `restic-rest-server` is an optional advanced endpoint, not the default workflow
 
 For a beginner setup, the easiest mental model is:
 
 1. Duplicati backs up `${DOCKER_BASE_DIR}`
 2. `db-backup` writes SQL dumps into `${DOCKER_BASE_DIR}/db-backup`
-3. That means Immich, Joplin, Paperless, and Docmost database dumps are automatically included in your main Duplicati backups once the `db-backup` profile is enabled
+3. That means Immich database dumps are automatically included in your main Duplicati backups once the `db-backup` profile is enabled
 
 ---
 
@@ -87,12 +87,12 @@ DUPLICATI_ENCRYPTION_KEY=your_generated_key
 Enable SQL dumps with:
 
 ```bash
-docker compose --profile db-backup up -d
+make up BUNDLES="ops" PROFILES="db-backup"
 ```
 
 What it does:
 
-- connects to the Immich, Joplin, Paperless, and Docmost PostgreSQL services
+- connects to the starter Immich PostgreSQL service
 - creates compressed dumps on a schedule
 - stores them in `${DOCKER_BASE_DIR}/db-backup`
 
@@ -104,18 +104,17 @@ That output is already inside the main Duplicati source tree.
 docker compose ps db-backup
 docker compose logs db-backup --tail 50
 ls -la ${DOCKER_BASE_DIR}/db-backup
-find ${DOCKER_BASE_DIR}/db-backup -maxdepth 2 -type f | grep -E 'immich|joplin'
-find ${DOCKER_BASE_DIR}/db-backup -maxdepth 2 -type f | grep -E 'paperless|docmost'
+find ${DOCKER_BASE_DIR}/db-backup -maxdepth 2 -type f | grep immich
 ```
 
 ---
 
 ## Restic Server
 
-The `restic` profile only starts a Restic repository server:
+The `restic` profile only starts a Restic repository server in the `ops` bundle:
 
 ```bash
-docker compose --profile restic up -d
+make up BUNDLES="ops" PROFILES="restic"
 ```
 
 This is for advanced setups where you already use Restic clients elsewhere. It is not required for the default backup workflow.
@@ -168,7 +167,7 @@ gunzip -c joplin_backup_YYYYMMDD.sql.gz | docker exec -i joplin-postgres psql -U
 
 - Duplicati opens at `http://your-server:8200`
 - one encrypted backup job exists for `/source/docker-configs` and `/source/project/.env`
-- `db-backup` is enabled if you want scheduled Immich, Joplin, Paperless, and Docmost PostgreSQL dumps
+- `db-backup` is enabled if you want scheduled Immich PostgreSQL dumps
 - `${BACKUP_DESTINATION}` has enough free space
 - media files follow a separate backup plan
 

@@ -1,15 +1,8 @@
-# ~/media-stack/docker-compose.yml
-# This is the main file to run the entire stack.
-# Command: docker compose up -d
-#
-# Most optional services are controlled with profiles.
-# Comment include lines only if you want to remove a whole module locally.
-# Use profiles to enable optional services within modules:
-#   docker compose --profile vpn --profile monitoring up -d
+# /mnt/g/docker/docker-compose.yml
+# Starter stack: the beginner-friendly default that works with `docker compose up -d`.
 
 name: media-stack
 
-# --- Global Network Definition ---
 networks:
   media-stack:
     driver: bridge
@@ -17,57 +10,438 @@ networks:
       config:
         - subnet: 172.20.0.0/16
 
-# --- Include all the component files ---
-# The common file with anchors is included first.
-include:
-  # Core infrastructure
-  - docker-compose.common.yml
-  - docker-compose.core.yml
+services:
+  docker-socket-proxy:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-tiny
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: docker-socket-proxy
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      SERVICES: 1
+      TASKS: 1
+      INFO: 1
+      VERSION: 1
+      POST: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      GRPC: 0
+      NODES: 0
+      PLUGINS: 0
+      SECRETS: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:2375/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-  # Optional host-specific overrides
-  # - docker-compose.local.yml
+  plex:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      VERSION: docker
+      PLEX_CLAIM: ${PLEX_CLAIM:-}
+      ADVERTISE_IP: ${PLEX_ADVERTISE_IP:-}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+    volumes:
+      - ${DOCKER_SSD_CONFIG_DIR}/plex:/config
+      - ${DOCKER_MEDIA_DIR}:/data
+      - ${PLEX_TRANSCODE_DIR:-${DOCKER_SSD_CONFIG_DIR}/plex-transcode}:/transcode
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:32400/identity"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        reservations:
+          memory: 1G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.plex.name=Plex"
+      - "pangolin.public-resources.plex.protocol=http"
+      - "pangolin.public-resources.plex.full-domain=${PLEX_SUBDOMAIN:-plex}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.plex.auth.sso-enabled=true"
+      - "pangolin.public-resources.plex.targets[0].hostname=${LOCAL_LAN_IP}"
+      - "pangolin.public-resources.plex.targets[0].method=http"
+      - "pangolin.public-resources.plex.targets[0].port=32400"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.hostname=${LOCAL_LAN_IP}"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.port=32400"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.path=/identity"
+      - "pangolin.public-resources.plex.targets[0].healthcheck.status=200"
 
-  # Communication
-  - docker-compose.communication.yml
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:${IMMICH_VERSION:-release}
+    container_name: immich_server
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    extends:
+      file: hwaccel.transcoding.yml
+      service: nvenc
+    group_add:
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-109}"
+    environment:
+      IMMICH_MACHINE_LEARNING_URL: http://immich-machine-learning:3003
+    volumes:
+      - ${UPLOAD_LOCATION}:/data
+      - ${THUMB_LOCATION}:/data/thumbs
+      - ${ENCODED_VIDEO_LOCATION}:/data/encoded-video
+      - ${PROFILE_LOCATION}:/data/profile
+      - ${BACKUP_LOCATION}:/data/backups
+      - ${DOCKER_MEDIA_DIR}/Photos:/photos
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
+      - .env
+    networks:
+      - media-stack
+    ports:
+      - "2283:2283"
+    depends_on:
+      redis:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2283/api/server/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+        reservations:
+          memory: 1G
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.immich.name=Immich"
+      - "pangolin.public-resources.immich.protocol=http"
+      - "pangolin.public-resources.immich.full-domain=${IMMICH_SUBDOMAIN:-photos}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.immich.auth.sso-enabled=false"
+      - "pangolin.public-resources.immich.targets[0].hostname=immich-server"
+      - "pangolin.public-resources.immich.targets[0].method=http"
+      - "pangolin.public-resources.immich.targets[0].port=2283"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.hostname=immich-server"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.port=2283"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.path=/api/server/ping"
+      - "pangolin.public-resources.immich.targets[0].healthcheck.status=200"
 
-  # Media management
-  - docker-compose.photos.yml
-  - docker-compose.media-servers.yml
-  # - docker-compose.arr.yml
-  # - docker-compose.downloaders.yml
-  # - docker-compose.requests.yml
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_VERSION:-release}-cuda
+    container_name: immich_machine_learning
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    extends:
+      file: hwaccel.ml.yml
+      service: cuda
+    volumes:
+      - model-cache:/cache
+    env_file:
+      - .env
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3003/ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+        reservations:
+          memory: 2G
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
-  # Management & monitoring
-  - docker-compose.management.yml
-  # - docker-compose.monitoring.yml
-  # - docker-compose.logging.yml # Loki/Promtail stack
+  redis:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: docker.io/valkey/valkey:8-alpine@sha256:3c3ccc8571d4866ec5ac5ffb2519b6b6a1fdbf6b5ff5fdab075413026fbff273
+    container_name: immich_redis
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  # Productivity
-  # - docker-compose.productivity.yml
-  # - docker-compose.documents.yml
-  # - docker-compose.files.yml
-  # - docker-compose.automation.yml
+  database:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    container_name: immich_postgres
+    networks:
+      - media-stack
+    environment:
+      POSTGRES_PASSWORD: "${DB_PASSWORD:?set DB_PASSWORD in .env}"
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_DB: ${DB_DATABASE_NAME}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    shm_size: 128mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE_NAME:-immich}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          memory: 512M
 
-  # Backup
-  - docker-compose.backup.yml
+  homarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: ghcr.io/homarr-labs/homarr:latest
+    container_name: homarr
+    environment:
+      TZ: ${TZ}
+      SECRET_ENCRYPTION_KEY: ${HOMARR_SECRET_ENCRYPTION_KEY}
+      DOCKER_HOSTNAMES: docker-socket-proxy
+      DOCKER_PORTS: 2375
+    volumes:
+      - ${DOCKER_BASE_DIR}/homarr/appdata:/appdata
+    networks:
+      - media-stack
+    ports:
+      - "3002:7575"
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:7575/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.homepage.name=Homarr"
+      - "pangolin.public-resources.homepage.protocol=http"
+      - "pangolin.public-resources.homepage.full-domain=${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.homepage.auth.sso-enabled=true"
+      - "pangolin.public-resources.homepage.targets[0].hostname=homarr"
+      - "pangolin.public-resources.homepage.targets[0].method=http"
+      - "pangolin.public-resources.homepage.targets[0].port=7575"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.hostname=homarr"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.port=7575"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.homepage.targets[0].healthcheck.status=200"
 
-  # Utilities (Homarr, Speedtest, Scrutiny, Dozzle)
-  - docker-compose.utilities.yml
+  portainer:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${DOCKER_BASE_DIR}/portainer:/data
+    networks:
+      - media-stack
+    ports:
+      - "9443:9443"
+    healthcheck:
+      test: ["CMD", "/docker", "container", "top", "portainer"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.portainer.name=Portainer"
+      - "pangolin.public-resources.portainer.protocol=http"
+      - "pangolin.public-resources.portainer.full-domain=${PORTAINER_SUBDOMAIN:-portainer}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.portainer.auth.sso-enabled=true"
+      - "pangolin.public-resources.portainer.targets[0].hostname=portainer"
+      - "pangolin.public-resources.portainer.targets[0].method=https"
+      - "pangolin.public-resources.portainer.targets[0].port=9443"
 
-  # Media utilities (Tautulli, Maintainerr, Tdarr)
-  - docker-compose.media-extras.yml
+  watchtower:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: ${TZ}
+      DOCKER_API_VERSION: "1.44"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_SCHEDULE: "0 0 4 * * *"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_TIMEOUT: "30s"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_NOTIFICATIONS: ${WATCHTOWER_NOTIFICATIONS:-}
+      WATCHTOWER_NOTIFICATION_URL: ${WATCHTOWER_NOTIFICATION_URL:-}
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "/watchtower", "--health-check"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
 
-# --- Available Profiles ---
-# monitoring    - Glances system monitor
-# dashboard     - Glance alternative dashboard
-# jellyfin      - Jellyfin and Jellyseerr
-# kavita        - Kavita ebook/comic reader
-# stash         - Stash media organizer
-# tdarr         - Tdarr media transcoding
-# jitsi         - Jitsi Meet private video calling
-# restic        - Restic backup server
-# db-backup     - Database backup worker
-# scrutiny      - Scrutiny disk S.M.A.R.T monitoring
-# speedtest     - Speedtest Tracker internet speed history
-# maintainerr   - Maintainerr media cleanup (requires *arr stack)
-# navidrome     - Navidrome music streaming
+  dozzle:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-tiny
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    environment:
+      DOZZLE_LEVEL: info
+      DOZZLE_TAILSIZE: 300
+      DOZZLE_FILTER: "status=running"
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+    networks:
+      - media-stack
+    ports:
+      - "8889:8080"
+    depends_on:
+      docker-socket-proxy:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+      - "pangolin.public-resources.dozzle.name=Dozzle"
+      - "pangolin.public-resources.dozzle.protocol=http"
+      - "pangolin.public-resources.dozzle.full-domain=${DOZZLE_SUBDOMAIN:-dozzle}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.dozzle.auth.sso-enabled=true"
+      - "pangolin.public-resources.dozzle.targets[0].hostname=dozzle"
+      - "pangolin.public-resources.dozzle.targets[0].method=http"
+      - "pangolin.public-resources.dozzle.targets[0].port=8080"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.hostname=dozzle"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.port=8080"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.dozzle.targets[0].healthcheck.status=200"
+
+  duplicati:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/duplicati:latest
+    container_name: duplicati
+    environment:
+      PUID: ${PUID}
+      PGID: ${PGID}
+      TZ: ${TZ}
+      SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_ENCRYPTION_KEY}
+    volumes:
+      - ${DOCKER_BASE_DIR}/duplicati:/config
+      - ${DOCKER_BASE_DIR}:/source/docker-configs:ro
+      - ${DOCKER_PROJECT_DIR:-/opt/media-stack}/.env:/source/project/.env:ro
+      - ${BACKUP_DESTINATION:-/mnt/backup}:/backups
+    networks:
+      - media-stack
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+
+  tautulli:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-medium
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    volumes:
+      - ${DOCKER_BASE_DIR}/tautulli:/config
+    networks:
+      - media-stack
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.tautulli.name=Tautulli"
+      - "pangolin.public-resources.tautulli.protocol=http"
+      - "pangolin.public-resources.tautulli.full-domain=${TAUTULLI_SUBDOMAIN:-tautulli}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.tautulli.auth.sso-enabled=true"
+      - "pangolin.public-resources.tautulli.targets[0].hostname=tautulli"
+      - "pangolin.public-resources.tautulli.targets[0].method=http"
+      - "pangolin.public-resources.tautulli.targets[0].port=8181"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.hostname=tautulli"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.port=8181"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.path=/status"
+      - "pangolin.public-resources.tautulli.targets[0].healthcheck.status=200"
+
+volumes:
+  model-cache:

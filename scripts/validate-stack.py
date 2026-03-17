@@ -4,255 +4,267 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-COMPOSE_MAIN = REPO_ROOT / "docker-compose.yml"
-CONFIG_DOC = REPO_ROOT / "docs" / "configuration.md"
-ENV_EXAMPLE = REPO_ROOT / ".env.example"
-SECURITY_COMPOSE_FILES = [
-    path
-    for path in sorted(REPO_ROOT.glob("docker-compose*.yml"))
-    if path.name != "docker-compose.local.example.yml"
-]
+AGENT_GUIDANCE = REPO_ROOT / "AGENTS.md"
 
-COMPOSE_FILES = [
-    path
-    for path in sorted(REPO_ROOT.glob("docker-compose*.yml"))
-    if path.name not in {"docker-compose.common.yml", "docker-compose.local.example.yml"}
-]
+STARTER_COMPOSE = REPO_ROOT / "docker-compose.yml"
+BUNDLE_COMPOSES = {
+    "media": REPO_ROOT / "docker-compose.media.yml",
+    "apps": REPO_ROOT / "docker-compose.apps.yml",
+    "ops": REPO_ROOT / "docker-compose.ops.yml",
+    "access": REPO_ROOT / "docker-compose.access.yml",
+}
+COMMON_COMPOSE = REPO_ROOT / "docker-compose.common.yml"
+LOCAL_OVERRIDE = REPO_ROOT / "docker-compose.local.example.yml"
 
-FORBIDDEN_DOC_TERMS = {
-    "nettest": [REPO_ROOT / "README.md", REPO_ROOT / "docs"],
-    "cAdvisor": [REPO_ROOT / "docs"],
-    "IT-Tools": [REPO_ROOT / "docs"],
-    "SQLite Backup Service": [REPO_ROOT / "docs" / "backup.md"],
+STARTER_ENV = REPO_ROOT / ".env.example"
+STARTER_ENV_MAX_KEYS = 35
+BUNDLE_ENV_FILES = {
+    "media": REPO_ROOT / "env" / "bundles" / "media.env.example",
+    "apps": REPO_ROOT / "env" / "bundles" / "apps.env.example",
+    "ops": REPO_ROOT / "env" / "bundles" / "ops.env.example",
+    "access": REPO_ROOT / "env" / "bundles" / "access.env.example",
 }
 
-TRACKED_ARTIFACT_PATTERNS = [
-    r"^scripts/\.venv/",
-    r"^scripts/build/",
-    r"^scripts/dist/",
-    r"^scripts/\.playwright-mcp/",
-    r"^scripts/\.coverage$",
-]
+ADVANCED_DOCS = {
+    REPO_ROOT / "docs" / "advanced" / "architecture.md",
+    REPO_ROOT / "docs" / "advanced" / "monitoring.md",
+    REPO_ROOT / "docs" / "advanced" / "logging.md",
+    REPO_ROOT / "docs" / "advanced" / "jitsi.md",
+    REPO_ROOT / "docs" / "advanced" / "docmost.md",
+    REPO_ROOT / "docs" / "advanced" / "scripts.md",
+}
 
-REQUIRED_SECRET_VARS = {
-    "BITMAGNET_POSTGRES_PASSWORD",
+LEGACY_COMPOSE_FILES = {
+    REPO_ROOT / "docker-compose.arr.yml",
+    REPO_ROOT / "docker-compose.automation.yml",
+    REPO_ROOT / "docker-compose.backup.yml",
+    REPO_ROOT / "docker-compose.communication.yml",
+    REPO_ROOT / "docker-compose.core.yml",
+    REPO_ROOT / "docker-compose.documents.yml",
+    REPO_ROOT / "docker-compose.downloaders.yml",
+    REPO_ROOT / "docker-compose.files.yml",
+    REPO_ROOT / "docker-compose.logging.yml",
+    REPO_ROOT / "docker-compose.management.yml",
+    REPO_ROOT / "docker-compose.media-extras.yml",
+    REPO_ROOT / "docker-compose.media-servers.yml",
+    REPO_ROOT / "docker-compose.monitoring.yml",
+    REPO_ROOT / "docker-compose.photos.yml",
+    REPO_ROOT / "docker-compose.productivity.yml",
+    REPO_ROOT / "docker-compose.requests.yml",
+    REPO_ROOT / "docker-compose.utilities.yml",
+}
+
+LEGACY_DOCS = {
+    REPO_ROOT / "docs" / "architecture.md",
+    REPO_ROOT / "docs" / "monitoring.md",
+    REPO_ROOT / "docs" / "logging.md",
+    REPO_ROOT / "docs" / "jitsi.md",
+    REPO_ROOT / "docs" / "docmost.md",
+    REPO_ROOT / "docs" / "scripts.md",
+    REPO_ROOT / "docs" / "docmost-space",
+}
+
+STARTER_SECRETS = {
     "DB_PASSWORD",
-    "DOCMOST_APP_SECRET",
-    "DOCMOST_DB_PASSWORD",
-    "GRAFANA_ADMIN_PASSWORD",
-    "JITSI_AUTH_PASSWORD",
-    "JITSI_JICOFO_AUTH_PASSWORD",
-    "JITSI_JICOFO_COMPONENT_SECRET",
-    "JITSI_JVB_AUTH_PASSWORD",
-    "JITSI_TURN_CREDENTIALS",
-    "JOPLIN_DB_PASSWORD",
-    "KARAKEEP_MEILI_MASTER_KEY",
-    "KARAKEEP_NEXTAUTH_SECRET",
-    "PAPERLESS_DB_PASSWORD",
-    "PAPERLESS_SECRET_KEY",
+    "DUPLICATI_ENCRYPTION_KEY",
+    "HOMARR_SECRET_ENCRYPTION_KEY",
+}
+BUNDLE_SECRETS = {
+    "media": {"BITMAGNET_POSTGRES_PASSWORD"},
+    "apps": {
+        "JOPLIN_DB_PASSWORD",
+        "PAPERLESS_SECRET_KEY",
+        "PAPERLESS_DB_PASSWORD",
+        "KARAKEEP_NEXTAUTH_SECRET",
+        "KARAKEEP_MEILI_MASTER_KEY",
+        "DOCMOST_APP_SECRET",
+        "DOCMOST_DB_PASSWORD",
+    },
+    "ops": {"GRAFANA_ADMIN_PASSWORD"},
+    "access": {
+        "JITSI_JICOFO_COMPONENT_SECRET",
+        "JITSI_JICOFO_AUTH_PASSWORD",
+        "JITSI_JVB_AUTH_PASSWORD",
+        "JITSI_TURN_CREDENTIALS",
+    },
 }
 
-REQUIRED_CONFIG_VARS = {
-    "JITSI_CLOUDFLARE_API_TOKEN",
-    "JITSI_MEDIA_PUBLIC_HOSTNAME",
-    "JITSI_MEDIA_SUBDOMAIN",
-    "JITSI_TURN_MAX_PORT",
-    "JITSI_TURN_MIN_PORT",
+EXPECTED_STARTER_SERVICES = {
+    "database",
+    "docker-socket-proxy",
+    "dozzle",
+    "duplicati",
+    "homarr",
+    "immich-machine-learning",
+    "immich-server",
+    "plex",
+    "portainer",
+    "redis",
+    "tautulli",
+    "watchtower",
 }
 
-STALE_ENV_VARS = {
-    "JITSI_EDGE_PUBLIC_IP",
-}
+SCENARIOS = [
+    {
+        "name": "starter",
+        "bundles": [],
+        "profiles": [],
+        "expected_exact": EXPECTED_STARTER_SERVICES,
+    },
+    {
+        "name": "media",
+        "bundles": ["media"],
+        "profiles": ["arr", "jellyfin"],
+        "expected_contains": {"gluetun", "radarr", "qbittorrent", "overseerr", "jellyfin"},
+    },
+    {
+        "name": "apps",
+        "bundles": ["apps"],
+        "profiles": [],
+        "expected_contains": {"freshrss", "paperless-ngx", "docmost", "joplin", "karakeep"},
+    },
+    {
+        "name": "ops",
+        "bundles": ["ops"],
+        "profiles": ["monitoring"],
+        "expected_contains": {"prometheus", "grafana", "loki", "promtail", "glances"},
+    },
+    {
+        "name": "access",
+        "bundles": ["access"],
+        "profiles": ["jitsi"],
+        "expected_contains": {"newt", "jitsi-web", "jitsi-jvb", "coturn"},
+    },
+]
 
-WEAK_SECRET_FALLBACKS = {
-    "admin",
-    "bitmagnet_secret",
-    "change_me",
-}
+FULL_STACK_PROFILES = [
+    "arr",
+    "downloaders",
+    "requests",
+    "jellyfin",
+    "stash",
+    "kavita",
+    "navidrome",
+    "tdarr",
+    "maintainerr",
+    "notifiarr",
+    "files",
+    "automation",
+    "kasm",
+    "monitoring",
+    "dashboard",
+    "speedtest",
+    "scrutiny",
+    "restic",
+    "db-backup",
+    "jitsi",
+]
 
-MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
 MARKDOWN_LINK_PATTERN = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
 
 
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def extract_services(path: Path) -> list[str]:
-    services: list[str] = []
-    in_services = False
-
-    for line in read_text(path).splitlines():
-        if line.startswith("services:"):
-            in_services = True
-            continue
-
-        if in_services and re.match(r"^[A-Za-z0-9_-]+:", line):
-            break
-
-        match = re.match(r"^  ([A-Za-z0-9_.-]+):\s*$", line)
-        if in_services and match:
-            services.append(match.group(1))
-
-    return services
-
-
-def shell_lines(command: list[str]) -> list[str]:
+def shell(command: list[str], *, cwd: Path) -> str:
     try:
-        output = subprocess.check_output(
+        return subprocess.check_output(
             command,
-            cwd=REPO_ROOT,
+            cwd=cwd,
             text=True,
             stderr=subprocess.STDOUT,
         )
     except subprocess.CalledProcessError as exc:
         detail = (exc.output or "").strip()
         raise RuntimeError(detail or f"command failed: {' '.join(command)}") from exc
-    return [line.strip() for line in output.splitlines() if line.strip()]
 
 
-def compose_profiles() -> set[str]:
-    return set(shell_lines(["docker", "compose", "config", "--profiles"]))
+def assignment_key(line: str) -> str | None:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#") or "=" not in line:
+        return None
+    return line.split("=", 1)[0].strip()
 
 
-def compose_services() -> dict[str, dict]:
-    try:
-        output = subprocess.check_output(
-            ["docker", "compose", "config", "--format", "json"],
-            cwd=REPO_ROOT,
-            text=True,
-            stderr=subprocess.STDOUT,
+def env_keys(path: Path) -> set[str]:
+    return {
+        key
+        for key in (
+            assignment_key(line)
+            for line in read_text(path).splitlines()
         )
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.output or "").strip()
-        raise RuntimeError(detail or "docker compose config --format json failed") from exc
-    config = json.loads(output)
-    return config["services"]
+        if key is not None
+    }
 
 
-def documented_profiles_from_comments(path: Path) -> set[str]:
-    profiles: set[str] = set()
-    for line in read_text(path).splitlines():
-        match = re.match(r"^#\s+([a-z0-9-]+)\s+-", line)
-        if match:
-            profiles.add(match.group(1))
-    return profiles
+def merge_env_lines(paths: list[Path], secret_keys: set[str]) -> list[str]:
+    lines: list[str] = []
+    seen_keys: set[str] = set()
 
-
-def documented_profiles_from_markdown(path: Path) -> set[str]:
-    profiles: set[str] = set()
-    for line in read_text(path).splitlines():
-        match = re.match(r"^\| `([a-z0-9-]+)` \|", line)
-        if match:
-            profiles.add(match.group(1))
-    return profiles
-
-
-def declared_env_vars(path: Path) -> set[str]:
-    variables: set[str] = set()
-    for line in read_text(path).splitlines():
-        match = re.match(r"^([A-Z][A-Z0-9_]+)=", line)
-        if match:
-            variables.add(match.group(1))
-    return variables
-
-
-def tracked_artifacts() -> list[str]:
-    tracked = shell_lines(["git", "ls-files"])
-    offenders: list[str] = []
-    for item in tracked:
-        if not (REPO_ROOT / item).exists():
-            continue
-        for pattern in TRACKED_ARTIFACT_PATTERNS:
-            if re.match(pattern, item):
-                offenders.append(item)
-                break
-    return offenders
-
-
-def stale_var_scan_files() -> list[Path]:
-    files: list[Path] = [
-        ENV_EXAMPLE,
-        REPO_ROOT / "README.md",
-    ]
-    files.extend(sorted(REPO_ROOT.glob("docker-compose*.yml")))
-    files.extend(sorted((REPO_ROOT / "config-templates").rglob("*")))
-    files.extend(sorted((REPO_ROOT / "docs").rglob("*.md")))
-
-    unique_files: list[Path] = []
-    seen: set[Path] = set()
-    for path in files:
-        if not path.is_file() or path in seen:
-            continue
-        seen.add(path)
-        unique_files.append(path)
-
-    return unique_files
-
-
-def find_forbidden_terms() -> list[str]:
-    errors: list[str] = []
-    for term, roots in FORBIDDEN_DOC_TERMS.items():
-        pattern = re.compile(re.escape(term))
-        for root in roots:
-            paths = [root] if root.is_file() else sorted(root.rglob("*.md"))
-            for path in paths:
-                text = read_text(path)
-                if pattern.search(text):
-                    errors.append(f"stale term '{term}' found in {path.relative_to(REPO_ROOT)}")
-    return errors
-
-
-def find_stale_variable_references() -> list[str]:
-    errors: list[str] = []
-    for path in stale_var_scan_files():
-        try:
-            text = read_text(path)
-        except UnicodeDecodeError:
-            continue
-        for variable in sorted(STALE_ENV_VARS):
-            if variable in text:
-                errors.append(
-                    f"stale variable '{variable}' found in {path.relative_to(REPO_ROOT)}"
-                )
-    return errors
-
-
-def find_weak_secret_fallbacks() -> list[str]:
-    errors: list[str] = []
-    default_pattern = re.compile(r"\$\{[^}:]+:-([^}]+)\}")
-    secret_field_pattern = re.compile(r"(PASSWORD|SECRET|PASS)")
-
-    for path in SECURITY_COMPOSE_FILES:
-        for lineno, line in enumerate(read_text(path).splitlines(), start=1):
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
+    for path in paths:
+        for line in read_text(path).splitlines():
+            key = assignment_key(line)
+            if key is None:
+                lines.append(line)
                 continue
-            if not secret_field_pattern.search(stripped):
+            if key in seen_keys:
                 continue
+            seen_keys.add(key)
+            if key in secret_keys and line.split("=", 1)[1].strip() == "":
+                lines.append(f"{key}=validation-{key.lower()}")
+            else:
+                lines.append(line)
 
-            for match in default_pattern.finditer(stripped):
-                fallback = match.group(1)
-                if fallback in WEAK_SECRET_FALLBACKS:
-                    errors.append(
-                        f"weak secret fallback '{fallback}' found in {path.relative_to(REPO_ROOT)}:{lineno}"
-                    )
+    return lines
 
-    return errors
+
+def write_scenario_env(temp_repo: Path, bundles: list[str]) -> None:
+    secret_keys = set(STARTER_SECRETS)
+    for bundle in bundles:
+        secret_keys.update(BUNDLE_SECRETS[bundle])
+
+    paths = [STARTER_ENV] + [BUNDLE_ENV_FILES[bundle] for bundle in bundles]
+    content = "\n".join(merge_env_lines(paths, secret_keys)).rstrip() + "\n"
+    (temp_repo / ".env").write_text(content, encoding="utf-8")
+
+
+def compose_command(temp_repo: Path, bundles: list[str], profiles: list[str], *tail: str) -> list[str]:
+    command = ["docker", "compose", "-f", "docker-compose.yml"]
+    for bundle in bundles:
+        command.extend(["-f", f"docker-compose.{bundle}.yml"])
+    for profile in profiles:
+        command.extend(["--profile", profile])
+    command.extend(tail)
+    return command
+
+
+def compose_services(temp_repo: Path, bundles: list[str], profiles: list[str]) -> set[str]:
+    output = shell(compose_command(temp_repo, bundles, profiles, "config", "--services"), cwd=temp_repo)
+    return {line.strip() for line in output.splitlines() if line.strip()}
+
+
+def compose_json(temp_repo: Path, bundles: list[str], profiles: list[str]) -> dict:
+    output = shell(
+        compose_command(temp_repo, bundles, profiles, "config", "--format", "json"),
+        cwd=temp_repo,
+    )
+    return json.loads(output)
 
 
 def markdown_files() -> list[Path]:
     files = [REPO_ROOT / "README.md", REPO_ROOT / "scripts" / "README.md"]
-    docs_root = REPO_ROOT / "docs"
-    if docs_root.exists():
-        files.extend(sorted(docs_root.rglob("*.md")))
+    files.extend(sorted((REPO_ROOT / "docs").rglob("*.md")))
     return [path for path in files if path.exists()]
 
 
@@ -313,55 +325,247 @@ def validate_markdown_links() -> list[str]:
                 continue
 
             path_part, anchor = split_link_target(target)
-            if not path_part:
-                resolved = path
-            else:
-                resolved = (path.parent / path_part).resolve()
-                if not resolved.exists():
-                    errors.append(
-                        f"broken markdown link in {path.relative_to(REPO_ROOT)} -> {target}"
-                    )
-                    continue
+            resolved = path if not path_part else (path.parent / path_part).resolve()
+            if not resolved.exists():
+                errors.append(f"broken markdown link in {path.relative_to(REPO_ROOT)} -> {target}")
+                continue
 
             if anchor:
                 if resolved.suffix.lower() != ".md":
                     errors.append(
-                        f"markdown anchor target is not a markdown file in "
-                        f"{path.relative_to(REPO_ROOT)} -> {target}"
+                        f"markdown anchor target is not a markdown file in {path.relative_to(REPO_ROOT)} -> {target}"
                     )
                     continue
-
                 anchors = anchor_cache.setdefault(resolved, markdown_anchors(resolved))
                 if anchor not in anchors:
-                    errors.append(
-                        f"missing markdown anchor in {path.relative_to(REPO_ROOT)} -> {target}"
-                    )
+                    errors.append(f"missing markdown anchor in {path.relative_to(REPO_ROOT)} -> {target}")
+
+    return errors
+
+
+def validate_repo_layout() -> list[str]:
+    errors: list[str] = []
+
+    for path in [STARTER_COMPOSE, COMMON_COMPOSE, LOCAL_OVERRIDE, *BUNDLE_COMPOSES.values()]:
+        if not path.exists():
+            errors.append(f"missing required compose file: {path.relative_to(REPO_ROOT)}")
+
+    for path in LEGACY_COMPOSE_FILES:
+        if path.exists():
+            errors.append(f"legacy compose file still present: {path.relative_to(REPO_ROOT)}")
+
+    for path in ADVANCED_DOCS:
+        if not path.exists():
+            errors.append(f"missing advanced doc: {path.relative_to(REPO_ROOT)}")
+
+    for path in LEGACY_DOCS:
+        if path.exists():
+            errors.append(f"legacy doc path still present: {path.relative_to(REPO_ROOT)}")
+
+    return errors
+
+
+def validate_beginner_docs() -> list[str]:
+    errors: list[str] = []
+    beginner_docs = [REPO_ROOT / "README.md", REPO_ROOT / "docs" / "quickstart.md"]
+    banned_terms = [
+        "make init-env",
+        "scripts/validate-stack.py",
+        "scripts/build-docmost-space.py",
+        "scripts/homarr_seed.py",
+        "scripts/sync-monitoring-config.sh",
+        "comment include",
+        "docker-compose.core.yml",
+        "docker-compose.arr.yml",
+        "docker-compose.downloaders.yml",
+        "docker-compose.media-servers.yml",
+        "docker-compose.communication.yml",
+    ]
+
+    for path in beginner_docs:
+        text = read_text(path)
+        for term in banned_terms:
+            if term in text:
+                errors.append(f"beginner doc still references '{term}' in {path.relative_to(REPO_ROOT)}")
+
+    return errors
+
+
+def validate_agent_guidance() -> list[str]:
+    errors: list[str] = []
+    if not AGENT_GUIDANCE.exists():
+        return ["missing AGENTS.md"]
+
+    text = read_text(AGENT_GUIDANCE)
+    banned_terms = [
+        "docker-compose.core.yml",
+        "docker-compose.arr.yml",
+        "docker-compose.downloaders.yml",
+        "docker-compose.media-servers.yml",
+        "docker-compose.communication.yml",
+        "comment include",
+        "Commented = disabled",
+        "Start full stack",
+        "docker compose --profile vpn up -d",
+    ]
+
+    for term in banned_terms:
+        if term in text:
+            errors.append(f"AGENTS.md still references '{term}'")
+
+    return errors
+
+
+def validate_example_env_files() -> list[str]:
+    errors: list[str] = []
+    required_keys = {
+        STARTER_ENV: {
+            "PUID",
+            "PGID",
+            "TZ",
+            "DOMAIN_NAME",
+            "LOCAL_LAN_IP",
+            "DOCKER_PROJECT_DIR",
+            "DOCKER_BASE_DIR",
+            "DOCKER_SSD_CONFIG_DIR",
+            "DOCKER_GIT_CONFIG_DIR",
+            "DOCKER_MEDIA_DIR",
+            "BACKUP_DESTINATION",
+            "DB_PASSWORD",
+            "DUPLICATI_ENCRYPTION_KEY",
+            "HOMARR_SECRET_ENCRYPTION_KEY",
+        },
+        BUNDLE_ENV_FILES["media"]: {"VPN_SERVICE_PROVIDER", "OPENVPN_USER", "OPENVPN_PASSWORD", "SERVER_REGIONS", "BITMAGNET_POSTGRES_PASSWORD"},
+        BUNDLE_ENV_FILES["apps"]: {"JOPLIN_DB_PASSWORD", "PAPERLESS_SECRET_KEY", "PAPERLESS_DB_PASSWORD", "KARAKEEP_NEXTAUTH_SECRET", "KARAKEEP_MEILI_MASTER_KEY", "DOCMOST_APP_SECRET", "DOCMOST_DB_PASSWORD"},
+        BUNDLE_ENV_FILES["ops"]: {"GRAFANA_ADMIN_PASSWORD"},
+        BUNDLE_ENV_FILES["access"]: {"PANGOLIN_ENDPOINT", "NEWT_ID", "NEWT_SECRET", "JITSI_JICOFO_COMPONENT_SECRET", "JITSI_JICOFO_AUTH_PASSWORD", "JITSI_JVB_AUTH_PASSWORD", "JITSI_TURN_CREDENTIALS", "JITSI_CLOUDFLARE_API_TOKEN"},
+    }
+
+    for path, required in required_keys.items():
+        if not path.exists():
+            errors.append(f"missing env example file: {path.relative_to(REPO_ROOT)}")
+            continue
+
+        keys = env_keys(path)
+        missing = sorted(required - keys)
+        if missing:
+            errors.append(f"{path.relative_to(REPO_ROOT)} missing keys: {', '.join(missing)}")
+
+    starter_keys = env_keys(STARTER_ENV)
+    if len(starter_keys) > STARTER_ENV_MAX_KEYS:
+        errors.append(
+            f".env.example has {len(starter_keys)} keys; keep the starter template at or below {STARTER_ENV_MAX_KEYS}"
+        )
+
+    bundle_keys: set[str] = set()
+    for path in BUNDLE_ENV_FILES.values():
+        bundle_keys.update(env_keys(path))
+
+    leaked_keys = sorted(starter_keys & bundle_keys)
+    if leaked_keys:
+        errors.append(
+            ".env.example should stay starter-only; remove bundle keys: "
+            + ", ".join(leaked_keys)
+        )
+
+    return errors
+
+
+def validate_init_script() -> list[str]:
+    errors: list[str] = []
+    starter_template_keys = env_keys(STARTER_ENV)
+    bundle_template_keys: dict[str, set[str]] = {
+        bundle: env_keys(path)
+        for bundle, path in BUNDLE_ENV_FILES.items()
+    }
+    all_bundle_keys = set().union(*bundle_template_keys.values())
+
+    with tempfile.TemporaryDirectory(prefix="init-validate-") as tmpdir:
+        temp_repo = Path(tmpdir) / "repo"
+        shutil.copytree(
+            REPO_ROOT,
+            temp_repo,
+            ignore=shutil.ignore_patterns(".git", ".env", "data", "build", "__pycache__", "*.pyc"),
+        )
+
+        try:
+            shell([sys.executable, str(temp_repo / "scripts" / "init-env.py")], cwd=temp_repo)
+        except RuntimeError as exc:
+            return [f"starter init failed: {exc}"]
+
+        starter_env_path = temp_repo / ".env"
+        if not starter_env_path.exists():
+            return ["starter init did not create .env"]
+
+        starter_env_keys = env_keys(starter_env_path)
+        missing_starter = sorted(starter_template_keys - starter_env_keys)
+        if missing_starter:
+            errors.append(f"starter init .env missing keys: {', '.join(missing_starter)}")
+
+        leaked_bundle_keys = sorted(starter_env_keys & all_bundle_keys)
+        if leaked_bundle_keys:
+            errors.append(
+                "starter init .env should not include bundle keys: "
+                + ", ".join(leaked_bundle_keys)
+            )
+
+        selected_bundles = ("media", "access")
+        temp_repo.joinpath(".env").unlink()
+
+        bundle_command = [sys.executable, str(temp_repo / "scripts" / "init-env.py")]
+        for bundle in selected_bundles:
+            bundle_command.extend(["--bundle", bundle])
+
+        try:
+            shell(bundle_command, cwd=temp_repo)
+        except RuntimeError as exc:
+            errors.append(f"bundle init failed: {exc}")
+            return errors
+
+        bundle_env_keys = env_keys(temp_repo / ".env")
+        expected_bundle_keys = starter_template_keys.copy()
+        for bundle in selected_bundles:
+            expected_bundle_keys.update(bundle_template_keys[bundle])
+
+        missing_selected = sorted(expected_bundle_keys - bundle_env_keys)
+        if missing_selected:
+            errors.append(
+                "bundle init .env missing selected starter or bundle keys: "
+                + ", ".join(missing_selected)
+            )
+
+        unselected_bundle_keys = set()
+        for bundle, keys in bundle_template_keys.items():
+            if bundle not in selected_bundles:
+                unselected_bundle_keys.update(keys)
+
+        leaked_unselected = sorted(bundle_env_keys & unselected_bundle_keys)
+        if leaked_unselected:
+            errors.append(
+                "bundle init .env should not include unselected bundle keys: "
+                + ", ".join(leaked_unselected)
+            )
 
     return errors
 
 
 def validate_docmost_bundle() -> list[str]:
-    command = [sys.executable, str(REPO_ROOT / "scripts" / "build-docmost-space.py"), "--check"]
-    try:
-        subprocess.check_output(
-            command,
-            cwd=REPO_ROOT,
-            text=True,
-            stderr=subprocess.STDOUT,
-        )
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.output or "").strip()
-        if not detail:
-            return ["docmost bundle check failed"]
-        cleaned: list[str] = []
-        for line in detail.splitlines():
-            stripped = line.strip()
-            if not stripped or stripped == "docmost bundle check failed:":
-                continue
-            if stripped.startswith("- "):
-                stripped = stripped[2:]
-            cleaned.append(f"docmost bundle: {stripped}")
-        return cleaned or ["docmost bundle check failed"]
+    with tempfile.TemporaryDirectory(prefix="docmost-") as tmpdir:
+        output_dir = Path(tmpdir) / "docmost-space"
+        for check in (False, True):
+            command = [sys.executable, str(REPO_ROOT / "scripts" / "build-docmost-space.py"), "--output-dir", str(output_dir)]
+            if check:
+                command.insert(2, "--check")
+            try:
+                subprocess.check_output(
+                    command,
+                    cwd=REPO_ROOT,
+                    text=True,
+                    stderr=subprocess.STDOUT,
+                )
+            except subprocess.CalledProcessError as exc:
+                detail = (exc.output or "").strip()
+                return [f"docmost bundle failed: {detail or 'unknown error'}"]
     return []
 
 
@@ -403,67 +607,74 @@ def validate_service_defaults(services: dict[str, dict]) -> list[str]:
     return errors
 
 
-def validate_required_env_vars() -> list[str]:
-    declared = declared_env_vars(ENV_EXAMPLE)
-    missing = sorted((REQUIRED_SECRET_VARS | REQUIRED_CONFIG_VARS) - declared)
-    if not missing:
-        return []
-    return [".env.example missing required vars: " + ", ".join(missing)]
+def validate_compose_scenarios() -> list[str]:
+    errors: list[str] = []
+
+    with tempfile.TemporaryDirectory(prefix="stack-validate-") as tmpdir:
+        temp_repo = Path(tmpdir) / "repo"
+        shutil.copytree(
+            REPO_ROOT,
+            temp_repo,
+            ignore=shutil.ignore_patterns(".git", ".env", "data", "build", "__pycache__", "*.pyc"),
+        )
+
+        for scenario in SCENARIOS:
+            write_scenario_env(temp_repo, scenario["bundles"])
+            try:
+                services = compose_services(temp_repo, scenario["bundles"], scenario["profiles"])
+            except RuntimeError as exc:
+                errors.append(f"{scenario['name']} compose config failed: {exc}")
+                continue
+
+            expected_exact = scenario.get("expected_exact")
+            if expected_exact is not None and services != expected_exact:
+                errors.append(
+                    f"{scenario['name']} services mismatch: expected {sorted(expected_exact)}, got {sorted(services)}"
+                )
+
+            expected_contains = scenario.get("expected_contains", set())
+            missing = sorted(expected_contains - services)
+            if missing:
+                errors.append(
+                    f"{scenario['name']} missing expected services: {', '.join(missing)}"
+                )
+
+            if scenario["name"] in {"starter", "media"}:
+                command = [sys.executable, str(temp_repo / "scripts" / "homarr_seed.py"), "--dry-run"]
+                for bundle in scenario["bundles"]:
+                    command.extend(["--bundle", bundle])
+                for profile in scenario["profiles"]:
+                    command.extend(["--profile", profile])
+                try:
+                    output = shell(command, cwd=temp_repo)
+                except RuntimeError as exc:
+                    errors.append(f"{scenario['name']} homarr dry-run failed: {exc}")
+                    continue
+                if "Included apps:" not in output:
+                    errors.append(f"{scenario['name']} homarr dry-run did not list apps")
+
+        write_scenario_env(temp_repo, list(BUNDLE_COMPOSES))
+        try:
+            full_config = compose_json(temp_repo, list(BUNDLE_COMPOSES), FULL_STACK_PROFILES)
+        except RuntimeError as exc:
+            errors.append(f"full-stack compose config failed: {exc}")
+            return errors
+
+        errors.extend(validate_service_defaults(full_config["services"]))
+
+    return errors
 
 
 def main() -> int:
     errors: list[str] = []
-
-    services_by_file = {path: extract_services(path) for path in COMPOSE_FILES}
-    owners: dict[str, list[str]] = {}
-    for path, services in services_by_file.items():
-        for service in services:
-            owners.setdefault(service, []).append(path.name)
-
-    for service, files in sorted(owners.items()):
-        if len(files) > 1:
-            errors.append(
-                f"duplicate compose service '{service}' declared in {', '.join(files)}"
-            )
-
-    services: dict[str, dict] = {}
-    compose_loaded = True
-    try:
-        actual_profiles = compose_profiles()
-        services = compose_services()
-    except RuntimeError as exc:
-        compose_loaded = False
-        errors.append(f"docker compose config failed: {exc}")
-
-    if compose_loaded:
-        main_profiles = documented_profiles_from_comments(COMPOSE_MAIN)
-        config_doc_profiles = documented_profiles_from_markdown(CONFIG_DOC)
-        env_profiles = documented_profiles_from_comments(ENV_EXAMPLE)
-
-        for source_name, documented in [
-            ("docker-compose.yml comments", main_profiles),
-            ("docs/configuration.md", config_doc_profiles),
-            (".env.example", env_profiles),
-        ]:
-            missing = sorted(actual_profiles - documented)
-            extra = sorted(documented - actual_profiles)
-            if missing:
-                errors.append(f"{source_name} missing profiles: {', '.join(missing)}")
-            if extra:
-                errors.append(f"{source_name} has stale profiles: {', '.join(extra)}")
-
-    offenders = tracked_artifacts()
-    if offenders:
-        errors.append("tracked local artifacts:\n  - " + "\n  - ".join(offenders[:20]))
-
-    errors.extend(find_forbidden_terms())
-    errors.extend(find_stale_variable_references())
-    errors.extend(find_weak_secret_fallbacks())
+    errors.extend(validate_repo_layout())
+    errors.extend(validate_example_env_files())
+    errors.extend(validate_init_script())
+    errors.extend(validate_beginner_docs())
+    errors.extend(validate_agent_guidance())
     errors.extend(validate_markdown_links())
     errors.extend(validate_docmost_bundle())
-    errors.extend(validate_required_env_vars())
-    if compose_loaded:
-        errors.extend(validate_service_defaults(services))
+    errors.extend(validate_compose_scenarios())
 
     if errors:
         print("validation failed:\n", file=sys.stderr)

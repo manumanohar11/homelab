@@ -1,0 +1,966 @@
+# /mnt/g/docker/docker-compose.media.yml
+# Optional media bundle: VPN, *Arr, downloaders, requests, and alternate media apps.
+services:
+  gluetun:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    environment:
+      VPN_SERVICE_PROVIDER: ${VPN_SERVICE_PROVIDER}
+      OPENVPN_USER: ${OPENVPN_USER}
+      OPENVPN_PASSWORD: ${OPENVPN_PASSWORD}
+      SERVER_REGIONS: ${SERVER_REGIONS}
+      FIREWALL_OUTBOUND_SUBNETS: 172.16.0.0/12,192.168.0.0/16
+      TZ: ${TZ}
+    volumes:
+    - ${DOCKER_BASE_DIR}/gluetun:/gluetun
+    networks:
+    - media-stack
+    ports:
+    - 8080:8080
+    - 9696:9696
+    - 7878:7878
+    - 8989:8989
+    - 6767:6767
+    - 6969:6969
+    - 8686:8686
+    - 8787:8787
+    - 9998:9998
+    - 8191:8191
+    - 3333:3333
+    - 3334:3334/tcp
+    - 3334:3334/udp
+    - 6881:6881
+    - 6881:6881/udp
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - /gluetun-entrypoint healthcheck
+      retries: 5
+    cap_add:
+    - NET_ADMIN
+    devices:
+    - /dev/net/tun:/dev/net/tun
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+  jellyfin:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
+      JELLYFIN_PublishedServerUrl: ${JELLYFIN_PUBLISHED_SERVER_URL:-}
+    volumes:
+    - ${DOCKER_BASE_DIR}/jellyfin:/config
+    - ${JELLYFIN_TRANSCODE_DIR:-${DOCKER_SSD_CONFIG_DIR}/jellyfin-transcodes}:/config/transcodes
+    - ${JELLYFIN_MEDIA_DIR}:/data
+    networks:
+    - media-stack
+    ports:
+    - 8096:8096
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8096/health
+      interval: 1m
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          memory: 1G
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - pangolin.public-resources.jellyfin.name=Jellyfin
+    - pangolin.public-resources.jellyfin.protocol=http
+    - pangolin.public-resources.jellyfin.full-domain=${JELLYFIN_SUBDOMAIN:-jellyfin}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.jellyfin.auth.sso-enabled=true
+    - pangolin.public-resources.jellyfin.targets[0].hostname=jellyfin
+    - pangolin.public-resources.jellyfin.targets[0].method=http
+    - pangolin.public-resources.jellyfin.targets[0].port=8096
+    - pangolin.public-resources.jellyfin.targets[0].healthcheck.hostname=jellyfin
+    - pangolin.public-resources.jellyfin.targets[0].healthcheck.port=8096
+    - pangolin.public-resources.jellyfin.targets[0].healthcheck.path=/health
+    - pangolin.public-resources.jellyfin.targets[0].healthcheck.status=200
+    profiles:
+    - jellyfin
+  stash:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-lsio-large
+    image: stashapp/stash:latest
+    container_name: stash
+    init: true
+    environment:
+      STASH_STASH: /data/
+      STASH_GENERATED: /generated/
+      STASH_METADATA: /metadata/
+      STASH_CACHE: /cache/
+      STASH_PORT: 9998
+    volumes:
+    - ${DOCKER_BASE_DIR}/stash/config:/root/.stash
+    - ${DOCKER_MEDIA_DIR}:/data
+    - ${DOCKER_BASE_DIR}/stash/metadata:/metadata
+    - ${DOCKER_BASE_DIR}/stash/cache:/cache
+    - ${DOCKER_BASE_DIR}/stash/blobs:/blobs
+    - ${DOCKER_BASE_DIR}/stash/generated:/generated
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9998
+      interval: 1m
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          memory: 512M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - pangolin.public-resources.stash.name=Stash
+    - pangolin.public-resources.stash.protocol=http
+    - pangolin.public-resources.stash.full-domain=${STASH_SUBDOMAIN:-stash}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.stash.auth.sso-enabled=true
+    - pangolin.public-resources.stash.targets[0].hostname=gluetun
+    - pangolin.public-resources.stash.targets[0].method=http
+    - pangolin.public-resources.stash.targets[0].port=9998
+    - pangolin.public-resources.stash.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.stash.targets[0].healthcheck.port=9998
+    - pangolin.public-resources.stash.targets[0].healthcheck.path=/
+    - pangolin.public-resources.stash.targets[0].healthcheck.status=200
+    profiles:
+    - stash
+  kavita:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/kavita:latest
+    container_name: kavita
+    volumes:
+    - ${DOCKER_BASE_DIR}/kavita:/config
+    - ${DOCKER_MEDIA_DIR}/Audio Books:/audiobooks:ro
+    - ${DOCKER_MEDIA_DIR}/Comics:/comics:ro
+    networks:
+    - media-stack
+    ports:
+    - 5000:5000
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:5000/api/health
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - pangolin.public-resources.kavita.name=Kavita
+    - pangolin.public-resources.kavita.protocol=http
+    - pangolin.public-resources.kavita.full-domain=${KAVITA_SUBDOMAIN:-kavita}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.kavita.auth.sso-enabled=true
+    - pangolin.public-resources.kavita.targets[0].hostname=kavita
+    - pangolin.public-resources.kavita.targets[0].method=http
+    - pangolin.public-resources.kavita.targets[0].port=5000
+    - pangolin.public-resources.kavita.targets[0].healthcheck.hostname=kavita
+    - pangolin.public-resources.kavita.targets[0].healthcheck.port=5000
+    - pangolin.public-resources.kavita.targets[0].healthcheck.path=/api/health
+    - pangolin.public-resources.kavita.targets[0].healthcheck.status=200
+    profiles:
+    - kavita
+  navidrome:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: deluan/navidrome:latest
+    container_name: navidrome
+    environment:
+      ND_SCANSCHEDULE: 1h
+      ND_LOGLEVEL: info
+      ND_SESSIONTIMEOUT: 24h
+      ND_BASEURL: ''
+      ND_ENABLETRANSCODINGCONFIG: 'true'
+      ND_ENABLESHARING: 'true'
+      ND_ENABLEFAVOURITES: 'true'
+      ND_ENABLESTARRATING: 'true'
+      ND_DEFAULTTHEME: Dark
+    volumes:
+    - ${DOCKER_BASE_DIR}/navidrome:/data
+    - ${DOCKER_MEDIA_DIR}/Songs:/music:ro
+    user: ${PUID}:${PGID}
+    networks:
+    - media-stack
+    ports:
+    - 4533:4533
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:4533/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.navidrome.name=Navidrome
+    - pangolin.public-resources.navidrome.protocol=http
+    - pangolin.public-resources.navidrome.full-domain=${NAVIDROME_SUBDOMAIN:-navidrome}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.navidrome.auth.sso-enabled=true
+    - pangolin.public-resources.navidrome.targets[0].hostname=navidrome
+    - pangolin.public-resources.navidrome.targets[0].method=http
+    - pangolin.public-resources.navidrome.targets[0].port=4533
+    - pangolin.public-resources.navidrome.targets[0].healthcheck.hostname=navidrome
+    - pangolin.public-resources.navidrome.targets[0].healthcheck.port=4533
+    - pangolin.public-resources.navidrome.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.navidrome.targets[0].healthcheck.status=200
+    profiles:
+    - navidrome
+  maintainerr:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: ghcr.io/jorenn92/maintainerr:latest
+    container_name: maintainerr
+    environment:
+      TZ: ${TZ}
+    volumes:
+    - ${DOCKER_BASE_DIR}/maintainerr:/opt/data
+    networks:
+    - media-stack
+    ports:
+    - 6246:6246
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:6246
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.maintainerr.name=Maintainerr
+    - pangolin.public-resources.maintainerr.protocol=http
+    - pangolin.public-resources.maintainerr.full-domain=${MAINTAINERR_SUBDOMAIN:-maintainerr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.maintainerr.auth.sso-enabled=true
+    - pangolin.public-resources.maintainerr.targets[0].hostname=maintainerr
+    - pangolin.public-resources.maintainerr.targets[0].method=http
+    - pangolin.public-resources.maintainerr.targets[0].port=6246
+    - pangolin.public-resources.maintainerr.targets[0].healthcheck.hostname=maintainerr
+    - pangolin.public-resources.maintainerr.targets[0].healthcheck.port=6246
+    - pangolin.public-resources.maintainerr.targets[0].healthcheck.path=/
+    - pangolin.public-resources.maintainerr.targets[0].healthcheck.status=200
+    profiles:
+    - maintainerr
+  tdarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: ghcr.io/haveagitgat/tdarr:latest
+    container_name: tdarr
+    init: true
+    environment:
+      UMASK_SET: 2
+      serverIP: 0.0.0.0
+      serverPort: 8266
+      webUIPort: 8265
+      internalNode: 'true'
+      inContainer: 'true'
+      ffmpegVersion: 6
+      nodeName: MainNode
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: all
+    volumes:
+    - ${DOCKER_BASE_DIR}/tdarr/server:/app/server
+    - ${DOCKER_BASE_DIR}/tdarr/configs:/app/configs
+    - ${DOCKER_BASE_DIR}/tdarr/logs:/app/logs
+    - ${DOCKER_MEDIA_DIR}:/media
+    - ${DOCKER_BASE_DIR}/tdarr/transcode_cache:/temp
+    networks:
+    - media-stack
+    ports:
+    - 8265:8265
+    - 8266:8266
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8265
+      interval: 1m
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          memory: 1G
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities:
+            - gpu
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.tdarr.name=Tdarr
+    - pangolin.public-resources.tdarr.protocol=http
+    - pangolin.public-resources.tdarr.full-domain=${TDARR_SUBDOMAIN:-tdarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.tdarr.auth.sso-enabled=true
+    - pangolin.public-resources.tdarr.targets[0].hostname=tdarr
+    - pangolin.public-resources.tdarr.targets[0].method=http
+    - pangolin.public-resources.tdarr.targets[0].port=8265
+    - pangolin.public-resources.tdarr.targets[0].healthcheck.hostname=tdarr
+    - pangolin.public-resources.tdarr.targets[0].healthcheck.port=8265
+    - pangolin.public-resources.tdarr.targets[0].healthcheck.path=/
+    - pangolin.public-resources.tdarr.targets[0].healthcheck.status=200
+    profiles:
+    - tdarr
+  qbittorrent:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-lsio-large
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      WEBUI_PORT: 8080
+    volumes:
+    - ${DOCKER_BASE_DIR}/qbittorrent:/config
+    - ${DOCKER_MEDIA_DIR}/downloads:/downloads
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8080
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Downloaders
+    - homepage.name=qBittorrent
+    - homepage.icon=qbittorrent
+    - homepage.href=https://${QBITTORRENT_SUBDOMAIN:-qbittorrent}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Torrent Client
+    - pangolin.public-resources.qbittorrent.name=qBittorrent
+    - pangolin.public-resources.qbittorrent.protocol=http
+    - pangolin.public-resources.qbittorrent.full-domain=${QBITTORRENT_SUBDOMAIN:-qbittorrent}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.qbittorrent.auth.sso-enabled=true
+    - pangolin.public-resources.qbittorrent.targets[0].hostname=gluetun
+    - pangolin.public-resources.qbittorrent.targets[0].method=http
+    - pangolin.public-resources.qbittorrent.targets[0].port=8080
+    - pangolin.public-resources.qbittorrent.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.qbittorrent.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.qbittorrent.targets[0].healthcheck.path=/
+    - pangolin.public-resources.qbittorrent.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+    - downloaders
+  prowlarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-lsio-medium
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    volumes:
+    - ${DOCKER_BASE_DIR}/prowlarr:/config
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9696/ping
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Downloaders
+    - homepage.name=Prowlarr
+    - homepage.icon=prowlarr
+    - homepage.href=https://${PROWLARR_SUBDOMAIN:-prowlarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Indexer Manager
+    - pangolin.public-resources.prowlarr.name=Prowlarr
+    - pangolin.public-resources.prowlarr.protocol=http
+    - pangolin.public-resources.prowlarr.full-domain=${PROWLARR_SUBDOMAIN:-prowlarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.prowlarr.auth.sso-enabled=true
+    - pangolin.public-resources.prowlarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.prowlarr.targets[0].method=http
+    - pangolin.public-resources.prowlarr.targets[0].port=9696
+    - pangolin.public-resources.prowlarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.prowlarr.targets[0].healthcheck.port=9696
+    - pangolin.public-resources.prowlarr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.prowlarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+    - downloaders
+  flaresolverr:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-service-large
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    container_name: flaresolverr
+    environment:
+      LOG_LEVEL: info
+      LOG_HTML: 'false'
+      CAPTCHA_SOLVER: none
+      TZ: ${TZ}
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8191/health
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Downloaders
+    - homepage.name=FlareSolverr
+    - homepage.icon=flaresolverr
+    - homepage.description=Cloudflare Bypass
+    profiles:
+    - arr
+    - downloaders
+  bitmagnet:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-service-large
+    image: ghcr.io/bitmagnet-io/bitmagnet:latest
+    container_name: bitmagnet
+    environment:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}
+      TMDB_API_KEY: ${TMDB_API_KEY}
+    volumes:
+    - ${DOCKER_BASE_DIR}/bitmagnet:/root/.config/bitmagnet
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:3333
+      interval: 1m
+      start_period: 60s
+    depends_on:
+      bitmagnet-postgres:
+        condition: service_healthy
+    command:
+    - worker
+    - run
+    - --keys=http_server
+    - --keys=queue_server
+    - --keys=dht_crawler
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Downloaders
+    - homepage.name=Bitmagnet
+    - homepage.icon=bittorrent
+    - homepage.href=https://${BITMAGNET_SUBDOMAIN:-bitmagnet}.${DOMAIN_NAME:-localhost}
+    - homepage.description=DHT Crawler
+    - pangolin.public-resources.bitmagnet.name=Bitmagnet
+    - pangolin.public-resources.bitmagnet.protocol=http
+    - pangolin.public-resources.bitmagnet.full-domain=${BITMAGNET_SUBDOMAIN:-bitmagnet}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.bitmagnet.auth.sso-enabled=true
+    - pangolin.public-resources.bitmagnet.targets[0].hostname=gluetun
+    - pangolin.public-resources.bitmagnet.targets[0].method=http
+    - pangolin.public-resources.bitmagnet.targets[0].port=3333
+    - pangolin.public-resources.bitmagnet.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.bitmagnet.targets[0].healthcheck.port=3333
+    - pangolin.public-resources.bitmagnet.targets[0].healthcheck.path=/
+    - pangolin.public-resources.bitmagnet.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+    - downloaders
+  bitmagnet-postgres:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-service-large
+    image: postgres:16-alpine
+    container_name: bitmagnet-postgres
+    environment:
+      POSTGRES_PASSWORD: ${BITMAGNET_POSTGRES_PASSWORD:?set BITMAGNET_POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: bitmagnet
+      PGUSER: postgres
+      POSTGRES_INITDB_ARGS: -c shared_buffers=256MB -c max_connections=200
+    volumes:
+    - bitmagnet_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U postgres -d bitmagnet
+      start_period: 20s
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    shm_size: 1g
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - homepage.group=Downloaders
+    - homepage.name=Bitmagnet DB
+    - homepage.description=PostgreSQL
+    profiles:
+    - arr
+    - downloaders
+  radarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _arr-lsio-large
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    network_mode: service:gluetun
+    volumes:
+    - ${DOCKER_BASE_DIR}/radarr:/config
+    - ${DOCKER_MEDIA_DIR}:/data
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:7878/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Media Management
+    - homepage.name=Radarr
+    - homepage.icon=radarr
+    - homepage.href=https://${RADARR_SUBDOMAIN:-radarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Movie Management
+    - pangolin.public-resources.radarr.name=Radarr
+    - pangolin.public-resources.radarr.protocol=http
+    - pangolin.public-resources.radarr.full-domain=${RADARR_SUBDOMAIN:-radarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.radarr.auth.sso-enabled=true
+    - pangolin.public-resources.radarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.radarr.targets[0].method=http
+    - pangolin.public-resources.radarr.targets[0].port=7878
+    - pangolin.public-resources.radarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.radarr.targets[0].healthcheck.port=7878
+    - pangolin.public-resources.radarr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.radarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  sonarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _arr-lsio-large
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    network_mode: service:gluetun
+    volumes:
+    - ${DOCKER_BASE_DIR}/sonarr:/config
+    - ${DOCKER_MEDIA_DIR}:/data
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8989/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Media Management
+    - homepage.name=Sonarr
+    - homepage.icon=sonarr
+    - homepage.href=https://${SONARR_SUBDOMAIN:-sonarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=TV Show Management
+    - pangolin.public-resources.sonarr.name=Sonarr
+    - pangolin.public-resources.sonarr.protocol=http
+    - pangolin.public-resources.sonarr.full-domain=${SONARR_SUBDOMAIN:-sonarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.sonarr.auth.sso-enabled=true
+    - pangolin.public-resources.sonarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.sonarr.targets[0].method=http
+    - pangolin.public-resources.sonarr.targets[0].port=8989
+    - pangolin.public-resources.sonarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.sonarr.targets[0].healthcheck.port=8989
+    - pangolin.public-resources.sonarr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.sonarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  lidarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _arr-lsio-large
+    image: lscr.io/linuxserver/lidarr:latest
+    container_name: lidarr
+    network_mode: service:gluetun
+    volumes:
+    - ${DOCKER_BASE_DIR}/lidarr:/config
+    - ${DOCKER_MEDIA_DIR}/Songs:/music_library
+    - ${DOCKER_BASE_DIR}/downloads:/downloads
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8686/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Media Management
+    - homepage.name=Lidarr
+    - homepage.icon=lidarr
+    - homepage.href=https://${LIDARR_SUBDOMAIN:-lidarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Music Management
+    - pangolin.public-resources.lidarr.name=Lidarr
+    - pangolin.public-resources.lidarr.protocol=http
+    - pangolin.public-resources.lidarr.full-domain=${LIDARR_SUBDOMAIN:-lidarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.lidarr.auth.sso-enabled=true
+    - pangolin.public-resources.lidarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.lidarr.targets[0].method=http
+    - pangolin.public-resources.lidarr.targets[0].port=8686
+    - pangolin.public-resources.lidarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.lidarr.targets[0].healthcheck.port=8686
+    - pangolin.public-resources.lidarr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.lidarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  readarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _arr-lsio-large
+    image: lscr.io/linuxserver/readarr:develop
+    container_name: readarr
+    network_mode: service:gluetun
+    volumes:
+    - ${DOCKER_BASE_DIR}/readarr:/config
+    - ${DOCKER_MEDIA_DIR}/Books:/books
+    - ${DOCKER_BASE_DIR}/downloads:/downloads
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8787/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Media Management
+    - homepage.name=Readarr
+    - homepage.icon=readarr
+    - homepage.href=https://${READARR_SUBDOMAIN:-readarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Book Management
+    - pangolin.public-resources.readarr.name=Readarr
+    - pangolin.public-resources.readarr.protocol=http
+    - pangolin.public-resources.readarr.full-domain=${READARR_SUBDOMAIN:-readarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.readarr.auth.sso-enabled=true
+    - pangolin.public-resources.readarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.readarr.targets[0].method=http
+    - pangolin.public-resources.readarr.targets[0].port=8787
+    - pangolin.public-resources.readarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.readarr.targets[0].healthcheck.port=8787
+    - pangolin.public-resources.readarr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.readarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  bazarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-lsio-medium
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    volumes:
+    - ${DOCKER_BASE_DIR}/bazarr:/config
+    - ${DOCKER_MEDIA_DIR}:/data
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:6767
+    depends_on:
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Media Management
+    - homepage.name=Bazarr
+    - homepage.icon=bazarr
+    - homepage.href=https://${BAZARR_SUBDOMAIN:-bazarr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Subtitle Management
+    - pangolin.public-resources.bazarr.name=Bazarr
+    - pangolin.public-resources.bazarr.protocol=http
+    - pangolin.public-resources.bazarr.full-domain=${BAZARR_SUBDOMAIN:-bazarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.bazarr.auth.sso-enabled=true
+    - pangolin.public-resources.bazarr.targets[0].hostname=gluetun
+    - pangolin.public-resources.bazarr.targets[0].method=http
+    - pangolin.public-resources.bazarr.targets[0].port=6767
+    - pangolin.public-resources.bazarr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.bazarr.targets[0].healthcheck.port=6767
+    - pangolin.public-resources.bazarr.targets[0].healthcheck.path=/
+    - pangolin.public-resources.bazarr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  whisparr:
+    extends:
+      file: docker-compose.common.yml
+      service: _arr-lsio-large
+    image: ghcr.io/hotio/whisparr:latest
+    container_name: whisparr
+    init: true
+    network_mode: service:gluetun
+    volumes:
+    - ${DOCKER_BASE_DIR}/whisparr:/config
+    - ${DOCKER_MEDIA_DIR}:/data
+    healthcheck:
+      interval: 1m
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:6969/ping
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          memory: 256M
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Media Management
+    - homepage.name=Whisparr
+    - homepage.icon=whisparr
+    - homepage.href=https://${WHISPARR_SUBDOMAIN:-whisparr}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Adult Content Management
+    - pangolin.public-resources.whisparr.name=Whisparr
+    - pangolin.public-resources.whisparr.protocol=http
+    - pangolin.public-resources.whisparr.full-domain=${WHISPARR_SUBDOMAIN:-whisparr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.whisparr.auth.sso-enabled=true
+    - pangolin.public-resources.whisparr.targets[0].hostname=gluetun
+    - pangolin.public-resources.whisparr.targets[0].method=http
+    - pangolin.public-resources.whisparr.targets[0].port=6969
+    - pangolin.public-resources.whisparr.targets[0].healthcheck.hostname=gluetun
+    - pangolin.public-resources.whisparr.targets[0].healthcheck.port=6969
+    - pangolin.public-resources.whisparr.targets[0].healthcheck.path=/ping
+    - pangolin.public-resources.whisparr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+  recyclarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _vpn-service-small
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    environment:
+      TZ: ${TZ}
+      RECYCLARR_CREATE_CONFIG: 'true'
+    volumes:
+    - ${DOCKER_BASE_DIR}/recyclarr:/config
+    user: ${PUID}:${PGID}
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - test -f /config/recyclarr.yml || exit 1
+      interval: 5m
+      retries: 1
+    depends_on:
+      radarr:
+        condition: service_healthy
+      sonarr:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Media Management
+    - homepage.name=Recyclarr
+    - homepage.icon=recyclarr
+    - homepage.description=TRaSH Guide Sync
+    profiles:
+    - arr
+  overseerr:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-medium
+    image: lscr.io/linuxserver/overseerr:latest
+    container_name: overseerr
+    volumes:
+    - ${DOCKER_BASE_DIR}/overseerr:/config
+    networks:
+    - media-stack
+    ports:
+    - 5055:5055
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:5055/api/v1/status
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - pangolin.public-resources.overseerr.name=Overseerr
+    - pangolin.public-resources.overseerr.protocol=http
+    - pangolin.public-resources.overseerr.full-domain=${OVERSEERR_SUBDOMAIN:-overseerr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.overseerr.auth.sso-enabled=true
+    - pangolin.public-resources.overseerr.targets[0].hostname=overseerr
+    - pangolin.public-resources.overseerr.targets[0].method=http
+    - pangolin.public-resources.overseerr.targets[0].port=5055
+    - pangolin.public-resources.overseerr.targets[0].healthcheck.hostname=overseerr
+    - pangolin.public-resources.overseerr.targets[0].healthcheck.port=5055
+    - pangolin.public-resources.overseerr.targets[0].healthcheck.path=/api/v1/status
+    - pangolin.public-resources.overseerr.targets[0].healthcheck.status=200
+    profiles:
+    - arr
+    - requests
+  jellyseerr:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: fallenbagel/jellyseerr:latest
+    container_name: jellyseerr
+    environment:
+      TZ: ${TZ}
+      LOG_LEVEL: info
+    volumes:
+    - ${DOCKER_BASE_DIR}/jellyseerr:/app/config
+    networks:
+    - media-stack
+    ports:
+    - 5056:5055
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:5055/api/v1/status
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.jellyseerr.name=Jellyseerr
+    - pangolin.public-resources.jellyseerr.protocol=http
+    - pangolin.public-resources.jellyseerr.full-domain=${JELLYSEERR_SUBDOMAIN:-jellyseerr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.jellyseerr.auth.sso-enabled=true
+    - pangolin.public-resources.jellyseerr.targets[0].hostname=jellyseerr
+    - pangolin.public-resources.jellyseerr.targets[0].method=http
+    - pangolin.public-resources.jellyseerr.targets[0].port=5055
+    - pangolin.public-resources.jellyseerr.targets[0].healthcheck.hostname=jellyseerr
+    - pangolin.public-resources.jellyseerr.targets[0].healthcheck.port=5055
+    - pangolin.public-resources.jellyseerr.targets[0].healthcheck.path=/api/v1/status
+    - pangolin.public-resources.jellyseerr.targets[0].healthcheck.status=200
+    profiles:
+    - jellyfin
+  notifiarr:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: golift/notifiarr:latest
+    container_name: notifiarr
+    environment:
+      TZ: ${TZ}
+      DN_API_KEY: ${NOTIFIARR_API_KEY:-}
+    volumes:
+    - ${DOCKER_BASE_DIR}/notifiarr:/config
+    - /var/run/utmp:/var/run/utmp:ro
+    networks:
+    - media-stack
+    ports:
+    - 5454:5454
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:5454
+    hostname: notifiarr
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - pangolin.public-resources.notifiarr.name=Notifiarr
+    - pangolin.public-resources.notifiarr.protocol=http
+    - pangolin.public-resources.notifiarr.full-domain=${NOTIFIARR_SUBDOMAIN:-notifiarr}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.notifiarr.auth.sso-enabled=true
+    - pangolin.public-resources.notifiarr.targets[0].hostname=notifiarr
+    - pangolin.public-resources.notifiarr.targets[0].method=http
+    - pangolin.public-resources.notifiarr.targets[0].port=5454
+    - pangolin.public-resources.notifiarr.targets[0].healthcheck.hostname=notifiarr
+    - pangolin.public-resources.notifiarr.targets[0].healthcheck.port=5454
+    - pangolin.public-resources.notifiarr.targets[0].healthcheck.path=/
+    - pangolin.public-resources.notifiarr.targets[0].healthcheck.status=200
+    profiles:
+    - notifiarr
+volumes:
+  bitmagnet_postgres_data: null

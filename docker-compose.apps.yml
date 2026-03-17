@@ -1,0 +1,703 @@
+# /mnt/g/docker/docker-compose.apps.yml
+# Optional apps bundle: productivity, documents, files, and automation.
+services:
+  freshrss:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-small
+    image: lscr.io/linuxserver/freshrss:latest
+    container_name: freshrss
+    volumes:
+    - ${DOCKER_BASE_DIR}/freshrss:/config
+    networks:
+    - media-stack
+    ports:
+    - 8081:80
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost/i/
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Productivity
+    - homepage.name=FreshRSS
+    - homepage.icon=freshrss
+    - homepage.href=https://${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}
+    - homepage.description=RSS Reader
+    - pangolin.public-resources.freshrss.name=FreshRSS
+    - pangolin.public-resources.freshrss.protocol=http
+    - pangolin.public-resources.freshrss.full-domain=${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.freshrss.auth.sso-enabled=true
+    - pangolin.public-resources.freshrss.targets[0].hostname=freshrss
+    - pangolin.public-resources.freshrss.targets[0].method=http
+    - pangolin.public-resources.freshrss.targets[0].port=80
+    - pangolin.public-resources.freshrss.targets[0].healthcheck.hostname=freshrss
+    - pangolin.public-resources.freshrss.targets[0].healthcheck.port=80
+    - pangolin.public-resources.freshrss.targets[0].healthcheck.path=/i/
+    - pangolin.public-resources.freshrss.targets[0].healthcheck.status=200
+  searxng-valkey:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: valkey/valkey:8-alpine
+    container_name: searxng-valkey
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - valkey-cli
+      - ping
+  searxng:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: searxng/searxng:latest
+    container_name: searxng
+    environment:
+      TZ: ${TZ}
+      SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-https://${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}}
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-lan-only-change-before-exposing}
+      SEARXNG_VALKEY_URL: valkey://searxng-valkey:6379/0
+      SEARXNG_LIMITER: ${SEARXNG_LIMITER:-true}
+    volumes:
+    - ${DOCKER_GIT_CONFIG_DIR}/searxng/settings.yml:/etc/searxng/settings.yml:ro
+    - ${DOCKER_GIT_CONFIG_DIR}/searxng/limiter.toml:/etc/searxng/limiter.toml:ro
+    networks:
+    - media-stack
+    ports:
+    - 8084:8080
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz')
+    depends_on:
+      searxng-valkey:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Productivity
+    - homepage.name=SearXNG
+    - homepage.icon=searxng
+    - homepage.href=https://${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Private Metasearch
+    - pangolin.public-resources.searxng.name=SearXNG
+    - pangolin.public-resources.searxng.protocol=http
+    - pangolin.public-resources.searxng.full-domain=${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.searxng.auth.sso-enabled=${SEARXNG_PANGOLIN_SSO_ENABLED:-true}
+    - pangolin.public-resources.searxng.targets[0].hostname=searxng
+    - pangolin.public-resources.searxng.targets[0].method=http
+    - pangolin.public-resources.searxng.targets[0].port=8080
+    - pangolin.public-resources.searxng.targets[0].healthcheck.hostname=searxng
+    - pangolin.public-resources.searxng.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.searxng.targets[0].healthcheck.path=/healthz
+    - pangolin.public-resources.searxng.targets[0].healthcheck.status=200
+  syncthing:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-medium
+    image: lscr.io/linuxserver/syncthing:latest
+    container_name: syncthing
+    volumes:
+    - ${DOCKER_BASE_DIR}/syncthing:/config
+    - ${SYNCTHING_DATA_DIR:-${DOCKER_MEDIA_DIR}/Sync}:/sync
+    networks:
+    - media-stack
+    ports:
+    - 8384:8384
+    - 22000:22000/tcp
+    - 22000:22000/udp
+    - 21027:21027/udp
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8384/rest/noauth/health
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Productivity
+    - homepage.name=Syncthing
+    - homepage.icon=syncthing
+    - homepage.href=https://${SYNCTHING_SUBDOMAIN:-syncthing}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Continuous File Sync
+    - pangolin.public-resources.syncthing.name=Syncthing
+    - pangolin.public-resources.syncthing.protocol=http
+    - pangolin.public-resources.syncthing.full-domain=${SYNCTHING_SUBDOMAIN:-syncthing}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.syncthing.auth.sso-enabled=true
+    - pangolin.public-resources.syncthing.targets[0].hostname=syncthing
+    - pangolin.public-resources.syncthing.targets[0].method=http
+    - pangolin.public-resources.syncthing.targets[0].port=8384
+    - pangolin.public-resources.syncthing.targets[0].healthcheck.hostname=syncthing
+    - pangolin.public-resources.syncthing.targets[0].healthcheck.port=8384
+    - pangolin.public-resources.syncthing.targets[0].healthcheck.path=/rest/noauth/health
+    - pangolin.public-resources.syncthing.targets[0].healthcheck.status=200
+  joplin-postgres:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: postgres:16-alpine
+    container_name: joplin-postgres
+    environment:
+      POSTGRES_DB: ${JOPLIN_DB_NAME:-joplin}
+      POSTGRES_USER: ${JOPLIN_DB_USER:-joplin}
+      POSTGRES_PASSWORD: ${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}
+    volumes:
+    - ${JOPLIN_DB_DATA_LOCATION:-${DOCKER_SSD_CONFIG_DIR}/joplin-postgres}:/var/lib/postgresql/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${JOPLIN_DB_USER:-joplin} -d ${JOPLIN_DB_NAME:-joplin}
+  joplin:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: joplin/server:${JOPLIN_VERSION:-latest}
+    container_name: joplin
+    environment:
+      TZ: ${TZ}
+      APP_PORT: 22300
+      APP_BASE_URL: ${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}
+      DB_CLIENT: pg
+      POSTGRES_HOST: joplin-postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: ${JOPLIN_DB_NAME:-joplin}
+      POSTGRES_USER: ${JOPLIN_DB_USER:-joplin}
+      POSTGRES_PASSWORD: ${JOPLIN_DB_PASSWORD:?set JOPLIN_DB_PASSWORD in .env}
+    networks:
+    - media-stack
+    ports:
+    - 22300:22300
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - node
+      - -e
+      - 'const { URL } = require(''url''); const base = new URL(process.env.APP_BASE_URL || ''http://localhost:22300''); const req = require(''http'').request({ host: ''127.0.0.1'', port: 22300, path: ''/api/ping'', headers: { Host: base.host, Origin: base.origin } }, (res) => process.exit(res.statusCode === 200 ? 0 : 1)); req.on(''error'', () => process.exit(1)); req.end();'
+    depends_on:
+      joplin-postgres:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Productivity
+    - homepage.name=Joplin
+    - homepage.icon=joplin
+    - homepage.href=${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Notes and Web Clipper
+    - pangolin.public-resources.joplin.name=Joplin
+    - pangolin.public-resources.joplin.protocol=http
+    - pangolin.public-resources.joplin.full-domain=${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.joplin.auth.sso-enabled=true
+    - pangolin.public-resources.joplin.targets[0].hostname=joplin
+    - pangolin.public-resources.joplin.targets[0].method=http
+    - pangolin.public-resources.joplin.targets[0].port=22300
+    - pangolin.public-resources.joplin.targets[0].healthcheck.hostname=joplin
+    - pangolin.public-resources.joplin.targets[0].healthcheck.port=22300
+    - pangolin.public-resources.joplin.targets[0].healthcheck.path=/api/ping
+    - pangolin.public-resources.joplin.targets[0].healthcheck.status=200
+    - pangolin.public-resources.joplin.targets[0].healthcheck.headers[0].name=Host
+    - pangolin.public-resources.joplin.targets[0].healthcheck.headers[0].value=${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.joplin.targets[0].healthcheck.headers[1].name=Origin
+    - pangolin.public-resources.joplin.targets[0].healthcheck.headers[1].value=${JOPLIN_BASE_URL:-https://${JOPLIN_SUBDOMAIN:-joplin}.${DOMAIN_NAME:-localhost}}
+  kasm:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/kasm:latest
+    container_name: kasm
+    environment:
+      KASM_PORT: 8444
+    volumes:
+    - ${DOCKER_BASE_DIR}/kasm/opt:/opt
+    - ${DOCKER_BASE_DIR}/kasm/profiles:/profiles
+    networks:
+    - media-stack
+    ports:
+    - 3003:3000
+    - 8444:8444
+    healthcheck:
+      start_period: 2m
+      test:
+      - CMD
+      - curl
+      - -f
+      - -k
+      - https://localhost:3000
+    privileged: true
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Productivity
+    - homepage.name=Kasm
+    - homepage.icon=kasm
+    - homepage.href=https://${KASM_SUBDOMAIN:-kasm}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Remote Workspaces
+    - pangolin.public-resources.kasm.name=Kasm
+    - pangolin.public-resources.kasm.protocol=http
+    - pangolin.public-resources.kasm.full-domain=${KASM_SUBDOMAIN:-kasm}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.kasm.auth.sso-enabled=true
+    - pangolin.public-resources.kasm.targets[0].hostname=kasm
+    - pangolin.public-resources.kasm.targets[0].method=https
+    - pangolin.public-resources.kasm.targets[0].port=8444
+    profiles:
+    - kasm
+  paperless-broker:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: redis:8-alpine
+    container_name: paperless-broker
+    volumes:
+    - ${DOCKER_BASE_DIR}/paperless/redis:/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+  paperless-db:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: postgres:18-alpine
+    container_name: paperless-db
+    environment:
+      POSTGRES_DB: ${PAPERLESS_DB_NAME:-paperless}
+      POSTGRES_USER: ${PAPERLESS_DB_USER:-paperless}
+      POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD:?set PAPERLESS_DB_PASSWORD in .env}
+    volumes:
+    - ${PAPERLESS_DB_DATA_LOCATION:-${DOCKER_SSD_CONFIG_DIR}/paperless-postgres}:/var/lib/postgresql/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${PAPERLESS_DB_USER:-paperless} -d ${PAPERLESS_DB_NAME:-paperless}
+  paperless-gotenberg:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: gotenberg/gotenberg:8.25
+    container_name: paperless-gotenberg
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:3000/health
+    command:
+    - gotenberg
+    - --chromium-disable-javascript=true
+    - --chromium-allow-list=file:///tmp/.*
+  paperless-tika:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: apache/tika:latest
+    container_name: paperless-tika
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:9998/
+  paperless-ngx:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless-ngx
+    environment:
+      USERMAP_UID: ${PUID}
+      USERMAP_GID: ${PGID}
+      PAPERLESS_TIME_ZONE: ${TZ}
+      PAPERLESS_URL: ${PAPERLESS_URL:-https://${PAPERLESS_SUBDOMAIN:-paperless}.${DOMAIN_NAME:-localhost}}
+      PAPERLESS_SECRET_KEY: ${PAPERLESS_SECRET_KEY:?set PAPERLESS_SECRET_KEY in .env}
+      PAPERLESS_REDIS: redis://paperless-broker:6379
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: ${PAPERLESS_DB_NAME:-paperless}
+      PAPERLESS_DBUSER: ${PAPERLESS_DB_USER:-paperless}
+      PAPERLESS_DBPASS: ${PAPERLESS_DB_PASSWORD:?set PAPERLESS_DB_PASSWORD in .env}
+      PAPERLESS_OCR_LANGUAGE: ${PAPERLESS_OCR_LANGUAGE:-eng}
+      PAPERLESS_OCR_LANGUAGES: ${PAPERLESS_OCR_LANGUAGES:-}
+      PAPERLESS_TIKA_ENABLED: '1'
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://paperless-gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://paperless-tika:9998
+    volumes:
+    - ${DOCKER_BASE_DIR}/paperless/data:/usr/src/paperless/data
+    - ${DOCKER_BASE_DIR}/paperless/media:/usr/src/paperless/media
+    - ${DOCKER_BASE_DIR}/paperless/export:/usr/src/paperless/export
+    - ${PAPERLESS_CONSUME_DIR:-${DOCKER_MEDIA_DIR}/Documents/consume}:/usr/src/paperless/consume
+    networks:
+    - media-stack
+    ports:
+    - 8010:8000
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -fs
+      - -S
+      - -L
+      - --max-time
+      - '2'
+      - http://localhost:8000
+    depends_on:
+      paperless-broker:
+        condition: service_healthy
+      paperless-db:
+        condition: service_healthy
+      paperless-gotenberg:
+        condition: service_healthy
+      paperless-tika:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Documents
+    - homepage.name=Paperless-ngx
+    - homepage.icon=paperless-ngx
+    - homepage.href=${PAPERLESS_URL:-https://${PAPERLESS_SUBDOMAIN:-paperless}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Document Archive & OCR
+    - pangolin.public-resources.paperless.name=Paperless-ngx
+    - pangolin.public-resources.paperless.protocol=http
+    - pangolin.public-resources.paperless.full-domain=${PAPERLESS_SUBDOMAIN:-paperless}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.paperless.auth.sso-enabled=true
+    - pangolin.public-resources.paperless.targets[0].hostname=paperless-ngx
+    - pangolin.public-resources.paperless.targets[0].method=http
+    - pangolin.public-resources.paperless.targets[0].port=8000
+    - pangolin.public-resources.paperless.targets[0].healthcheck.hostname=paperless-ngx
+    - pangolin.public-resources.paperless.targets[0].healthcheck.port=8000
+    - pangolin.public-resources.paperless.targets[0].healthcheck.path=/
+    - pangolin.public-resources.paperless.targets[0].healthcheck.status=200
+  stirling-pdf:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: docker.stirlingpdf.com/stirlingtools/stirling-pdf:latest
+    container_name: stirling-pdf
+    environment:
+      DOCKER_ENABLE_SECURITY: 'false'
+      SECURITY_ENABLELOGIN: 'false'
+      SYSTEM_DEFAULTLOCALE: en-US
+      UI_APPNAME: Stirling PDF
+      UI_HOMEDESCRIPTION: Self-hosted PDF toolbox
+      UI_APPNAMENAVBAR: Stirling PDF
+      SYSTEM_MAXFILESIZE: '100'
+      METRICS_ENABLED: 'true'
+    volumes:
+    - ${DOCKER_BASE_DIR}/stirling-pdf/tessdata:/usr/share/tessdata
+    - ${DOCKER_BASE_DIR}/stirling-pdf/config:/configs
+    - ${DOCKER_BASE_DIR}/stirling-pdf/logs:/logs
+    networks:
+    - media-stack
+    ports:
+    - 8085:8080
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -f http://localhost:8080/api/v1/info/status | grep -q 'UP'
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Documents
+    - homepage.name=Stirling PDF
+    - homepage.icon=stirling-pdf
+    - homepage.href=https://${STIRLING_SUBDOMAIN:-pdf}.${DOMAIN_NAME:-localhost}
+    - homepage.description=PDF Tools
+    - pangolin.public-resources.stirling-pdf.name=Stirling PDF
+    - pangolin.public-resources.stirling-pdf.protocol=http
+    - pangolin.public-resources.stirling-pdf.full-domain=${STIRLING_SUBDOMAIN:-pdf}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.stirling-pdf.auth.sso-enabled=true
+    - pangolin.public-resources.stirling-pdf.targets[0].hostname=stirling-pdf
+    - pangolin.public-resources.stirling-pdf.targets[0].method=http
+    - pangolin.public-resources.stirling-pdf.targets[0].port=8080
+    - pangolin.public-resources.stirling-pdf.targets[0].healthcheck.hostname=stirling-pdf
+    - pangolin.public-resources.stirling-pdf.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.stirling-pdf.targets[0].healthcheck.path=/api/v1/info/status
+    - pangolin.public-resources.stirling-pdf.targets[0].healthcheck.status=200
+  karakeep-meilisearch:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: getmeili/meilisearch:v1.37.0
+    container_name: karakeep-meilisearch
+    environment:
+      MEILI_NO_ANALYTICS: 'true'
+      MEILI_MASTER_KEY: ${KARAKEEP_MEILI_MASTER_KEY:?set KARAKEEP_MEILI_MASTER_KEY in .env}
+    volumes:
+    - ${DOCKER_BASE_DIR}/karakeep/meilisearch:/meili_data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:7700/health
+  karakeep-chrome:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: gcr.io/zenika-hub/alpine-chrome:124
+    container_name: karakeep-chrome
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --output-document=/dev/null
+      - http://localhost:9222/json/version
+    command:
+    - --no-sandbox
+    - --disable-gpu
+    - --disable-dev-shm-usage
+    - --remote-debugging-address=0.0.0.0
+    - --remote-debugging-port=9222
+    - --hide-scrollbars
+  karakeep:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: ghcr.io/karakeep-app/karakeep:${KARAKEEP_VERSION:-release}
+    container_name: karakeep
+    environment:
+      NEXTAUTH_URL: ${KARAKEEP_BASE_URL:-https://${KARAKEEP_SUBDOMAIN:-karakeep}.${DOMAIN_NAME:-localhost}}
+      NEXTAUTH_SECRET: ${KARAKEEP_NEXTAUTH_SECRET:?set KARAKEEP_NEXTAUTH_SECRET in .env}
+      MEILI_ADDR: http://karakeep-meilisearch:7700
+      MEILI_MASTER_KEY: ${KARAKEEP_MEILI_MASTER_KEY:?set KARAKEEP_MEILI_MASTER_KEY in .env}
+      BROWSER_WEB_URL: http://karakeep-chrome:9222
+      DATA_DIR: /data
+    volumes:
+    - ${DOCKER_BASE_DIR}/karakeep/data:/data
+    networks:
+    - media-stack
+    ports:
+    - 3005:3000
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://127.0.0.1:3000/api/health
+    depends_on:
+      karakeep-meilisearch:
+        condition: service_healthy
+      karakeep-chrome:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Knowledge
+    - homepage.name=Karakeep
+    - homepage.icon=karakeep
+    - homepage.href=${KARAKEEP_BASE_URL:-https://${KARAKEEP_SUBDOMAIN:-karakeep}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Bookmarks & Read Later
+    - pangolin.public-resources.karakeep.name=Karakeep
+    - pangolin.public-resources.karakeep.protocol=http
+    - pangolin.public-resources.karakeep.full-domain=${KARAKEEP_SUBDOMAIN:-karakeep}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.karakeep.auth.sso-enabled=true
+    - pangolin.public-resources.karakeep.targets[0].hostname=karakeep
+    - pangolin.public-resources.karakeep.targets[0].method=http
+    - pangolin.public-resources.karakeep.targets[0].port=3000
+    - pangolin.public-resources.karakeep.targets[0].healthcheck.hostname=karakeep
+    - pangolin.public-resources.karakeep.targets[0].healthcheck.port=3000
+    - pangolin.public-resources.karakeep.targets[0].healthcheck.path=/api/health
+    - pangolin.public-resources.karakeep.targets[0].healthcheck.status=200
+  docmost-db:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: postgres:18-alpine
+    container_name: docmost-db
+    environment:
+      POSTGRES_DB: ${DOCMOST_DB_NAME:-docmost}
+      POSTGRES_USER: ${DOCMOST_DB_USER:-docmost}
+      POSTGRES_PASSWORD: ${DOCMOST_DB_PASSWORD:?set DOCMOST_DB_PASSWORD in .env}
+    volumes:
+    - ${DOCMOST_DB_DATA_LOCATION:-${DOCKER_SSD_CONFIG_DIR}/docmost-postgres}:/var/lib/postgresql/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${DOCMOST_DB_USER:-docmost} -d ${DOCMOST_DB_NAME:-docmost}
+  docmost-redis:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: redis:8-alpine
+    container_name: docmost-redis
+    volumes:
+    - ${DOCKER_BASE_DIR}/docmost/redis:/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
+    - --maxmemory-policy
+    - noeviction
+  docmost:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: docmost/docmost:latest
+    container_name: docmost
+    environment:
+      APP_URL: ${DOCMOST_BASE_URL:-https://${DOCMOST_SUBDOMAIN:-docs}.${DOMAIN_NAME:-localhost}}
+      PORT: 3000
+      APP_SECRET: ${DOCMOST_APP_SECRET:?set DOCMOST_APP_SECRET in .env}
+      DATABASE_URL: postgresql://${DOCMOST_DB_USER:-docmost}:${DOCMOST_DB_PASSWORD:?set DOCMOST_DB_PASSWORD in .env}@docmost-db:5432/${DOCMOST_DB_NAME:-docmost}?schema=public
+      REDIS_URL: redis://docmost-redis:6379
+      STORAGE_DRIVER: local
+    volumes:
+    - ${DOCKER_BASE_DIR}/docmost/storage:/app/data/storage
+    networks:
+    - media-stack
+    ports:
+    - 3004:3000
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:3000/api/health
+    depends_on:
+      docmost-db:
+        condition: service_healthy
+      docmost-redis:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Knowledge
+    - homepage.name=Docmost
+    - homepage.icon=docmost
+    - homepage.href=${DOCMOST_BASE_URL:-https://${DOCMOST_SUBDOMAIN:-docs}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Collaborative Wiki
+    - pangolin.public-resources.docmost.name=Docmost
+    - pangolin.public-resources.docmost.protocol=http
+    - pangolin.public-resources.docmost.full-domain=${DOCMOST_SUBDOMAIN:-docs}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.docmost.auth.sso-enabled=true
+    - pangolin.public-resources.docmost.targets[0].hostname=docmost
+    - pangolin.public-resources.docmost.targets[0].method=http
+    - pangolin.public-resources.docmost.targets[0].port=3000
+    - pangolin.public-resources.docmost.targets[0].healthcheck.hostname=docmost
+    - pangolin.public-resources.docmost.targets[0].healthcheck.port=3000
+    - pangolin.public-resources.docmost.targets[0].healthcheck.path=/api/health
+    - pangolin.public-resources.docmost.targets[0].healthcheck.status=200
+  nextcloud:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-large
+    image: lscr.io/linuxserver/nextcloud:latest
+    container_name: nextcloud
+    environment:
+      NEXTCLOUD_TRUSTED_DOMAINS: ${NEXTCLOUD_TRUSTED_DOMAINS:-${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}}
+    volumes:
+    - ${DOCKER_BASE_DIR}/nextcloud:/config
+    - ${DOCKER_MEDIA_DIR}:/data
+    networks:
+    - media-stack
+    ports:
+    - 8443:443
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - -k
+      - https://localhost/status.php
+      interval: 1m
+      start_period: 5m
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Files
+    - homepage.name=Nextcloud
+    - homepage.icon=nextcloud
+    - homepage.href=https://${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}
+    - homepage.description=File Sync & Share
+    - pangolin.public-resources.nextcloud.name=Nextcloud
+    - pangolin.public-resources.nextcloud.protocol=http
+    - pangolin.public-resources.nextcloud.full-domain=${NEXTCLOUD_SUBDOMAIN:-cloud}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.nextcloud.auth.sso-enabled=true
+    - pangolin.public-resources.nextcloud.targets[0].hostname=nextcloud
+    - pangolin.public-resources.nextcloud.targets[0].method=https
+    - pangolin.public-resources.nextcloud.targets[0].port=443
+    profiles:
+    - files
+  n8n:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    environment:
+      GENERIC_TIMEZONE: ${TZ}
+      TZ: ${TZ}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+      N8N_RUNNERS_ENABLED: 'true'
+      N8N_HOST: ${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      NODE_ENV: production
+      WEBHOOK_URL: https://${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}/
+      N8N_METRICS: 'true'
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+    volumes:
+    - ${DOCKER_BASE_DIR}/n8n:/home/node/.n8n
+    networks:
+    - media-stack
+    ports:
+    - 5678:5678
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --no-verbose
+      - --tries=1
+      - --spider
+      - http://localhost:5678/healthz
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Automation
+    - homepage.name=n8n
+    - homepage.icon=n8n
+    - homepage.href=https://${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}
+    - homepage.description=Workflow Automation
+    - pangolin.public-resources.n8n.name=n8n
+    - pangolin.public-resources.n8n.protocol=http
+    - pangolin.public-resources.n8n.full-domain=${N8N_SUBDOMAIN:-n8n}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.n8n.auth.sso-enabled=true
+    - pangolin.public-resources.n8n.targets[0].hostname=n8n
+    - pangolin.public-resources.n8n.targets[0].method=http
+    - pangolin.public-resources.n8n.targets[0].port=5678
+    - pangolin.public-resources.n8n.targets[0].healthcheck.hostname=n8n
+    - pangolin.public-resources.n8n.targets[0].healthcheck.port=5678
+    - pangolin.public-resources.n8n.targets[0].healthcheck.path=/healthz
+    - pangolin.public-resources.n8n.targets[0].healthcheck.status=200
+    profiles:
+    - automation

@@ -2,7 +2,9 @@
 
 [← Back to README](../README.md)
 
-Complete guide to network configuration, VPN routing, and port mappings.
+Advanced guide to network configuration, VPN routing, and port mappings.
+
+Starter users can ignore most of this page. The default `docker compose up -d` path does not start Gluetun or Newt.
 
 ---
 
@@ -185,7 +187,7 @@ radarr:
   # No ports defined here - Gluetun exposes them
 ```
 
-To keep existing URLs stable, Gluetun keeps exposing the current VPN-routed ports even though the optional services themselves are now controlled with profiles:
+To keep existing URLs stable, Gluetun keeps exposing the current VPN-routed ports even though the optional services themselves now live in the `media` bundle and are further controlled with profiles:
 
 ```yaml
 gluetun:
@@ -204,6 +206,13 @@ gluetun:
 ```
 
 ### VPN-Routed Services
+
+These services only exist after you start the `media` bundle, for example:
+
+```bash
+make init BUNDLES="media"
+make up BUNDLES="media" PROFILES="arr"
+```
 
 | Service | Port | Access URL |
 |:--------|:----:|:-----------|
@@ -294,8 +303,8 @@ This list focuses on the ports published on the host. Internal-only sidecars sta
 | 22000 | Syncthing Sync | TCP / UDP | Direct |
 | 21027 | Syncthing Discovery | UDP | Direct |
 | 22300 | Joplin | HTTP | Direct |
-| 3003 | Kasm Wizard | HTTPS | Direct, `kasm` profile only |
-| 8444 | Kasm UI | HTTPS | Direct, `kasm` profile only |
+| 3003 | Kasm Wizard | HTTPS | Direct, `apps` bundle + `kasm` profile |
+| 8444 | Kasm UI | HTTPS | Direct, `apps` bundle + `kasm` profile |
 
 #### Documents & Knowledge
 
@@ -366,6 +375,8 @@ This list focuses on the ports published on the host. Internal-only sidecars sta
 
 ### Option 1: Pangolin/Newt (Recommended)
 
+This path only exists after you start the `access` bundle.
+
 ```mermaid
 flowchart LR
     User["👤 User<br/>(Remote)"]
@@ -389,6 +400,13 @@ newt:
     NEWT_ID: ${NEWT_ID}
     NEWT_SECRET: ${NEWT_SECRET}
     PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT}
+```
+
+Starter command path:
+
+```bash
+make init BUNDLES="access"
+make up BUNDLES="access"
 ```
 
 ### Option 2: Cloudflare Tunnel
@@ -620,7 +638,7 @@ graph TB
 
 ## Related Documentation
 
-- [Architecture](architecture.md) - Network topology diagrams
+- [Architecture](advanced/architecture.md) - Network topology diagrams
 - [Configuration](configuration.md) - VPN setup details
 - [Troubleshooting](troubleshooting.md) - More network debugging
 

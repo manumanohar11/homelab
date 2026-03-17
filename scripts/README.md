@@ -1,30 +1,25 @@
 # Repository Scripts
 
-Shared maintenance scripts for the homelab stack.
+These scripts are maintainer-facing unless noted otherwise.
 
-## Available Scripts
+## User-Facing
 
-- `scripts/init-env.py` - Create `.env` from `.env.example` when needed and generate any missing required secrets for first-time startup.
-- `scripts/sync-monitoring-config.sh` - Sync tracked monitoring and logging templates from `config-templates/` into `${DOCKER_BASE_DIR}` and create the required runtime directories.
-- `scripts/setup-logging.sh` - Backward-compatible wrapper for `scripts/sync-monitoring-config.sh`.
-- `scripts/build-docmost-space.py` - Generate the import-ready `docs/docmost-space/` wiki bundle for Docmost.
-- `scripts/validate-stack.py` - Validate compose modules, documented profiles, markdown links, Docmost bundle freshness, stale doc references, and accidentally tracked local artifacts.
+- `scripts/init-env.py`
+  - Wrapped by `make init`
+  - Creates `.env` from `.env.example`
+  - Optionally appends bundle settings from `env/bundles/*.env.example`
+  - Generates starter or bundle secrets when they are missing
 
-## Common Usage
+## Maintainer-Facing
 
-```bash
-# Bootstrap .env for first-time setup
-python3 scripts/init-env.py
-
-# Sync monitoring and logging templates into runtime config directories
-./scripts/sync-monitoring-config.sh
-
-# Check whether runtime configs drifted from tracked templates
-./scripts/sync-monitoring-config.sh --check
-
-# Rebuild the import-ready Docmost bundle
-python3 scripts/build-docmost-space.py
-
-# Validate compose and documentation consistency
-python3 scripts/validate-stack.py
-```
+- `scripts/validate-stack.py`
+  - Validates the starter stack, each bundle, the full stack, markdown links, and Docmost output
+- `scripts/build-docmost-space.py`
+  - Builds the import-ready Docmost bundle under `build/docmost-space/`
+- `scripts/sync-monitoring-config.sh`
+  - Syncs tracked monitoring/logging templates into `${DOCKER_BASE_DIR}`
+- `scripts/setup-logging.sh`
+  - Compatibility wrapper around `scripts/sync-monitoring-config.sh`
+- `scripts/homarr_seed.py`
+  - Applies the curated Homarr board to the resolved starter or bundle-aware compose config
+  - Supports `--bundle`, `--profile`, and `--dry-run` for previewing advanced layouts

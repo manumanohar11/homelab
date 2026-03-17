@@ -40,7 +40,7 @@ This helps you isolate whether the issue is:
 - isolated to the VPN-routed containers
 - specific to a remote service or API
 
-See [Utility Scripts](scripts.md) for repo maintenance helpers.
+See [Maintainer Scripts](advanced/scripts.md) for repo maintenance helpers.
 
 ### Health Check Script
 
@@ -264,7 +264,7 @@ docker compose up -d --force-recreate [service]
 
 **Check Gluetun status:**
 ```bash
-docker compose logs gluetun | tail -50
+make logs BUNDLES="media" SERVICE=gluetun TAIL=50
 ```
 
 **Verify VPN IP:**
@@ -299,7 +299,7 @@ curl -s ifconfig.me
 
 **Restart VPN:**
 ```bash
-docker compose restart gluetun
+make restart BUNDLES="media" SERVICE=gluetun
 ```
 
 </details>
@@ -1008,10 +1008,10 @@ Manual updates ensure:
 
 Yes, but not recommended for *Arr stack.
 
-To disable VPN:
-1. Comment out Gluetun service
-2. Change *Arr services to use bridge network
-3. Add ports directly to each service
+To avoid VPN entirely:
+1. Do not enable the `media` bundle or the `arr` profile
+2. Keep using the starter stack only
+3. If you want the *Arr apps without VPN, treat that as a custom fork of the repo and rework the `media` bundle yourself
 
 > [!CAUTION]
 > Security tradeoff: Your real IP will be exposed to trackers.
@@ -1139,7 +1139,7 @@ docker compose up -d [service]
 ### Use Centralized Logging
 
 For advanced log analysis, use the Loki/Grafana logging stack:
-- See [Logging Guide](logging.md) for setup
+- See [Advanced Logging](advanced/logging.md) for setup
 - Access Grafana dashboards at `http://your-server:3000`
 - Pre-built dashboards for container error tracking and per-service log browsing
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sqlite3
@@ -21,6 +22,7 @@ ICON_BASE = "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@master/svg"
 FALLBACK_ICON = f"{ICON_BASE}/homarr.svg"
 SEED_APP_PREFIX = "seed-app-"
 SEED_ITEM_PREFIX = "seed-item-"
+BUNDLE_CHOICES = ("media", "apps", "ops", "access")
 
 PANGOLIN_LABEL = re.compile(r"^pangolin\.public-resources\.([^.]+)\.(.+)$")
 ENV_VAR_PATTERN = re.compile(r"\$\{([^}:]+)(:-([^}]*))?\}")
@@ -263,30 +265,56 @@ def resolve_db_path(env: dict[str, str]) -> Path:
     return REPO_ROOT / "data" / "homarr" / "appdata" / "db" / "db.sqlite"
 
 
-def load_compose_services() -> dict[str, dict[str, Any]]:
-    commands = (
-        ["docker", "compose", "--profile", "*", "config", "--format", "json"],
-        ["docker", "compose", "config", "--format", "json"],
-    )
-    last_error = "docker compose config did not run"
+def unique_values(values: list[str]) -> tuple[str, ...]:
+    ordered: list[str] = []
+    seen: set[str] = set()
 
-    for command in commands:
-        try:
-            result = subprocess.run(
-                command,
-                cwd=REPO_ROOT,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-            last_error = str(exc)
+    for value in values:
+        if value in seen:
             continue
+        seen.add(value)
+        ordered.append(value)
 
-        config = json.loads(result.stdout)
-        return config.get("services", {})
+    return tuple(ordered)
 
-    raise RuntimeError(f"Unable to load docker compose config: {last_error}")
+
+def compose_config_command(
+    bundles: tuple[str, ...],
+    profiles: tuple[str, ...],
+) -> list[str]:
+    command = ["docker", "compose", "-f", "docker-compose.yml"]
+
+    for bundle in bundles:
+        command.extend(["-f", f"docker-compose.{bundle}.yml"])
+    for profile in profiles:
+        command.extend(["--profile", profile])
+
+    command.extend(["config", "--format", "json"])
+    return command
+
+
+def load_compose_services(
+    bundles: tuple[str, ...] = (),
+    profiles: tuple[str, ...] = (),
+) -> dict[str, dict[str, Any]]:
+    command = compose_config_command(bundles, profiles)
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("docker compose is not installed or not on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"docker compose config failed: {detail}") from exc
+
+    config = json.loads(result.stdout)
+    return config.get("services", {})
 
 
 def slugify(value: str) -> str:
@@ -545,8 +573,11 @@ def choose_icon_slug(service: str, labels: dict[str, str], override: ServiceOver
     return override.icon_slug or labels.get("homepage.icon") or service
 
 
-def build_service_cards() -> list[ServiceCard]:
-    services = load_compose_services()
+def build_service_cards(
+    bundles: tuple[str, ...] = (),
+    profiles: tuple[str, ...] = (),
+) -> list[ServiceCard]:
+    services = load_compose_services(bundles, profiles)
     cards: list[ServiceCard] = []
 
     for service_name, service in services.items():
@@ -821,11 +852,15 @@ def reset_section_collapse_states(
         )
 
 
-def seed_board(db_path: Path) -> list[str]:
+def seed_board(
+    db_path: Path,
+    bundles: tuple[str, ...] = (),
+    profiles: tuple[str, ...] = (),
+) -> list[str]:
     if not db_path.exists():
         raise FileNotFoundError(f"Homarr database not found at {db_path}")
 
-    cards = build_service_cards()
+    cards = build_service_cards(bundles, profiles)
     if not cards:
         raise RuntimeError("No routable services were discovered for the Homarr board.")
 
@@ -962,14 +997,61 @@ def seed_board(db_path: Path) -> list[str]:
     return [card.name for card in cards]
 
 
-def main() -> int:
-    env = load_env(ENV_PATH)
-    db_path = resolve_db_path(env)
-    included_apps = seed_board(db_path)
-    print(f"Seeded Homarr board at {db_path}")
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Seed the Homarr board from the resolved starter or bundle-aware compose config.",
+    )
+    parser.add_argument(
+        "--bundle",
+        action="append",
+        choices=BUNDLE_CHOICES,
+        default=[],
+        help="Include an optional compose bundle. Repeat for multiple bundles.",
+    )
+    parser.add_argument(
+        "--profile",
+        action="append",
+        default=[],
+        help="Enable a compose profile while resolving services. Repeat as needed.",
+    )
+    parser.add_argument(
+        "--db-path",
+        type=Path,
+        help="Override the detected Homarr SQLite path.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview the apps that would be seeded without writing to the Homarr database.",
+    )
+    return parser.parse_args()
+
+
+def print_included_apps(app_names: list[str], prefix: str) -> None:
+    print(prefix)
     print("Included apps:")
-    for app_name in included_apps:
+    for app_name in app_names:
         print(f"- {app_name}")
+
+
+def main() -> int:
+    args = parse_args()
+    bundles = unique_values(args.bundle)
+    profiles = unique_values(args.profile)
+
+    cards = build_service_cards(bundles, profiles)
+    if not cards:
+        raise RuntimeError("No routable services were discovered for the Homarr board.")
+
+    app_names = [card.name for card in cards]
+    if args.dry_run:
+        print_included_apps(app_names, "Dry run only. No changes were written.")
+        return 0
+
+    env = load_env(ENV_PATH)
+    db_path = args.db_path or resolve_db_path(env)
+    included_apps = seed_board(db_path, bundles, profiles)
+    print_included_apps(included_apps, f"Seeded Homarr board at {db_path}")
     return 0
 
 

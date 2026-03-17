@@ -2,157 +2,145 @@
 
 Guidelines for AI agents working in this Docker-based homelab infrastructure repository.
 
-## Repository Overview
+## Repository Model
 
-Modular Docker Compose infrastructure for self-hosted services: media management (*Arr suite), media servers (Plex/Jellyfin/Tdarr), photo management (Immich), monitoring (Prometheus/Grafana/Loki), tunnel proxy (Pangolin/Newt), backup (Duplicati), requests (Overseerr), automation (n8n), and document/knowledge tools (Paperless-ngx, Stirling-PDF, Karakeep, Docmost).
+This repo is now starter-first:
+
+- `docker compose up -d` starts only the beginner-friendly starter stack.
+- Optional services live in bundle files and are enabled with `make up BUNDLES="..." PROFILES="..."`.
+- Shared compose defaults belong in `docker-compose.common.yml`, not duplicated across bundle files.
+
+Starter services:
+
+- `docker-socket-proxy`
+- `plex`
+- `immich-server`
+- `immich-machine-learning`
+- `database`
+- `redis`
+- `homarr`
+- `portainer`
+- `dozzle`
+- `watchtower`
+- `duplicati`
+- `tautulli`
+
+Optional bundles:
+
+- `media`: Gluetun, *Arr, downloaders, requests, and alternate media apps
+- `apps`: productivity, documents, files, and automation
+- `ops`: monitoring, logging, diagnostics, and advanced backups
+- `access`: Pangolin/Newt, Jitsi, coturn, and DDNS helpers
 
 ## Commands Reference
 
 ```bash
-# Stack operations
-docker compose up -d                      # Start full stack
-docker compose up -d <service>            # Start specific service
-docker compose down                       # Stop all services
-docker compose restart <service>          # Restart service
-docker compose ps                         # Check status
+# Beginner path
+make init
+docker compose up -d
 
-# Profile-based startup (for optional services)
-docker compose --profile vpn up -d        # Start with VPN services
-docker compose --profile monitoring up -d # Start with extra monitoring
-docker compose --profile jellyfin up -d   # Start Jellyfin instead of Plex
+# Bundle-aware workflow
+make init BUNDLES="media apps"
+make up BUNDLES="media" PROFILES="arr jellyfin"
+make config BUNDLES="ops" PROFILES="monitoring"
+make logs BUNDLES="access" PROFILES="jitsi" SERVICE=jitsi-web
 
-# Logs and debugging
-docker compose logs -f <service>          # View logs
-docker compose config                     # Validate compose files
+# Starter-only debugging
+docker compose config
+docker compose logs -f <service>
 docker inspect --format='{{.State.Health.Status}}' <container>
-docker exec -it <container> /bin/bash     # Shell into container
-docker stats                              # Resource usage
+docker exec -it <container> /bin/bash
+docker stats
+
+# Maintainer validation
+python3 scripts/validate-stack.py
+python3 scripts/build-docmost-space.py --check
 ```
 
 ## Project Structure
 
-```
-docker-compose.yml              # Main entry point (uses include directive)
-docker-compose.common.yml       # YAML anchors and reusable configurations
-docker-compose.core.yml         # VPN (gluetun), tunnels (newt/Pangolin)
-docker-compose.arr.yml          # *Arr suite (radarr, sonarr, readarr, etc.)
-docker-compose.downloaders.yml  # qBittorrent, Prowlarr, FlareSolverr, Bitmagnet
-docker-compose.media-servers.yml# Plex, Jellyfin, Stash, Tdarr
-docker-compose.management.yml   # Portainer, Watchtower, Glances
-docker-compose.monitoring.yml   # Prometheus, Grafana, Alertmanager, Uptime Kuma
-docker-compose.logging.yml      # Loki and Promtail
-docker-compose.photos.yml       # Immich stack
-docker-compose.documents.yml    # Paperless-ngx, Stirling-PDF, Karakeep, Docmost
-docker-compose.files.yml        # Nextcloud
-docker-compose.automation.yml   # n8n
-docker-compose.requests.yml     # Overseerr, Jellyseerr, Notifiarr
-docker-compose.backup.yml       # Duplicati, Restic, DB-Backup
-hwaccel.transcoding.yml         # Hardware acceleration for transcoding
-hwaccel.ml.yml                  # Hardware acceleration for ML
-configs/                        # Application configs (tracked in git)
-  alertmanager/                 # Alertmanager configuration
-  glance-homepage/              # Glance dashboard config
-  loki/                         # Loki log aggregation config
-  promtail/                     # Promtail log collector config
-.env                            # Environment variables (NOT tracked)
-.env.example                    # Template for environment variables
+```text
+docker-compose.yml               # Starter stack only
+docker-compose.common.yml        # Shared anchors and helper services
+docker-compose.media.yml         # Optional media bundle
+docker-compose.apps.yml          # Optional apps bundle
+docker-compose.ops.yml           # Optional ops bundle
+docker-compose.access.yml        # Optional access bundle
+docker-compose.local.example.yml # Host-specific local overrides template
+hwaccel.transcoding.yml          # Hardware acceleration for transcoding
+hwaccel.ml.yml                   # Hardware acceleration for ML
+env/bundles/                     # Optional bundle env fragments
+docs/advanced/                   # Maintainer and advanced operator docs
+configs/                         # Tracked app config templates
+.env.example                     # Starter env template
 ```
 
-## Service Categories
+## Compose Conventions
 
-### Infrastructure
-| Service | Port | Purpose |
-|---------|------|---------|
-| Gluetun | - | VPN container |
-| Newt | - | Pangolin tunnel (auth & proxy) |
+### Optionality
 
-### Media Management (*Arr Suite)
-| Service | Port | Purpose |
-|---------|------|---------|
-| Radarr | 7878 | Movie management |
-| Sonarr | 8989 | TV show management |
-| Lidarr | 8686 | Music management |
-| Readarr | 8787 | Book management |
-| Bazarr | 6767 | Subtitle management |
-| Whisparr | 6969 | Adult content management |
-| Recyclarr | - | TRaSH guide sync |
+- Tracked optionality is handled with bundle files plus service profiles.
+- Do not reintroduce commented include toggles or hidden compose generation layers.
+- `docker-compose.yml` must remain starter-only.
 
-### Downloaders
-| Service | Port | Purpose |
-|---------|------|---------|
-| qBittorrent | 8080 | Torrent client |
-| Prowlarr | 9696 | Indexer manager |
-| FlareSolverr | 8191 | Cloudflare bypass |
-| Bitmagnet | 3333 | DHT crawler |
+### Shared Defaults
 
-### Media Servers
-| Service | Port | Purpose |
-|---------|------|---------|
-| Plex | 32400 | Primary media server |
-| Jellyfin | 8096 | Alternative media server |
-| Stash | 9998 | Adult media organizer |
-| Tdarr | 8265 | Media transcoding |
+- `docker-compose.common.yml` is the only tracked source for shared `x-*` defaults.
+- Prefer `extends` from helper services instead of repeating standard `restart`, `security_opt`, `logging`, standard resources, or VPN wiring.
+- Use the helper that matches the service shape before overriding specifics.
 
-### Photos
-| Service | Port | Purpose |
-|---------|------|---------|
-| Immich Server | 2283 | Photo management |
-| Immich ML | - | Machine learning |
+Available helpers:
 
-### Monitoring
-| Service | Port | Purpose |
-|---------|------|---------|
-| Prometheus | 9090 | Metrics collection |
-| Grafana | 3000 | Visualization |
-| Alertmanager | 9093 | Alert management |
-| Loki | 3100 | Log aggregation |
-| Uptime Kuma | 3001 | Uptime monitoring |
+- `_service-tiny`, `_service-small`, `_service-medium`, `_service-large`
+- `_lsio-small`, `_lsio-medium`, `_lsio-large`
+- `_vpn-service-small`, `_vpn-service-medium`, `_vpn-service-large`
+- `_vpn-lsio-small`, `_vpn-lsio-medium`, `_vpn-lsio-large`
+- `_arr-lsio-small`, `_arr-lsio-medium`, `_arr-lsio-large`
 
-### Documents & Knowledge
-| Service | Port | Purpose |
-|---------|------|---------|
-| Paperless-ngx | 8010 | Document archive and OCR |
-| Stirling-PDF | 8085 | PDF toolbox |
-| Karakeep | 3005 | Bookmark and read-later manager |
-| Docmost | 3004 | Collaborative wiki |
+Available anchors:
 
-### Management
-| Service | Port | Purpose |
-|---------|------|---------|
-| Portainer | 9443 | Container management |
-| Watchtower | - | Auto updates |
-| Duplicati | 8200 | Backup solution |
-| Overseerr | 5055 | Media requests |
+- `*common-env`
+- `*lsio-env`
+- `*security-opts`
+- `*default-logging`
+- `*healthcheck-defaults`
+- `*resources-tiny`
+- `*resources-small`
+- `*resources-medium`
+- `*resources-large`
+- `*vpn-depends-on`
+- `*arr-depends-on`
 
-## Code Style Guidelines
+### Property Order
 
-### File Header & Service Order
-Start compose files with path/purpose comment. Follow this property order:
-```
-image → container_name → restart → security_opt → network_mode → 
-environment → volumes → user → networks → ports → healthcheck → 
-depends_on → logging → deploy → labels → profiles
+Use this service property order when practical:
+
+```text
+extends → image → container_name → restart → init → security_opt →
+network_mode → environment → env_file → volumes → user → group_add →
+networks → ports → healthcheck → depends_on → logging → deploy →
+labels → profiles
 ```
 
-### Naming & Environment Variables
-- **Containers**: lowercase, hyphen-separated (`uptime-kuma`)
-- **Networks**: Use shared `media-stack` network  
-- **Volumes**: Use env vars (`${DOCKER_BASE_DIR}/service:/config`)
-- **Common vars**: `PUID`, `PGID`, `TZ`, `DOCKER_BASE_DIR`, `DOCKER_MEDIA_DIR`, `DOMAIN_NAME`
-- **Defaults**: `${VAR:-default_value}`
+### Naming and Environment Variables
 
-### Standard Service Template
+- Containers: lowercase, hyphen-separated
+- Networks: use the shared `media-stack` network unless the service intentionally uses host or service network mode
+- Volumes: prefer env-backed paths such as `${DOCKER_BASE_DIR}/service:/config`
+- Defaults: use `${VAR:-default}` where a safe default exists
+- Common variables: `PUID`, `PGID`, `TZ`, `DOCKER_BASE_DIR`, `DOCKER_MEDIA_DIR`, `DOMAIN_NAME`
+
+## Service Patterns
+
+### Standard LinuxServer.io Service
+
 ```yaml
 service-name:
+  extends:
+    file: docker-compose.common.yml
+    service: _lsio-medium
   image: lscr.io/linuxserver/app:latest
   container_name: service-name
-  restart: unless-stopped
-  security_opt:
-    - no-new-privileges:true
-  environment:
-    PUID: ${PUID}
-    PGID: ${PGID}
-    TZ: ${TZ}
   volumes:
     - ${DOCKER_BASE_DIR}/service-name:/config
   networks:
@@ -161,39 +149,34 @@ service-name:
     - "8080:8080"
   healthcheck:
     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-    interval: 30s
-    timeout: 10s
-    retries: 3
-    start_period: 30s
-  logging:
-    driver: json-file
-    options:
-      max-size: "10m"
-      max-file: "3"
-  deploy:
-    resources:
-      limits:
-        cpus: '1'
-        memory: 512M
-      reservations:
-        memory: 128M
   labels:
     - "com.centurylinklabs.watchtower.enable=true"
-    - "homepage.group=Category"
-    - "homepage.name=Service Name"
 ```
 
-### VPN-Routed Service Pattern
-For services routing through VPN, use `network_mode: "service:gluetun"` and depend on gluetun health:
+### VPN-Routed Service
+
 ```yaml
 service-name:
-  network_mode: "service:gluetun"
-  depends_on:
-    gluetun:
-      condition: service_healthy
+  extends:
+    file: docker-compose.common.yml
+    service: _vpn-service-medium
+  image: ghcr.io/example/app:latest
+  container_name: service-name
 ```
 
-### GPU-Enabled Service (NVIDIA)
+### *Arr Service
+
+```yaml
+service-name:
+  extends:
+    file: docker-compose.common.yml
+    service: _arr-lsio-large
+  image: lscr.io/linuxserver/radarr:latest
+  container_name: radarr
+```
+
+### GPU-Enabled Service
+
 ```yaml
 service-name:
   environment:
@@ -208,115 +191,36 @@ service-name:
             capabilities: [gpu]
 ```
 
-### Health Checks (Required)
-All services MUST have healthchecks:
-```yaml
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:PORT/health"]
-  interval: 1m
-  timeout: 10s
-  retries: 3
-  start_period: 30s
-```
-
-### Logging (Required)
-All services MUST have log rotation:
-```yaml
-logging:
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "3"
-```
-
-### Resource Limits (Recommended)
-```yaml
-deploy:
-  resources:
-    limits:
-      cpus: '2'
-      memory: 2G
-    reservations:
-      memory: 512M
-```
-
-### YAML Anchors
-Use anchors from `docker-compose.common.yml`:
-- `*common-env` - PUID, PGID, TZ
-- `*default-logging` - Standard log rotation
-- `*healthcheck-defaults` - Standard health check timing
-- `*resources-small/medium/large` - Resource limits
-- `*security-opts` - no-new-privileges
-- `*vpn-depends-on` - VPN dependency
-- `*arr-depends-on` - Full *Arr dependencies
-
 ## Security Guidelines
 
-1. **Never commit secrets** - `.env` is gitignored
-2. **Use environment variables** for all sensitive data
-3. **Read-only mounts** - Use `:ro` when write not needed
-4. **Docker socket** - Always mount read-only (`/var/run/docker.sock:ro`)
-5. **Limit privileges** - Only use `privileged: true` when necessary (e.g., cAdvisor)
-6. **Security options** - Add `no-new-privileges:true` to all services
-7. **Resource limits** - Always set memory/CPU limits to prevent runaway containers
-
-## Image Sources
-
-- **LinuxServer.io**: `lscr.io/linuxserver/` (preferred for media apps)
-- **Hotio**: `ghcr.io/hotio/` (alternative media images)
-- **Official**: Docker Hub official images for databases/monitoring
-- **GitHub Container Registry**: `ghcr.io/` for community projects
-
-## Enabling/Disabling Services
-
-### Preferred Method: Use profiles for optional services
-```yaml
-# In service definition:
-profiles:
-  - arr
-
-# To start:
-docker compose --profile arr up -d
-```
-
-### Secondary Method: Comment includes in docker-compose.yml
-```yaml
-include:
-  - docker-compose.core.yml
-  # - docker-compose.arr.yml      # Commented = disabled
-```
+1. Never commit secrets. `.env` remains gitignored.
+2. Use environment variables for all sensitive data.
+3. Prefer read-only mounts when write access is not required.
+4. Mount the Docker socket read-only unless a tool explicitly requires otherwise.
+5. Add `no-new-privileges:true` to every service.
+6. Set resource limits and reservations on every service.
+7. Only use `privileged: true` when there is a real service requirement.
 
 ## Testing Changes
 
-1. Validate: `docker compose config`
-2. Check specific file: `docker compose -f docker-compose.core.yml config`
-3. Start: `docker compose up -d <service>`
-4. Check logs: `docker compose logs -f <service>`
-5. Verify health: `docker inspect --format='{{.State.Health.Status}}' <container>`
+1. Starter validation: `docker compose config`
+2. Bundle validation: `make config BUNDLES="media" PROFILES="arr jellyfin"`
+3. Service startup: `make up BUNDLES="ops" PROFILES="monitoring" SERVICE=grafana`
+4. Logs: `make logs BUNDLES="access" PROFILES="jitsi" SERVICE=jitsi-web`
+5. Full repo validation: `python3 scripts/validate-stack.py`
 
-## Troubleshooting
+## Maintainer Scripts
 
-| Issue | Solution |
-|-------|----------|
-| Service won't start | `docker compose logs <service>` |
-| Health check failing | Verify endpoint and container network |
-| Permission issues | Check PUID/PGID match host user |
-| Network issues | Ensure service on `media-stack` network |
-| VPN issues | Check gluetun health first |
-| Out of memory | Check `docker stats`, increase limits |
-| Logs filling disk | Verify logging config with max-size |
-
-## Git Workflow
-
-- Commit compose changes with descriptive messages
-- Never commit `.env` or gitignored files
-- Keep sensitive configs out of `configs/` directory
-- Use `.env.example` as template for required variables
+- `scripts/init-env.py`: user-facing bootstrap behind `make init`
+- `scripts/validate-stack.py`: validates starter, bundles, docs, and Docmost output
+- `scripts/build-docmost-space.py`: builds import-ready content under `build/docmost-space/`
+- `scripts/sync-monitoring-config.sh`: syncs tracked monitoring and logging templates
+- `scripts/homarr_seed.py`: seeds the Homarr board from the resolved starter or bundle-aware compose config
 
 ## Backup Strategy
 
-1. **Config backup**: All `${DOCKER_BASE_DIR}` directories
-2. **Secrets backup**: Keep `.env` in your backup plan
-3. **Database backup**: Use db-backup service for PostgreSQL dumps into `${DOCKER_BASE_DIR}/db-backup`
-4. **Media backup**: Separate strategy for large media files
-5. **Recommended schedule**: Daily for configs, weekly for databases
+1. Back up `${DOCKER_BASE_DIR}` configuration directories.
+2. Include `.env` in the backup plan.
+3. Use `db-backup` for PostgreSQL dumps where configured.
+4. Treat large media libraries as a separate backup problem.
+5. Prefer daily config backups and at least weekly database backups.

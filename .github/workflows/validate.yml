@@ -19,17 +19,5 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Prepare environment file
-        run: cp .env.example .env
-
-      - name: Validate rendered compose config
-        run: docker compose config --quiet
-
-      - name: Sync tracked monitoring templates
-        run: bash scripts/sync-monitoring-config.sh
-
-      - name: Verify monitoring template sync
-        run: bash scripts/sync-monitoring-config.sh --check
-
-      - name: Run repository validation
+      - name: Validate starter, bundles, docs, and docmost output
         run: python3 scripts/validate-stack.py

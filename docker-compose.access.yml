@@ -1,0 +1,293 @@
+# /mnt/g/docker/docker-compose.access.yml
+# Optional access bundle: Pangolin/Newt and Jitsi private calling.
+services:
+  newt:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: fosrl/newt
+    container_name: newt
+    environment:
+      PANGOLIN_ENDPOINT: ${PANGOLIN_ENDPOINT:-}
+      NEWT_ID: ${NEWT_ID}
+      NEWT_SECRET: ${NEWT_SECRET}
+      DOCKER_SOCKET: /var/run/docker.sock
+      TZ: ${TZ}
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+    - media-stack
+    healthcheck:
+      start_period: 10s
+      test:
+      - CMD-SHELL
+      - pgrep -x newt || exit 1
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+  jitsi-web:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: jitsi/web:${JITSI_IMAGE_VERSION:-stable-10655}
+    container_name: jitsi-web
+    environment:
+      TZ: ${TZ}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:-https://${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}}
+      ENABLE_AUTH: '1'
+      ENABLE_GUESTS: '1'
+      ENABLE_P2P: '1'
+      ENABLE_XMPP_WEBSOCKET: '1'
+      ENABLE_COLIBRI_WEBSOCKET: '1'
+      DISABLE_HTTPS: '1'
+      ENABLE_HTTP_REDIRECT: '0'
+      ENABLE_LETSENCRYPT: '0'
+      AUTH_TYPE: internal
+      COLIBRI_WEBSOCKET_JVB_LOOKUP_NAME: jitsi-jvb
+      TURN_HOST: ${JITSI_TURN_HOST:-${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}}
+      TURN_PORT: ${JITSI_TURN_PORT:-3478}
+      TURN_TRANSPORT: ${JITSI_TURN_TRANSPORT:-udp,tcp}
+      TURN_CREDENTIALS: ${JITSI_TURN_CREDENTIALS:?set JITSI_TURN_CREDENTIALS in .env}
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_GUEST_DOMAIN: ${JITSI_XMPP_GUEST_DOMAIN:-guest.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_SERVER: xmpp.${JITSI_XMPP_DOMAIN:-meet.jitsi}
+    volumes:
+    - ${DOCKER_BASE_DIR}/jitsi/web:/config
+    - ${DOCKER_BASE_DIR}/jitsi/web/crontabs:/var/spool/cron/crontabs
+    - ${DOCKER_BASE_DIR}/jitsi/transcripts:/usr/share/jitsi-meet/transcripts
+    - ${DOCKER_GIT_CONFIG_DIR}/jitsi/web/custom-config.js:/config/custom-config.js:ro
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - curl -fsS http://127.0.0.1/ >/dev/null || exit 1
+    depends_on:
+      jitsi-prosody:
+        condition: service_healthy
+      jitsi-jicofo:
+        condition: service_healthy
+      jitsi-jvb:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    - homepage.group=Communication
+    - homepage.name=Jitsi Meet
+    - homepage.icon=jitsi-meet
+    - homepage.href=${JITSI_PUBLIC_URL:-https://${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Private Video Calling
+    - pangolin.public-resources.meet.name=Jitsi Meet
+    - pangolin.public-resources.meet.protocol=http
+    - pangolin.public-resources.meet.full-domain=${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.meet.auth.sso-enabled=false
+    - pangolin.public-resources.meet.targets[0].hostname=jitsi-web
+    - pangolin.public-resources.meet.targets[0].method=http
+    - pangolin.public-resources.meet.targets[0].port=80
+    - pangolin.public-resources.meet.targets[0].healthcheck.hostname=jitsi-web
+    - pangolin.public-resources.meet.targets[0].healthcheck.port=80
+    - pangolin.public-resources.meet.targets[0].healthcheck.path=/
+    - pangolin.public-resources.meet.targets[0].healthcheck.status=200
+    profiles:
+    - jitsi
+  jitsi-prosody:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: jitsi/prosody:${JITSI_IMAGE_VERSION:-stable-10655}
+    container_name: jitsi-prosody
+    environment:
+      TZ: ${TZ}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:-https://${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}}
+      AUTH_TYPE: internal
+      ENABLE_AUTH: '1'
+      ENABLE_GUESTS: '1'
+      ENABLE_LOBBY: '1'
+      ENABLE_XMPP_WEBSOCKET: '1'
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD:?set JITSI_JICOFO_AUTH_PASSWORD in .env}
+      JICOFO_COMPONENT_SECRET: ${JITSI_JICOFO_COMPONENT_SECRET:?set JITSI_JICOFO_COMPONENT_SECRET in .env}
+      JVB_AUTH_USER: jvb
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD:?set JITSI_JVB_AUTH_PASSWORD in .env}
+      TURN_HOST: ${JITSI_TURN_HOST:-${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}}
+      TURN_PORT: ${JITSI_TURN_PORT:-3478}
+      TURN_TRANSPORT: ${JITSI_TURN_TRANSPORT:-udp,tcp}
+      TURN_CREDENTIALS: ${JITSI_TURN_CREDENTIALS:?set JITSI_TURN_CREDENTIALS in .env}
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_GUEST_DOMAIN: ${JITSI_XMPP_GUEST_DOMAIN:-guest.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_SERVER: xmpp.${JITSI_XMPP_DOMAIN:-meet.jitsi}
+    volumes:
+    - ${DOCKER_BASE_DIR}/jitsi/prosody/config:/config
+    - ${DOCKER_BASE_DIR}/jitsi/prosody/prosody-plugins-custom:/prosody-plugins-custom
+    - ${DOCKER_GIT_CONFIG_DIR}/jitsi/prosody/bootstrap.sh:/opt/jitsi-prosody/bootstrap.sh:ro
+    networks:
+      media-stack:
+        aliases:
+        - xmpp.${JITSI_XMPP_DOMAIN:-meet.jitsi}
+    healthcheck:
+      test:
+      - CMD
+      - /usr/local/bin/healthcheck.sh
+    entrypoint:
+    - /bin/sh
+    - /opt/jitsi-prosody/bootstrap.sh
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    profiles:
+    - jitsi
+  jitsi-jicofo:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: jitsi/jicofo:${JITSI_IMAGE_VERSION:-stable-10655}
+    container_name: jitsi-jicofo
+    environment:
+      TZ: ${TZ}
+      AUTH_TYPE: internal
+      ENABLE_AUTH: '1'
+      ENABLE_AUTO_OWNER: '0'
+      ENABLE_MODERATOR_CHECKS: '1'
+      JICOFO_ENABLE_AUTH: '1'
+      JICOFO_ENABLE_REST: '1'
+      JICOFO_AUTH_PASSWORD: ${JITSI_JICOFO_AUTH_PASSWORD:?set JITSI_JICOFO_AUTH_PASSWORD in .env}
+      XMPP_DOMAIN: ${JITSI_XMPP_DOMAIN:-meet.jitsi}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_MUC_DOMAIN: ${JITSI_XMPP_MUC_DOMAIN:-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_SERVER: xmpp.${JITSI_XMPP_DOMAIN:-meet.jitsi}
+    volumes:
+    - ${DOCKER_BASE_DIR}/jitsi/jicofo:/config
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - 'code="$$(curl -s -o /dev/null -w ''%{http_code}'' http://127.0.0.1:8888/ || true)"
+
+        [ "$$code" = "200" ] || [ "$$code" = "404" ]
+
+        '
+    depends_on:
+      jitsi-prosody:
+        condition: service_healthy
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    profiles:
+    - jitsi
+  jitsi-ddns:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: python:3.12-alpine
+    container_name: jitsi-ddns
+    environment:
+      TZ: ${TZ}
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      DDNS_HOSTNAME: ${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}
+      DDNS_API_TOKEN: ${JITSI_CLOUDFLARE_API_TOKEN:-}
+      DDNS_COMMENT: Managed by media-stack jitsi-ddns
+      DDNS_STATUS_PATH: /tmp/jitsi-ddns-status.json
+      DDNS_USER_AGENT: media-stack-jitsi-ddns/1.0
+    volumes:
+    - ${DOCKER_GIT_CONFIG_DIR}/ddns/update-cloudflare.py:/opt/ddns/update-cloudflare.py:ro
+    user: ${PUID}:${PGID}
+    networks:
+    - media-stack
+    healthcheck:
+      start_period: 45s
+      test:
+      - CMD
+      - python3
+      - -c
+      - "import json, pathlib, sys, time\nstatus_path = pathlib.Path(\"/tmp/jitsi-ddns-status.json\")\nif not status_path.exists():\n    raise SystemExit(1)\nstatus = json.loads(status_path.read_text())\nlast_success = float(status.get(\"last_success\", 0))\nraise SystemExit(0 if time.time() - last_success < 900 else 1)\n"
+    command:
+    - python3
+    - /opt/ddns/update-cloudflare.py
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    profiles:
+    - jitsi
+  jitsi-jvb:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: jitsi/jvb:${JITSI_IMAGE_VERSION:-stable-10655}
+    container_name: jitsi-jvb
+    environment:
+      TZ: ${TZ}
+      PUBLIC_URL: ${JITSI_PUBLIC_URL:-https://${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}}
+      ENABLE_COLIBRI_WEBSOCKET: '1'
+      COLIBRI_REST_ENABLED: 'true'
+      SHUTDOWN_REST_ENABLED: 'false'
+      JITSI_MEDIA_PUBLIC_HOSTNAME: ${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}
+      JITSI_JVB_UDP_PORT: ${JITSI_JVB_UDP_PORT:-10000}
+      JVB_ADVERTISE_PRIVATE_CANDIDATES: 'false'
+      JVB_AUTH_PASSWORD: ${JITSI_JVB_AUTH_PASSWORD:?set JITSI_JVB_AUTH_PASSWORD in .env}
+      JVB_PORT: ${JITSI_JVB_UDP_PORT:-10000}
+      JVB_WS_DOMAIN: ${JITSI_SUBDOMAIN:-meet}.${DOMAIN_NAME:-localhost}
+      XMPP_AUTH_DOMAIN: ${JITSI_XMPP_AUTH_DOMAIN:-auth.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_INTERNAL_MUC_DOMAIN: ${JITSI_XMPP_INTERNAL_MUC_DOMAIN:-internal-muc.${JITSI_XMPP_DOMAIN:-meet.jitsi}}
+      XMPP_SERVER: xmpp.${JITSI_XMPP_DOMAIN:-meet.jitsi}
+    volumes:
+    - ${DOCKER_BASE_DIR}/jitsi/jvb:/config
+    - ${DOCKER_GIT_CONFIG_DIR}/jitsi/jvb/bootstrap.sh:/opt/jitsi-jvb/bootstrap.sh:ro
+    networks:
+    - media-stack
+    ports:
+    - ${JITSI_JVB_UDP_PORT:-10000}:10000/udp
+    healthcheck:
+      test:
+      - CMD
+      - /usr/local/bin/healthcheck.sh
+    depends_on:
+      jitsi-prosody:
+        condition: service_healthy
+      jitsi-ddns:
+        condition: service_healthy
+    entrypoint:
+    - /bin/sh
+    - /opt/jitsi-jvb/bootstrap.sh
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    profiles:
+    - jitsi
+  coturn:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: coturn/coturn:latest
+    container_name: coturn
+    environment:
+      TZ: ${TZ}
+      JITSI_MEDIA_PUBLIC_HOSTNAME: ${JITSI_MEDIA_PUBLIC_HOSTNAME:-rtc.${DOMAIN_NAME:-localhost}}
+      JITSI_TURN_CREDENTIALS: ${JITSI_TURN_CREDENTIALS:?set JITSI_TURN_CREDENTIALS in .env}
+      JITSI_TURN_PORT: ${JITSI_TURN_PORT:-3478}
+      JITSI_TURN_MIN_PORT: ${JITSI_TURN_MIN_PORT:-20000}
+      JITSI_TURN_MAX_PORT: ${JITSI_TURN_MAX_PORT:-20100}
+    volumes:
+    - ${DOCKER_BASE_DIR}/coturn/data:/var/lib/coturn
+    - ${DOCKER_GIT_CONFIG_DIR}/coturn/bootstrap.sh:/config/bootstrap.sh:ro
+    - ${DOCKER_GIT_CONFIG_DIR}/coturn/turnserver.conf:/config/turnserver.conf.template:ro
+    networks:
+    - media-stack
+    ports:
+    - ${JITSI_TURN_PORT:-3478}:3478/udp
+    - ${JITSI_TURN_PORT:-3478}:3478/tcp
+    - ${JITSI_TURN_MIN_PORT:-20000}-${JITSI_TURN_MAX_PORT:-20100}:${JITSI_TURN_MIN_PORT:-20000}-${JITSI_TURN_MAX_PORT:-20100}/udp
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pidof turnserver >/dev/null || exit 1
+    depends_on:
+      jitsi-ddns:
+        condition: service_healthy
+    entrypoint:
+    - /bin/sh
+    - /config/bootstrap.sh
+    labels:
+    - com.centurylinklabs.watchtower.enable=true
+    profiles:
+    - jitsi
