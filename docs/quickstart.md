@@ -30,6 +30,9 @@ Starter secrets are generated automatically:
 - `DB_PASSWORD`
 - `DUPLICATI_ENCRYPTION_KEY`
 - `HOMARR_SECRET_ENCRYPTION_KEY`
+- `LINKWARDEN_NEXTAUTH_SECRET`
+- `LINKWARDEN_POSTGRES_PASSWORD`
+- `LINKWARDEN_MEILI_MASTER_KEY`
 
 You still need to review the host paths and timezone in `.env`.
 
@@ -42,7 +45,19 @@ sudo mkdir -p /mnt/photos/{upload,thumbs,encoded-video,profile,backups}
 sudo chown -R $USER:$USER /opt/media-stack /mnt/media /mnt/photos
 ```
 
-## 5. Start The Starter Stack
+## 5. Validate The Starter Config
+
+```bash
+docker compose config
+```
+
+If you later start using bundles, validate those resolved files before starting them:
+
+```bash
+make config BUNDLES="media" PROFILES="arr jellyfin"
+```
+
+## 6. Start The Starter Stack
 
 ```bash
 docker compose up -d
@@ -56,6 +71,10 @@ Expected starter services:
 - `immich-machine-learning`
 - `database`
 - `redis`
+- `linkwarden-db`
+- `linkwarden-meilisearch`
+- `linkwarden`
+- `freshrss`
 - `homarr`
 - `portainer`
 - `dozzle`
@@ -64,19 +83,21 @@ Expected starter services:
 - `tautulli`
 - `docker-socket-proxy`
 
-## 6. First URLs
+## 7. First URLs
 
 | Service | URL |
 |:--------|:----|
 | Homarr | `http://your-server:3002` |
 | Plex | `http://your-server:32400/web` |
 | Immich | `http://your-server:2283` |
+| Linkwarden | `http://your-server:3006` |
+| FreshRSS | `http://your-server:8083` |
 | Portainer | `https://your-server:9443` |
 | Dozzle | `http://your-server:8889` |
 | Duplicati | `http://your-server:8200` |
 | Tautulli | `http://your-server:8181` |
 
-## 7. Add More Later
+## 8. Add More Later
 
 When the starter stack is stable, layer on bundles instead of editing compose includes:
 

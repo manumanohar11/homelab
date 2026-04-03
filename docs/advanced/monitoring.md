@@ -23,4 +23,6 @@ If you need to sync tracked monitoring config into runtime paths, use:
 make sync-config
 ```
 
-That is a maintainer/operator task, not part of the beginner path.
+Use that only after changing tracked monitoring or logging templates that need copying into `${DOCKER_BASE_DIR}`.
+
+That is a maintainer/operator task, not part of the beginner path or a normal day-to-day restart.

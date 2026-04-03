@@ -30,7 +30,7 @@ Optional bundles:
 - `media`: Gluetun, *Arr, downloaders, requests, and alternate media apps
 - `apps`: productivity, documents, files, and automation
 - `ops`: monitoring, logging, diagnostics, and advanced backups
-- `access`: Pangolin/Newt, Jitsi, coturn, and DDNS helpers
+- `access`: Pangolin/Newt remote access
 
 ## Commands Reference
 
@@ -43,7 +43,7 @@ docker compose up -d
 make init BUNDLES="media apps"
 make up BUNDLES="media" PROFILES="arr jellyfin"
 make config BUNDLES="ops" PROFILES="monitoring"
-make logs BUNDLES="access" PROFILES="jitsi" SERVICE=jitsi-web
+make logs BUNDLES="access" SERVICE=newt
 
 # Starter-only debugging
 docker compose config
@@ -206,7 +206,7 @@ service-name:
 1. Starter validation: `docker compose config`
 2. Bundle validation: `make config BUNDLES="media" PROFILES="arr jellyfin"`
 3. Service startup: `make up BUNDLES="ops" PROFILES="monitoring" SERVICE=grafana`
-4. Logs: `make logs BUNDLES="access" PROFILES="jitsi" SERVICE=jitsi-web`
+4. Logs: `make logs BUNDLES="access" SERVICE=newt`
 5. Full repo validation: `python3 scripts/validate-stack.py`
 
 ## Maintainer Scripts

@@ -248,6 +248,132 @@ services:
         reservations:
           memory: 512M
 
+  linkwarden-db:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: postgres:16-alpine
+    container_name: linkwarden-db
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LINKWARDEN_POSTGRES_PASSWORD:?set LINKWARDEN_POSTGRES_PASSWORD in .env}
+    volumes:
+      - ${DOCKER_SSD_CONFIG_DIR}/linkwarden-postgres:/var/lib/postgresql/data
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  linkwarden-meilisearch:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: getmeili/meilisearch:v1.12.8
+    container_name: linkwarden-meilisearch
+    environment:
+      MEILI_NO_ANALYTICS: "true"
+      MEILI_MASTER_KEY: ${LINKWARDEN_MEILI_MASTER_KEY:?set LINKWARDEN_MEILI_MASTER_KEY in .env}
+    volumes:
+      - ${DOCKER_BASE_DIR}/linkwarden/meilisearch:/meili_data
+    networks:
+      - media-stack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  linkwarden:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: ghcr.io/linkwarden/linkwarden:latest
+    container_name: linkwarden
+    environment:
+      NEXTAUTH_URL: ${LINKWARDEN_BASE_URL:-https://${LINKWARDEN_SUBDOMAIN:-linkwarden}.${DOMAIN_NAME:-localhost}}/api/v1/auth
+      NEXTAUTH_SECRET: ${LINKWARDEN_NEXTAUTH_SECRET:?set LINKWARDEN_NEXTAUTH_SECRET in .env}
+      DATABASE_URL: postgresql://postgres:${LINKWARDEN_POSTGRES_PASSWORD:?set LINKWARDEN_POSTGRES_PASSWORD in .env}@linkwarden-db:5432/postgres
+      POSTGRES_PASSWORD: ${LINKWARDEN_POSTGRES_PASSWORD:?set LINKWARDEN_POSTGRES_PASSWORD in .env}
+      MEILI_HOST: http://linkwarden-meilisearch:7700
+      MEILI_MASTER_KEY: ${LINKWARDEN_MEILI_MASTER_KEY:?set LINKWARDEN_MEILI_MASTER_KEY in .env}
+      BASE_URL: ${LINKWARDEN_BASE_URL:-https://${LINKWARDEN_SUBDOMAIN:-linkwarden}.${DOMAIN_NAME:-localhost}}
+      STORAGE_FOLDER: /data/data
+      NEXT_PUBLIC_DISABLE_REGISTRATION: ${LINKWARDEN_DISABLE_REGISTRATION:-true}
+    volumes:
+      - ${DOCKER_BASE_DIR}/linkwarden/data:/data/data
+    networks:
+      - media-stack
+    ports:
+      - "3006:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/', (res) => process.exit((res.statusCode || 500) < 400 ? 0 : 1)).on('error', () => process.exit(1))"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    depends_on:
+      linkwarden-db:
+        condition: service_healthy
+      linkwarden-meilisearch:
+        condition: service_healthy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "pangolin.public-resources.linkwarden.name=Linkwarden"
+      - "pangolin.public-resources.linkwarden.protocol=http"
+      - "pangolin.public-resources.linkwarden.full-domain=${LINKWARDEN_SUBDOMAIN:-linkwarden}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.linkwarden.auth.sso-enabled=false"
+      - "pangolin.public-resources.linkwarden.targets[0].hostname=linkwarden"
+      - "pangolin.public-resources.linkwarden.targets[0].method=http"
+      - "pangolin.public-resources.linkwarden.targets[0].port=3000"
+      - "pangolin.public-resources.linkwarden.targets[0].healthcheck.hostname=linkwarden"
+      - "pangolin.public-resources.linkwarden.targets[0].healthcheck.port=3000"
+      - "pangolin.public-resources.linkwarden.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.linkwarden.targets[0].healthcheck.status=200"
+
+  freshrss:
+    extends:
+      file: docker-compose.common.yml
+      service: _lsio-small
+    image: lscr.io/linuxserver/freshrss:latest
+    container_name: freshrss
+    volumes:
+      - ${DOCKER_BASE_DIR}/freshrss:/config
+    networks:
+      - media-stack
+    ports:
+      - "${FRESHRSS_PORT:-8083}:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/i/"]
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Productivity"
+      - "homepage.name=FreshRSS"
+      - "homepage.icon=freshrss"
+      - "homepage.href=https://${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=RSS Reader"
+      - "pangolin.public-resources.freshrss.name=FreshRSS"
+      - "pangolin.public-resources.freshrss.protocol=http"
+      - "pangolin.public-resources.freshrss.full-domain=${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.freshrss.auth.sso-enabled=true"
+      - "pangolin.public-resources.freshrss.targets[0].hostname=freshrss"
+      - "pangolin.public-resources.freshrss.targets[0].method=http"
+      - "pangolin.public-resources.freshrss.targets[0].port=80"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.hostname=freshrss"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.port=80"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.path=/i/"
+      - "pangolin.public-resources.freshrss.targets[0].healthcheck.status=200"
+
   homarr:
     extends:
       file: docker-compose.common.yml
@@ -308,7 +434,7 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      - "com.centurylinklabs.watchtower.enable=false"
       - "pangolin.public-resources.portainer.name=Portainer"
       - "pangolin.public-resources.portainer.protocol=http"
       - "pangolin.public-resources.portainer.full-domain=${PORTAINER_SUBDOMAIN:-portainer}.${DOMAIN_NAME:-localhost}"
@@ -329,6 +455,7 @@ services:
       TZ: ${TZ}
       DOCKER_API_VERSION: "1.44"
       WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_SCHEDULE: "0 0 4 * * *"
       WATCHTOWER_ROLLING_RESTART: "true"
       WATCHTOWER_TIMEOUT: "30s"

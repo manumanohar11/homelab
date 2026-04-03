@@ -103,19 +103,19 @@ services:
   _lsio-small:
     <<: [*service-defaults, *resources-small]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     healthcheck: *default-healthcheck
 
   _lsio-medium:
     <<: [*service-defaults, *resources-medium]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     healthcheck: *default-healthcheck
 
   _lsio-large:
     <<: [*service-defaults, *resources-large]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     healthcheck: *default-healthcheck
 
   _vpn-service-small:
@@ -139,7 +139,7 @@ services:
   _vpn-lsio-small:
     <<: [*service-defaults, *resources-small]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *vpn-depends-on
     healthcheck: *default-healthcheck
@@ -147,7 +147,7 @@ services:
   _vpn-lsio-medium:
     <<: [*service-defaults, *resources-medium]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *vpn-depends-on
     healthcheck: *default-healthcheck
@@ -155,7 +155,7 @@ services:
   _vpn-lsio-large:
     <<: [*service-defaults, *resources-large]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *vpn-depends-on
     healthcheck: *default-healthcheck
@@ -163,7 +163,7 @@ services:
   _arr-lsio-small:
     <<: [*service-defaults, *resources-small]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *arr-depends-on
     healthcheck: *default-healthcheck
@@ -171,7 +171,7 @@ services:
   _arr-lsio-medium:
     <<: [*service-defaults, *resources-medium]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *arr-depends-on
     healthcheck: *default-healthcheck
@@ -179,7 +179,7 @@ services:
   _arr-lsio-large:
     <<: [*service-defaults, *resources-large]
     init: false
-    environment: *common-env
+    environment: *lsio-env
     network_mode: "service:gluetun"
     depends_on: *arr-depends-on
     healthcheck: *default-healthcheck

@@ -311,17 +311,17 @@ make restart BUNDLES="media" SERVICE=gluetun
 
 **Check database container:**
 ```bash
-docker compose ps immich_postgres redis
-docker compose logs immich_postgres
+docker compose ps database redis
+docker compose logs database
 ```
 
 **Test connection:**
 ```bash
 # PostgreSQL
-docker exec immich_postgres pg_isready
+docker compose exec database pg_isready -U postgres -d immich
 
 # Redis
-docker exec redis redis-cli ping
+docker compose exec redis redis-cli ping
 ```
 
 **Verify credentials:**
@@ -330,12 +330,12 @@ docker exec redis redis-cli ping
 cat .env | grep DB_PASSWORD
 
 # Test connection
-docker exec immich_postgres psql -U postgres -c "SELECT 1"
+docker compose exec database psql -U postgres -d immich -c "SELECT 1"
 ```
 
 **Restart database:**
 ```bash
-docker compose restart immich_postgres redis
+docker compose restart database redis
 ```
 
 </details>
@@ -438,12 +438,12 @@ docker compose logs plex | grep -i "scan\|library"
 
 **Check ML container:**
 ```bash
-docker compose logs immich_machine_learning
+docker compose logs immich-machine-learning
 ```
 
 **Verify GPU for ML:**
 ```bash
-docker exec immich_machine_learning nvidia-smi
+docker compose exec immich-machine-learning nvidia-smi
 ```
 
 **Check ML queue:**
@@ -451,7 +451,7 @@ docker exec immich_machine_learning nvidia-smi
 
 **Restart ML:**
 ```bash
-docker compose restart immich_machine_learning
+docker compose restart immich-machine-learning
 ```
 
 > [!NOTE]
@@ -474,7 +474,7 @@ ls -la /mnt/photos/upload
 
 **Check logs:**
 ```bash
-docker compose logs immich_server | grep -i "upload\|error"
+docker compose logs immich-server | grep -i "upload\|error"
 ```
 
 </details>
@@ -972,7 +972,9 @@ Domain needed for:
 <details>
 <summary><strong>Why is Immich excluded from Watchtower?</strong></summary>
 
-Immich updates can include:
+Watchtower only touches services explicitly labeled with `com.centurylinklabs.watchtower.enable=true`.
+
+Immich stays excluded because updates can include:
 - Database migrations
 - Breaking changes
 - ML model updates
@@ -1032,11 +1034,11 @@ docker compose up -d [service]
 For Immich:
 ```bash
 # Stop services first
-docker compose stop immich_server immich_machine_learning
+docker compose stop immich-server immich-machine-learning
 
 # Pull and restart
-docker compose pull immich_server immich_machine_learning
-docker compose up -d immich_server immich_machine_learning
+docker compose pull immich-server immich-machine-learning
+docker compose up -d immich-server immich-machine-learning
 ```
 
 </details>

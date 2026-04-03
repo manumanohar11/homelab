@@ -19,7 +19,7 @@ help:
 		'  make init BUNDLES="media apps"' \
 		'  make up BUNDLES="media" PROFILES="arr jellyfin"' \
 		'  make config BUNDLES="ops" PROFILES="monitoring"' \
-		'  make pull BUNDLES="access" PROFILES="jitsi"' \
+		'  make pull BUNDLES="access"' \
 		'' \
 		'Maintainer commands:' \
 		'  make validate' \

@@ -12,7 +12,7 @@ The repo now has one default entrypoint and four optional bundles.
 | `docker-compose.media.yml` | VPN, *Arr, downloaders, requests, alternate media apps |
 | `docker-compose.apps.yml` | Productivity, documents, files, automation |
 | `docker-compose.ops.yml` | Monitoring, logging, diagnostics, advanced backups |
-| `docker-compose.access.yml` | Pangolin/Newt and Jitsi |
+| `docker-compose.access.yml` | Pangolin/Newt remote access |
 | `docker-compose.common.yml` | Shared helper definitions used by compose services |
 | `docker-compose.local.example.yml` | Host-specific override example |
 
@@ -33,7 +33,7 @@ Do not comment compose includes to enable features. Add bundles instead.
 make init BUNDLES="media apps"
 make up BUNDLES="media apps" PROFILES="arr jellyfin"
 make config BUNDLES="ops" PROFILES="monitoring"
-make pull BUNDLES="access" PROFILES="jitsi"
+make pull BUNDLES="access"
 ```
 
 ## Environment Files
@@ -50,6 +50,30 @@ make pull BUNDLES="access" PROFILES="jitsi"
 
 `make init BUNDLES="..."` appends any missing variables from the selected bundle templates and initializes that bundle's generated secrets.
 
+## Validation
+
+Use the resolved config before every first start or major bundle change:
+
+```bash
+docker compose config
+make config BUNDLES="media" PROFILES="arr jellyfin"
+make validate
+```
+
+`make validate` is the maintainer-grade check that exercises starter and bundle scenarios.
+
+## Update Policy
+
+`watchtower` now updates only services that explicitly keep `com.centurylinklabs.watchtower.enable=true`.
+
+Sensitive services stay label-disabled by default so upgrades happen intentionally, after release-note review and backups.
+
+## Docker API Access
+
+Most starter and ops dashboards use the filtered `docker-socket-proxy` service.
+
+Direct Docker socket mounts remain only where the upstream app needs broader Docker API access, such as `portainer`, `watchtower`, `newt`, and `promtail`.
+
 ## Profiles
 
 Profiles still exist, but only inside the bundle that owns them.
@@ -59,7 +83,7 @@ Profiles still exist, but only inside the bundle that owns them.
 | `media` | `arr`, `downloaders`, `requests`, `jellyfin`, `stash`, `kavita`, `navidrome`, `tdarr`, `maintainerr`, `notifiarr` |
 | `apps` | `kasm`, `files`, `automation` |
 | `ops` | `monitoring`, `dashboard`, `speedtest`, `scrutiny`, `restic`, `db-backup` |
-| `access` | `jitsi` |
+| `access` | None |
 
 ## Host Overrides
 

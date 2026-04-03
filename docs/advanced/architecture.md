@@ -10,7 +10,7 @@ The repo is organized around one starter entrypoint plus four optional bundles.
 - `media` adds VPN-routed automation and alternate media apps.
 - `apps` adds productivity, documents, files, and automation.
 - `ops` adds observability and advanced backup tooling.
-- `access` adds Pangolin/Newt and Jitsi.
+- `access` adds Pangolin/Newt remote access.
 
 ## Key Dependencies
 

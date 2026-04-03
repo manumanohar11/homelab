@@ -107,7 +107,7 @@ flowchart LR
 | **Download Traffic** | Through VPN tunnel | *Arr stack, qBittorrent, Prowlarr |
 | **Streaming Traffic** | Direct to internet | Plex, Jellyfin |
 | **Productivity Traffic** | Direct to LAN/clients | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
-| **Documents & Knowledge Traffic** | Direct to LAN/clients | Paperless-ngx, Stirling-PDF, Karakeep, Docmost |
+| **Documents & Knowledge Traffic** | Direct to LAN/clients | Linkwarden, Paperless-ngx, Stirling-PDF, Karakeep, Docmost |
 | **Local Traffic** | Docker network only | Databases, Redis |
 | **Monitoring Traffic** | Direct | Prometheus, Grafana |
 
@@ -141,13 +141,13 @@ graph LR
     style DOCKER_NET fill:#2c3e50,color:#fff
 ```
 
-Services can reach each other by container name:
+Services can reach each other by service name:
 
 ```bash
 # From any container
 curl http://plex:32400       # Reaches Plex
 curl http://grafana:3000     # Reaches Grafana
-curl http://immich_server:2283  # Reaches Immich
+curl http://immich-server:2283  # Reaches Immich
 ```
 
 ### Network Modes
@@ -156,7 +156,7 @@ curl http://immich_server:2283  # Reaches Immich
 |:-----|:------|:---------|
 | `bridge` | Standard network access | Most services |
 | `network_mode: service:gluetun` | Route through VPN | *Arr stack, downloaders |
-| `host` | Direct host network | None by default |
+| `host` | Direct host network | Plex |
 
 ---
 
@@ -297,7 +297,7 @@ This list focuses on the ports published on the host. Internal-only sidecars sta
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
-| 8081 | FreshRSS | HTTP | Direct |
+| 8083 | FreshRSS | HTTP | Direct |
 | 8084 | SearXNG | HTTP | Direct |
 | 8384 | Syncthing GUI | HTTP | Direct |
 | 22000 | Syncthing Sync | TCP / UDP | Direct |
@@ -310,10 +310,11 @@ This list focuses on the ports published on the host. Internal-only sidecars sta
 
 | Port | Service | Protocol | Access |
 |:----:|:--------|:--------:|:-------|
-| 8010 | Paperless-ngx | HTTP | Direct |
-| 8085 | Stirling PDF | HTTP | Direct |
+| 3006 | Linkwarden | HTTP | Direct |
 | 3004 | Docmost | HTTP | Direct |
 | 3005 | Karakeep | HTTP | Direct |
+| 8010 | Paperless-ngx | HTTP | Direct |
+| 8085 | Stirling PDF | HTTP | Direct |
 
 #### *Arr Stack (VPN-Routed)
 
@@ -442,7 +443,6 @@ If you must expose ports directly:
 |:--------|:-----------------|
 | Plex | 32400/tcp |
 | Jellyfin | 8096/tcp |
-| Jitsi Meet | `10000/udp`, `3478/tcp`, `3478/udp`, `20000-20100/udp` |
 
 ---
 

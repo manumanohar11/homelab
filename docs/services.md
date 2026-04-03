@@ -13,10 +13,14 @@ This is a bundle-oriented service catalog.
 | Immich ML | - | Face/object processing |
 | Immich PostgreSQL | 5432 | Immich database |
 | Immich Redis | 6379 | Immich cache |
+| Linkwarden PostgreSQL | 5432 | Linkwarden database |
+| Linkwarden Meilisearch | 7700 | Linkwarden search index |
+| Linkwarden | 3006 | Starter bookmarks and archive |
+| FreshRSS | 8083 | Starter RSS reader |
 | Homarr | 3002 | Starter dashboard |
 | Portainer | 9443 | Container management |
 | Dozzle | 8889 | Live logs |
-| Watchtower | - | Image update automation |
+| Watchtower | - | Label-gated image update automation |
 | Duplicati | 8200 | Starter backups |
 | Tautulli | 8181 | Plex stats |
 | Docker Socket Proxy | - | Filtered Docker API for starter tools |
@@ -35,9 +39,10 @@ This is a bundle-oriented service catalog.
 
 | Group | Services |
 |:------|:---------|
-| Productivity | FreshRSS, SearXNG, Syncthing, Joplin, Kasm |
+| Productivity | SearXNG, Syncthing, Joplin, Kasm |
 | Documents | Paperless-ngx, Stirling PDF |
 | Knowledge | Karakeep, Docmost |
+| Business | ERPNext |
 | Files & Automation | Nextcloud, n8n |
 
 ## Ops Bundle
@@ -54,4 +59,3 @@ This is a bundle-oriented service catalog.
 | Group | Services |
 |:------|:---------|
 | Remote Access | Newt |
-| Private Calling | Jitsi Web, Prosody, Jicofo, JVB, coturn, jitsi-ddns |

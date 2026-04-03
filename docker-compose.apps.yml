@@ -1,43 +1,6 @@
 # /mnt/g/docker/docker-compose.apps.yml
 # Optional apps bundle: productivity, documents, files, and automation.
 services:
-  freshrss:
-    extends:
-      file: docker-compose.common.yml
-      service: _lsio-small
-    image: lscr.io/linuxserver/freshrss:latest
-    container_name: freshrss
-    volumes:
-    - ${DOCKER_BASE_DIR}/freshrss:/config
-    networks:
-    - media-stack
-    ports:
-    - 8081:80
-    healthcheck:
-      start_period: 60s
-      test:
-      - CMD
-      - curl
-      - -f
-      - http://localhost/i/
-    labels:
-    - com.centurylinklabs.watchtower.enable=false
-    - homepage.group=Productivity
-    - homepage.name=FreshRSS
-    - homepage.icon=freshrss
-    - homepage.href=https://${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}
-    - homepage.description=RSS Reader
-    - pangolin.public-resources.freshrss.name=FreshRSS
-    - pangolin.public-resources.freshrss.protocol=http
-    - pangolin.public-resources.freshrss.full-domain=${FRESHRSS_SUBDOMAIN:-freshrss}.${DOMAIN_NAME:-localhost}
-    - pangolin.public-resources.freshrss.auth.sso-enabled=true
-    - pangolin.public-resources.freshrss.targets[0].hostname=freshrss
-    - pangolin.public-resources.freshrss.targets[0].method=http
-    - pangolin.public-resources.freshrss.targets[0].port=80
-    - pangolin.public-resources.freshrss.targets[0].healthcheck.hostname=freshrss
-    - pangolin.public-resources.freshrss.targets[0].healthcheck.port=80
-    - pangolin.public-resources.freshrss.targets[0].healthcheck.path=/i/
-    - pangolin.public-resources.freshrss.targets[0].healthcheck.status=200
   searxng-valkey:
     extends:
       file: docker-compose.common.yml
@@ -60,7 +23,7 @@ services:
     environment:
       TZ: ${TZ}
       SEARXNG_BASE_URL: ${SEARXNG_BASE_URL:-https://${SEARXNG_SUBDOMAIN:-search}.${DOMAIN_NAME:-localhost}}
-      SEARXNG_SECRET: ${SEARXNG_SECRET:-lan-only-change-before-exposing}
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET in .env}
       SEARXNG_VALKEY_URL: valkey://searxng-valkey:6379/0
       SEARXNG_LIMITER: ${SEARXNG_LIMITER:-true}
     volumes:
@@ -188,7 +151,7 @@ services:
       joplin-postgres:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Productivity
     - homepage.name=Joplin
     - homepage.icon=joplin
@@ -413,7 +376,7 @@ services:
       - CMD-SHELL
       - curl -f http://localhost:8080/api/v1/info/status | grep -q 'UP'
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Documents
     - homepage.name=Stirling PDF
     - homepage.icon=stirling-pdf
@@ -505,7 +468,7 @@ services:
       karakeep-chrome:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Knowledge
     - homepage.name=Karakeep
     - homepage.icon=karakeep
@@ -609,6 +572,287 @@ services:
     - pangolin.public-resources.docmost.targets[0].healthcheck.port=3000
     - pangolin.public-resources.docmost.targets[0].healthcheck.path=/api/health
     - pangolin.public-resources.docmost.targets[0].healthcheck.status=200
+  erpnext-db:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: mariadb:11.8
+    container_name: erpnext-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${ERPNEXT_DB_ROOT_PASSWORD:?set ERPNEXT_DB_ROOT_PASSWORD in .env}
+      MARIADB_AUTO_UPGRADE: '1'
+    volumes:
+    - ${ERPNEXT_DB_DATA_LOCATION:-${DOCKER_BASE_DIR}/erpnext/db}:/var/lib/mysql
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - mariadb-admin ping -h 127.0.0.1 -uroot -p"$${MYSQL_ROOT_PASSWORD}" --silent
+      start_period: 45s
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    command:
+    - --character-set-server=utf8mb4
+    - --collation-server=utf8mb4_unicode_ci
+    - --skip-character-set-client-handshake
+    - --skip-innodb-read-only-compressed
+  erpnext-redis-cache:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: redis:6.2-alpine
+    container_name: erpnext-redis-cache
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+  erpnext-redis-queue:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: redis:6.2-alpine
+    container_name: erpnext-redis-queue
+    volumes:
+    - ${ERPNEXT_REDIS_QUEUE_DATA_LOCATION:-${DOCKER_BASE_DIR}/erpnext/redis-queue}:/data
+    networks:
+    - media-stack
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+  erpnext-configurator:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-configurator
+    restart: on-failure
+    environment:
+      DB_HOST: erpnext-db
+      DB_PORT: '3306'
+      REDIS_CACHE: erpnext-redis-cache:6379
+      REDIS_QUEUE: erpnext-redis-queue:6379
+      SOCKETIO_PORT: '9000'
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-db:
+        condition: service_healthy
+      erpnext-redis-cache:
+        condition: service_healthy
+      erpnext-redis-queue:
+        condition: service_healthy
+    entrypoint:
+    - bash
+    - -c
+    command:
+    - >
+      mkdir -p sites logs;
+      [ -f sites/common_site_config.json ] || printf '{}\n' > sites/common_site_config.json;
+      ls -1 apps > sites/apps.txt;
+      bench set-config -g db_host $$DB_HOST;
+      bench set-config -gp db_port $$DB_PORT;
+      bench set-config -g redis_cache "redis://$$REDIS_CACHE";
+      bench set-config -g redis_queue "redis://$$REDIS_QUEUE";
+      bench set-config -g redis_socketio "redis://$$REDIS_QUEUE";
+      bench set-config -gp socketio_port $$SOCKETIO_PORT;
+      bench set-config -g chromium_path /usr/bin/chromium-headless-shell;
+  erpnext-init-site:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-init-site
+    restart: on-failure
+    environment:
+      ERPNEXT_SITE_NAME: ${ERPNEXT_SITE_NAME:-business.${DOMAIN_NAME:-localhost}}
+      ERPNEXT_DB_ROOT_PASSWORD: ${ERPNEXT_DB_ROOT_PASSWORD:?set ERPNEXT_DB_ROOT_PASSWORD in .env}
+      ERPNEXT_ADMIN_PASSWORD: ${ERPNEXT_ADMIN_PASSWORD:?set ERPNEXT_ADMIN_PASSWORD in .env}
+      ERPNEXT_BASE_URL: ${ERPNEXT_BASE_URL:-https://${ERPNEXT_SUBDOMAIN:-business}.${DOMAIN_NAME:-localhost}}
+      ERPNEXT_OWNER_EMAIL: ${ERPNEXT_OWNER_EMAIL:-erp-admin@${DOMAIN_NAME:-localhost}}
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    - ${DOCKER_PROJECT_DIR}/scripts/erpnext-init-site.sh:/usr/local/bin/erpnext-init-site.sh:ro
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-db:
+        condition: service_healthy
+      erpnext-redis-cache:
+        condition: service_healthy
+      erpnext-redis-queue:
+        condition: service_healthy
+      erpnext-configurator:
+        condition: service_completed_successfully
+    entrypoint:
+    - bash
+    - /usr/local/bin/erpnext-init-site.sh
+  erpnext-backend:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-backend
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    healthcheck:
+      start_period: 90s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/method/ping')
+    depends_on:
+      erpnext-init-site:
+        condition: service_completed_successfully
+  erpnext-frontend:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-frontend
+    environment:
+      BACKEND: erpnext-backend:8000
+      SOCKETIO: erpnext-websocket:9000
+      FRAPPE_SITE_NAME_HEADER: ${ERPNEXT_SITE_NAME:-business.${DOMAIN_NAME:-localhost}}
+      UPSTREAM_REAL_IP_ADDRESS: ${UPSTREAM_REAL_IP_ADDRESS:-127.0.0.1}
+      UPSTREAM_REAL_IP_HEADER: ${UPSTREAM_REAL_IP_HEADER:-X-Forwarded-For}
+      UPSTREAM_REAL_IP_RECURSIVE: ${UPSTREAM_REAL_IP_RECURSIVE:-off}
+      PROXY_READ_TIMEOUT: ${ERPNEXT_PROXY_READ_TIMEOUT:-120}
+      CLIENT_MAX_BODY_SIZE: ${ERPNEXT_CLIENT_MAX_BODY_SIZE:-50m}
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    ports:
+    - ${ERPNEXT_HTTP_PORT:-8087}:8080
+    healthcheck:
+      start_period: 60s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/method/ping')
+    depends_on:
+      erpnext-backend:
+        condition: service_healthy
+      erpnext-websocket:
+        condition: service_started
+    labels:
+    - com.centurylinklabs.watchtower.enable=false
+    - homepage.group=Business
+    - homepage.name=ERPNext
+    - homepage.icon=erpnext
+    - homepage.href=${ERPNEXT_BASE_URL:-https://${ERPNEXT_SUBDOMAIN:-business}.${DOMAIN_NAME:-localhost}}
+    - homepage.description=Business Management Suite
+    - pangolin.public-resources.erpnext.name=ERPNext
+    - pangolin.public-resources.erpnext.protocol=http
+    - pangolin.public-resources.erpnext.full-domain=${ERPNEXT_SUBDOMAIN:-business}.${DOMAIN_NAME:-localhost}
+    - pangolin.public-resources.erpnext.auth.sso-enabled=false
+    - pangolin.public-resources.erpnext.targets[0].hostname=erpnext-frontend
+    - pangolin.public-resources.erpnext.targets[0].method=http
+    - pangolin.public-resources.erpnext.targets[0].port=8080
+    - pangolin.public-resources.erpnext.targets[0].healthcheck.hostname=erpnext-frontend
+    - pangolin.public-resources.erpnext.targets[0].healthcheck.port=8080
+    - pangolin.public-resources.erpnext.targets[0].healthcheck.path=/api/method/ping
+    - pangolin.public-resources.erpnext.targets[0].healthcheck.status=200
+    command:
+    - nginx-entrypoint.sh
+  erpnext-websocket:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-websocket
+    environment:
+      FRAPPE_REDIS_CACHE: redis://erpnext-redis-cache:6379
+      FRAPPE_REDIS_QUEUE: redis://erpnext-redis-queue:6379
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-init-site:
+        condition: service_completed_successfully
+    command:
+    - node
+    - /home/frappe/frappe-bench/apps/frappe/socketio.js
+  erpnext-queue-short:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-queue-short
+    environment:
+      FRAPPE_REDIS_CACHE: redis://erpnext-redis-cache:6379
+      FRAPPE_REDIS_QUEUE: redis://erpnext-redis-queue:6379
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-init-site:
+        condition: service_completed_successfully
+    command:
+    - bench
+    - worker
+    - --queue
+    - short,default
+  erpnext-queue-long:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-medium
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-queue-long
+    environment:
+      FRAPPE_REDIS_CACHE: redis://erpnext-redis-cache:6379
+      FRAPPE_REDIS_QUEUE: redis://erpnext-redis-queue:6379
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-init-site:
+        condition: service_completed_successfully
+    command:
+    - bench
+    - worker
+    - --queue
+    - long,default,short
+  erpnext-scheduler:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-small
+    image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
+    container_name: erpnext-scheduler
+    volumes:
+    - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
+    - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
+    networks:
+    - media-stack
+    depends_on:
+      erpnext-init-site:
+        condition: service_completed_successfully
+    command:
+    - bench
+    - schedule
   nextcloud:
     extends:
       file: docker-compose.common.yml
@@ -682,7 +926,7 @@ services:
       - --spider
       - http://localhost:5678/healthz
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Automation
     - homepage.name=n8n
     - homepage.icon=n8n

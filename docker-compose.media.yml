@@ -19,7 +19,7 @@ services:
     networks:
     - media-stack
     ports:
-    - 8080:8080
+    - 8081:8080
     - 9696:9696
     - 7878:7878
     - 8989:8989
@@ -44,7 +44,7 @@ services:
     devices:
     - /dev/net/tun:/dev/net/tun
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
   jellyfin:
     extends:
       file: docker-compose.common.yml
@@ -228,7 +228,7 @@ services:
         reservations:
           memory: 256M
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.navidrome.name=Navidrome
     - pangolin.public-resources.navidrome.protocol=http
     - pangolin.public-resources.navidrome.full-domain=${NAVIDROME_SUBDOMAIN:-navidrome}.${DOMAIN_NAME:-localhost}
@@ -263,7 +263,7 @@ services:
       - -f
       - http://localhost:6246
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.maintainerr.name=Maintainerr
     - pangolin.public-resources.maintainerr.protocol=http
     - pangolin.public-resources.maintainerr.full-domain=${MAINTAINERR_SUBDOMAIN:-maintainerr}.${DOMAIN_NAME:-localhost}
@@ -327,7 +327,7 @@ services:
             capabilities:
             - gpu
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.tdarr.name=Tdarr
     - pangolin.public-resources.tdarr.protocol=http
     - pangolin.public-resources.tdarr.full-domain=${TDARR_SUBDOMAIN:-tdarr}.${DOMAIN_NAME:-localhost}
@@ -449,7 +449,7 @@ services:
         reservations:
           memory: 256M
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Downloaders
     - homepage.name=FlareSolverr
     - homepage.icon=flaresolverr
@@ -497,7 +497,7 @@ services:
         reservations:
           memory: 256M
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Downloaders
     - homepage.name=Bitmagnet
     - homepage.icon=bittorrent
@@ -559,7 +559,6 @@ services:
       service: _arr-lsio-large
     image: lscr.io/linuxserver/radarr:latest
     container_name: radarr
-    network_mode: service:gluetun
     volumes:
     - ${DOCKER_BASE_DIR}/radarr:/config
     - ${DOCKER_MEDIA_DIR}:/data
@@ -603,7 +602,6 @@ services:
       service: _arr-lsio-large
     image: lscr.io/linuxserver/sonarr:latest
     container_name: sonarr
-    network_mode: service:gluetun
     volumes:
     - ${DOCKER_BASE_DIR}/sonarr:/config
     - ${DOCKER_MEDIA_DIR}:/data
@@ -647,11 +645,10 @@ services:
       service: _arr-lsio-large
     image: lscr.io/linuxserver/lidarr:latest
     container_name: lidarr
-    network_mode: service:gluetun
     volumes:
     - ${DOCKER_BASE_DIR}/lidarr:/config
     - ${DOCKER_MEDIA_DIR}/Songs:/music_library
-    - ${DOCKER_BASE_DIR}/downloads:/downloads
+    - ${DOCKER_MEDIA_DIR}/downloads:/downloads
     healthcheck:
       interval: 1m
       test:
@@ -692,11 +689,10 @@ services:
       service: _arr-lsio-large
     image: lscr.io/linuxserver/readarr:develop
     container_name: readarr
-    network_mode: service:gluetun
     volumes:
     - ${DOCKER_BASE_DIR}/readarr:/config
     - ${DOCKER_MEDIA_DIR}/Books:/books
-    - ${DOCKER_BASE_DIR}/downloads:/downloads
+    - ${DOCKER_MEDIA_DIR}/downloads:/downloads
     healthcheck:
       interval: 1m
       test:
@@ -779,7 +775,6 @@ services:
     image: ghcr.io/hotio/whisparr:latest
     container_name: whisparr
     init: true
-    network_mode: service:gluetun
     volumes:
     - ${DOCKER_BASE_DIR}/whisparr:/config
     - ${DOCKER_MEDIA_DIR}:/data
@@ -798,7 +793,7 @@ services:
         reservations:
           memory: 256M
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Media Management
     - homepage.name=Whisparr
     - homepage.icon=whisparr
@@ -841,7 +836,7 @@ services:
       sonarr:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Media Management
     - homepage.name=Recyclarr
     - homepage.icon=recyclarr
@@ -908,7 +903,7 @@ services:
       - --spider
       - http://localhost:5055/api/v1/status
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.jellyseerr.name=Jellyseerr
     - pangolin.public-resources.jellyseerr.protocol=http
     - pangolin.public-resources.jellyseerr.full-domain=${JELLYSEERR_SUBDOMAIN:-jellyseerr}.${DOMAIN_NAME:-localhost}
@@ -948,7 +943,7 @@ services:
       - http://localhost:5454
     hostname: notifiarr
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.notifiarr.name=Notifiarr
     - pangolin.public-resources.notifiarr.protocol=http
     - pangolin.public-resources.notifiarr.full-domain=${NOTIFIARR_SUBDOMAIN:-notifiarr}.${DOMAIN_NAME:-localhost}

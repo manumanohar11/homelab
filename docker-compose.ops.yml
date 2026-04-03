@@ -28,7 +28,7 @@ services:
         condition: service_healthy
     pid: host
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.glances.name=Glances
     - pangolin.public-resources.glances.protocol=http
     - pangolin.public-resources.glances.full-domain=${GLANCES_SUBDOMAIN:-glances}.${DOMAIN_NAME:-localhost}
@@ -72,7 +72,7 @@ services:
       docker-socket-proxy:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.glance.name=Glance
     - pangolin.public-resources.glance.protocol=http
     - pangolin.public-resources.glance.full-domain=${GLANCE_SUBDOMAIN:-glance}.${DOMAIN_NAME:-localhost}
@@ -115,7 +115,6 @@ services:
     - --storage.tsdb.retention.time=30d
     - --web.console.libraries=/usr/share/prometheus/console_libraries
     - --web.console.templates=/usr/share/prometheus/consoles
-    - --web.enable-lifecycle
     deploy:
       resources:
         limits:
@@ -124,7 +123,7 @@ services:
         reservations:
           memory: 256M
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.prometheus.name=Prometheus
     - pangolin.public-resources.prometheus.protocol=http
     - pangolin.public-resources.prometheus.full-domain=${PROMETHEUS_SUBDOMAIN:-prometheus}.${DOMAIN_NAME:-localhost}
@@ -164,7 +163,7 @@ services:
     - --config.file=/etc/alertmanager/alertmanager.yml
     - --storage.path=/alertmanager
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.alertmanager.name=Alertmanager
     - pangolin.public-resources.alertmanager.protocol=http
     - pangolin.public-resources.alertmanager.full-domain=${ALERTMANAGER_SUBDOMAIN:-alertmanager}.${DOMAIN_NAME:-localhost}
@@ -207,7 +206,7 @@ services:
       prometheus:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.grafana.name=Grafana
     - pangolin.public-resources.grafana.protocol=http
     - pangolin.public-resources.grafana.full-domain=${GRAFANA_SUBDOMAIN:-grafana}.${DOMAIN_NAME:-localhost}
@@ -270,7 +269,7 @@ services:
       docker-socket-proxy:
         condition: service_healthy
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.uptime-kuma.name=Uptime Kuma
     - pangolin.public-resources.uptime-kuma.protocol=http
     - pangolin.public-resources.uptime-kuma.full-domain=${UPTIME_KUMA_SUBDOMAIN:-uptime}.${DOMAIN_NAME:-localhost}
@@ -302,7 +301,7 @@ services:
       - -version
     command: -config.file=/etc/loki/local-config.yaml
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - homepage.group=Monitoring
     - homepage.name=Loki
     - homepage.icon=loki
@@ -395,7 +394,7 @@ services:
     cap_add:
     - SYS_RAWIO
     labels:
-    - com.centurylinklabs.watchtower.enable=true
+    - com.centurylinklabs.watchtower.enable=false
     - pangolin.public-resources.scrutiny.name=Scrutiny
     - pangolin.public-resources.scrutiny.protocol=http
     - pangolin.public-resources.scrutiny.full-domain=${SCRUTINY_SUBDOMAIN:-scrutiny}.${DOMAIN_NAME:-localhost}

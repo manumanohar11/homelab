@@ -1,6 +1,6 @@
 # Media Stack
 
-Starter-first Docker Compose homelab for Plex, Immich, and a handful of operator tools.
+Starter-first Docker Compose homelab for Plex, Immich, Linkwarden, FreshRSS, and a handful of operator tools.
 
 The default path is intentionally small:
 
@@ -17,6 +17,10 @@ That starts only the starter stack:
 - `immich-machine-learning`
 - `database`
 - `redis`
+- `linkwarden-db`
+- `linkwarden-meilisearch`
+- `linkwarden`
+- `freshrss`
 - `homarr`
 - `portainer`
 - `dozzle`
@@ -51,6 +55,8 @@ Starter URLs:
 | Homarr | `http://your-server:3002` |
 | Plex | `http://your-server:32400/web` |
 | Immich | `http://your-server:2283` |
+| Linkwarden | `http://your-server:3006` |
+| FreshRSS | `http://your-server:8083` |
 | Portainer | `https://your-server:9443` |
 | Dozzle | `http://your-server:8889` |
 | Duplicati | `http://your-server:8200` |
@@ -73,9 +79,9 @@ make up BUNDLES="apps"
 make init BUNDLES="ops"
 make up BUNDLES="ops" PROFILES="monitoring"
 
-# Pangolin/Newt and Jitsi private calling
+# Pangolin/Newt remote access
 make init BUNDLES="access"
-make up BUNDLES="access" PROFILES="jitsi"
+make up BUNDLES="access"
 ```
 
 ## Docs
@@ -84,9 +90,11 @@ make up BUNDLES="access" PROFILES="jitsi"
 - [Bundles](docs/bundles.md)
 - [Configuration](docs/configuration.md)
 - [Services](docs/services.md)
+- [Backup & Recovery](docs/backup.md)
+- [Networking](docs/networking.md)
+- [Troubleshooting](docs/troubleshooting.md)
 - [Advanced Architecture](docs/advanced/architecture.md)
 - [Advanced Monitoring](docs/advanced/monitoring.md)
 - [Advanced Logging](docs/advanced/logging.md)
-- [Advanced Jitsi](docs/advanced/jitsi.md)
 - [Advanced Docmost Publishing](docs/advanced/docmost.md)
 - [Maintainer Scripts](docs/advanced/scripts.md)

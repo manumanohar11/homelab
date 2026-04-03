@@ -37,7 +37,6 @@ ADVANCED_DOCS = {
     REPO_ROOT / "docs" / "advanced" / "architecture.md",
     REPO_ROOT / "docs" / "advanced" / "monitoring.md",
     REPO_ROOT / "docs" / "advanced" / "logging.md",
-    REPO_ROOT / "docs" / "advanced" / "jitsi.md",
     REPO_ROOT / "docs" / "advanced" / "docmost.md",
     REPO_ROOT / "docs" / "advanced" / "scripts.md",
 }
@@ -66,7 +65,6 @@ LEGACY_DOCS = {
     REPO_ROOT / "docs" / "architecture.md",
     REPO_ROOT / "docs" / "monitoring.md",
     REPO_ROOT / "docs" / "logging.md",
-    REPO_ROOT / "docs" / "jitsi.md",
     REPO_ROOT / "docs" / "docmost.md",
     REPO_ROOT / "docs" / "scripts.md",
     REPO_ROOT / "docs" / "docmost-space",
@@ -76,10 +74,14 @@ STARTER_SECRETS = {
     "DB_PASSWORD",
     "DUPLICATI_ENCRYPTION_KEY",
     "HOMARR_SECRET_ENCRYPTION_KEY",
+    "LINKWARDEN_NEXTAUTH_SECRET",
+    "LINKWARDEN_POSTGRES_PASSWORD",
+    "LINKWARDEN_MEILI_MASTER_KEY",
 }
 BUNDLE_SECRETS = {
     "media": {"BITMAGNET_POSTGRES_PASSWORD"},
     "apps": {
+        "SEARXNG_SECRET",
         "JOPLIN_DB_PASSWORD",
         "PAPERLESS_SECRET_KEY",
         "PAPERLESS_DB_PASSWORD",
@@ -87,14 +89,11 @@ BUNDLE_SECRETS = {
         "KARAKEEP_MEILI_MASTER_KEY",
         "DOCMOST_APP_SECRET",
         "DOCMOST_DB_PASSWORD",
+        "ERPNEXT_DB_ROOT_PASSWORD",
+        "ERPNEXT_ADMIN_PASSWORD",
     },
     "ops": {"GRAFANA_ADMIN_PASSWORD"},
-    "access": {
-        "JITSI_JICOFO_COMPONENT_SECRET",
-        "JITSI_JICOFO_AUTH_PASSWORD",
-        "JITSI_JVB_AUTH_PASSWORD",
-        "JITSI_TURN_CREDENTIALS",
-    },
+    "access": set(),
 }
 
 EXPECTED_STARTER_SERVICES = {
@@ -102,9 +101,13 @@ EXPECTED_STARTER_SERVICES = {
     "docker-socket-proxy",
     "dozzle",
     "duplicati",
+    "freshrss",
     "homarr",
     "immich-machine-learning",
     "immich-server",
+    "linkwarden",
+    "linkwarden-db",
+    "linkwarden-meilisearch",
     "plex",
     "portainer",
     "redis",
@@ -129,7 +132,15 @@ SCENARIOS = [
         "name": "apps",
         "bundles": ["apps"],
         "profiles": [],
-        "expected_contains": {"freshrss", "paperless-ngx", "docmost", "joplin", "karakeep"},
+        "expected_contains": {
+            "paperless-ngx",
+            "docmost",
+            "joplin",
+            "karakeep",
+            "erpnext-frontend",
+            "erpnext-backend",
+            "erpnext-db",
+        },
     },
     {
         "name": "ops",
@@ -140,8 +151,8 @@ SCENARIOS = [
     {
         "name": "access",
         "bundles": ["access"],
-        "profiles": ["jitsi"],
-        "expected_contains": {"newt", "jitsi-web", "jitsi-jvb", "coturn"},
+        "profiles": [],
+        "expected_contains": {"newt"},
     },
 ]
 
@@ -165,8 +176,12 @@ FULL_STACK_PROFILES = [
     "scrutiny",
     "restic",
     "db-backup",
-    "jitsi",
 ]
+
+ONE_SHOT_RESTART_SERVICES = {
+    "erpnext-configurator",
+    "erpnext-init-site",
+}
 
 MARKDOWN_LINK_PATTERN = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
@@ -434,11 +449,24 @@ def validate_example_env_files() -> list[str]:
             "DB_PASSWORD",
             "DUPLICATI_ENCRYPTION_KEY",
             "HOMARR_SECRET_ENCRYPTION_KEY",
+            "LINKWARDEN_NEXTAUTH_SECRET",
+            "LINKWARDEN_POSTGRES_PASSWORD",
+            "LINKWARDEN_MEILI_MASTER_KEY",
         },
         BUNDLE_ENV_FILES["media"]: {"VPN_SERVICE_PROVIDER", "OPENVPN_USER", "OPENVPN_PASSWORD", "SERVER_REGIONS", "BITMAGNET_POSTGRES_PASSWORD"},
-        BUNDLE_ENV_FILES["apps"]: {"JOPLIN_DB_PASSWORD", "PAPERLESS_SECRET_KEY", "PAPERLESS_DB_PASSWORD", "KARAKEEP_NEXTAUTH_SECRET", "KARAKEEP_MEILI_MASTER_KEY", "DOCMOST_APP_SECRET", "DOCMOST_DB_PASSWORD"},
+        BUNDLE_ENV_FILES["apps"]: {
+            "JOPLIN_DB_PASSWORD",
+            "PAPERLESS_SECRET_KEY",
+            "PAPERLESS_DB_PASSWORD",
+            "KARAKEEP_NEXTAUTH_SECRET",
+            "KARAKEEP_MEILI_MASTER_KEY",
+            "DOCMOST_APP_SECRET",
+            "DOCMOST_DB_PASSWORD",
+            "ERPNEXT_DB_ROOT_PASSWORD",
+            "ERPNEXT_ADMIN_PASSWORD",
+        },
         BUNDLE_ENV_FILES["ops"]: {"GRAFANA_ADMIN_PASSWORD"},
-        BUNDLE_ENV_FILES["access"]: {"PANGOLIN_ENDPOINT", "NEWT_ID", "NEWT_SECRET", "JITSI_JICOFO_COMPONENT_SECRET", "JITSI_JICOFO_AUTH_PASSWORD", "JITSI_JVB_AUTH_PASSWORD", "JITSI_TURN_CREDENTIALS", "JITSI_CLOUDFLARE_API_TOKEN"},
+        BUNDLE_ENV_FILES["access"]: {"PANGOLIN_ENDPOINT", "NEWT_ID", "NEWT_SECRET"},
     }
 
     for path, required in required_keys.items():
@@ -509,7 +537,7 @@ def validate_init_script() -> list[str]:
                 + ", ".join(leaked_bundle_keys)
             )
 
-        selected_bundles = ("media", "access")
+        selected_bundles = ("media", "apps", "access")
         temp_repo.joinpath(".env").unlink()
 
         bundle_command = [sys.executable, str(temp_repo / "scripts" / "init-env.py")]
@@ -576,8 +604,9 @@ def validate_service_defaults(services: dict[str, dict]) -> list[str]:
         image = service.get("image") or ""
         is_linuxserver = isinstance(image, str) and image.startswith("lscr.io/linuxserver/")
 
-        if service.get("restart") != "unless-stopped":
-            errors.append(f"service '{name}' must set restart: unless-stopped")
+        expected_restart = "on-failure" if name in ONE_SHOT_RESTART_SERVICES else "unless-stopped"
+        if service.get("restart") != expected_restart:
+            errors.append(f"service '{name}' must set restart: {expected_restart}")
 
         if is_linuxserver:
             if service.get("init") is not False:

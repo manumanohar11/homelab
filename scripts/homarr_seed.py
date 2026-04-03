@@ -154,6 +154,12 @@ SERVICE_OVERRIDES: dict[str, ServiceOverride] = {
         section="Requests",
         icon_slug="jellyseerr",
     ),
+    "linkwarden": ServiceOverride(
+        description="Bookmarks and archives",
+        section="Knowledge",
+        icon_slug="linkwarden",
+        order=10,
+    ),
     "kavita": ServiceOverride(
         description="Reading library",
         section="Media Servers",
