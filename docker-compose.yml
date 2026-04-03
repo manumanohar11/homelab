@@ -479,9 +479,8 @@ services:
     container_name: dozzle
     environment:
       DOZZLE_LEVEL: info
-      DOZZLE_TAILSIZE: 300
       DOZZLE_FILTER: "status=running"
-      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      DOZZLE_REMOTE_HOST: tcp://docker-socket-proxy:2375
     networks:
       - media-stack
     ports:

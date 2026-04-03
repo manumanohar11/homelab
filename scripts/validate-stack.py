@@ -183,6 +183,10 @@ ONE_SHOT_RESTART_SERVICES = {
     "erpnext-init-site",
 }
 
+INIT_FALSE_SERVICES = {
+    "db-backup",
+}
+
 MARKDOWN_LINK_PATTERN = re.compile(r"(?<!\!)\[[^\]]+\]\(([^)]+)\)")
 URI_SCHEME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.*)$", re.MULTILINE)
@@ -608,9 +612,12 @@ def validate_service_defaults(services: dict[str, dict]) -> list[str]:
         if service.get("restart") != expected_restart:
             errors.append(f"service '{name}' must set restart: {expected_restart}")
 
-        if is_linuxserver:
+        if is_linuxserver or name in INIT_FALSE_SERVICES:
             if service.get("init") is not False:
-                errors.append(f"service '{name}' must set init: false for LinuxServer.io images")
+                if name in INIT_FALSE_SERVICES:
+                    errors.append(f"service '{name}' must set init: false")
+                else:
+                    errors.append(f"service '{name}' must set init: false for LinuxServer.io images")
         elif service.get("init") is not True:
             errors.append(f"service '{name}' must set init: true")
 

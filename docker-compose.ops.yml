@@ -440,6 +440,7 @@ services:
       service: _service-medium
     image: tiredofit/db-backup:latest
     container_name: db-backup
+    init: false
     environment:
       TIMEZONE: ${TZ}
       CONTAINER_ENABLE_MONITORING: 'false'
