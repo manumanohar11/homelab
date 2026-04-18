@@ -41,7 +41,7 @@ The `duplicati` service mounts these sources:
 - Homarr customizations live under `${DOCKER_BASE_DIR}/homarr/appdata`; keep that directory and the matching `HOMARR_SECRET_ENCRYPTION_KEY` together when moving to a new server
 - if you enable `db-backup`, its dumps appear under `${DOCKER_BASE_DIR}/db-backup`, so they are already covered by `/source/docker-configs`
 - ERPNext backup artifacts live under `${DOCKER_BASE_DIR}/erpnext/sites/<site>/private/backups`, so they are also already covered by `/source/docker-configs`
-- `docmost/storage`, `paperless/media`, and the rest of the application files already live under `${DOCKER_BASE_DIR}` and are included in the main Duplicati source tree
+- `karakeep/data`, `karakeep/meilisearch`, `docmost/storage`, `paperless/media`, and the rest of the application files already live under `${DOCKER_BASE_DIR}` and are included in the main Duplicati source tree
 - media libraries and original photo libraries should use a separate large-data backup strategy
 
 ---

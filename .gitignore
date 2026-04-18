@@ -85,3 +85,8 @@ downloads/
 secrets/
 credentials/
 auth/
+
+# Local business migration data
+migration/tally/raw/
+migration/tally/output/
+migration/tally/reports/

@@ -556,6 +556,46 @@ If you only see issues when accessing it remotely, compare local access at `http
 
 </details>
 
+### Karakeep
+
+<details>
+<summary><strong>Karakeep won't start</strong></summary>
+
+**Check the application and sidecars:**
+```bash
+docker compose logs karakeep --tail=100
+docker compose logs karakeep-meilisearch --tail=100
+docker compose logs karakeep-chrome --tail=100
+docker inspect --format='{{.State.Health.Status}}' karakeep
+```
+
+**Common causes:**
+- `KARAKEEP_NEXTAUTH_SECRET` or `KARAKEEP_MEILI_MASTER_KEY` is missing in `.env`
+- `KARAKEEP_BASE_URL` does not match the real public URL
+- `karakeep-meilisearch` or `karakeep-chrome` is unhealthy, so `karakeep` never reaches healthy state
+
+</details>
+
+<details>
+<summary><strong>Crawling or search stopped working</strong></summary>
+
+If link previews, screenshots, or full-text search break after a config change or upgrade, inspect the app and both sidecars together:
+
+```bash
+docker compose logs karakeep --tail=100 | grep -Ei 'crawl|chrome|meili|search|error'
+docker compose logs karakeep-chrome --tail=100
+docker compose logs karakeep-meilisearch --tail=100
+```
+
+**Common causes:**
+- the Chrome sidecar name changed but `BROWSER_WEB_URL` still points at the old hostname
+- `KARAKEEP_BASE_URL` no longer matches the URL your reverse proxy or tunnel serves
+- the Meilisearch data directory contains an older incompatible `data.ms` index after a manual image/version change
+
+If you intentionally changed Meilisearch versions and it refuses to start, stop the Karakeep stack, rename or remove `${DOCKER_BASE_DIR}/karakeep/meilisearch/data.ms`, bring the services back up, then reindex bookmarks from the Karakeep admin UI.
+
+</details>
+
 ### Grafana
 
 <details>

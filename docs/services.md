@@ -42,7 +42,7 @@ This is a bundle-oriented service catalog.
 | Productivity | SearXNG, Syncthing, Joplin, Kasm |
 | Documents | Paperless-ngx, Stirling PDF |
 | Knowledge | Karakeep, Docmost |
-| Business | ERPNext |
+| Business | [ERPNext](erpnext.md) |
 | Files & Automation | Nextcloud, n8n |
 
 ## Ops Bundle

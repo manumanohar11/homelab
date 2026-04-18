@@ -9,6 +9,10 @@ These scripts are maintainer-facing unless noted otherwise.
   - Creates `.env` from `.env.example`
   - Optionally appends bundle settings from `env/bundles/*.env.example`
   - Generates starter or bundle secrets when they are missing
+- `scripts/bootstrap-host.py`
+  - Wrapped by `make prep-dirs`
+  - Resolves the current starter or bundle-aware compose config
+  - Creates missing bind-mount directories for the selected bundles and profiles
 
 ## Maintainer-Facing
 

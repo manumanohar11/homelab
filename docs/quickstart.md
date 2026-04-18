@@ -36,13 +36,12 @@ Starter secrets are generated automatically:
 
 You still need to review the host paths and timezone in `.env`.
 
+For the default starter paths, `make bootstrap` runs `make init` and `make prep-dirs` together.
+
 ## 4. Create Starter Directories
 
 ```bash
-sudo mkdir -p /opt/media-stack/data
-sudo mkdir -p /mnt/media/{Movies,TV,Music,Photos,Sync}
-sudo mkdir -p /mnt/photos/{upload,thumbs,encoded-video,profile,backups}
-sudo chown -R $USER:$USER /opt/media-stack /mnt/media /mnt/photos
+make prep-dirs
 ```
 
 ## 5. Validate The Starter Config

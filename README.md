@@ -7,6 +7,7 @@ The default path is intentionally small:
 ```bash
 make init
 nano .env
+make prep-dirs
 docker compose up -d
 ```
 
@@ -39,14 +40,12 @@ cd /opt/media-stack
 
 make init
 nano .env
-
-sudo mkdir -p /opt/media-stack/data
-sudo mkdir -p /mnt/media/{Movies,TV,Music,Photos,Sync}
-sudo mkdir -p /mnt/photos/{upload,thumbs,encoded-video,profile,backups}
-sudo chown -R $USER:$USER /opt/media-stack /mnt/media /mnt/photos
+make prep-dirs
 
 docker compose up -d
 ```
+
+For the default starter paths, `make bootstrap` runs `make init` and `make prep-dirs` together.
 
 Starter URLs:
 
@@ -90,6 +89,7 @@ make up BUNDLES="access"
 - [Bundles](docs/bundles.md)
 - [Configuration](docs/configuration.md)
 - [Services](docs/services.md)
+- [ERPNext Business Setup](docs/erpnext.md)
 - [Backup & Recovery](docs/backup.md)
 - [Networking](docs/networking.md)
 - [Troubleshooting](docs/troubleshooting.md)

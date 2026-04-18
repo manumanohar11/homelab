@@ -703,6 +703,8 @@ services:
       service: _service-large
     image: frappe/erpnext:${ERPNEXT_VERSION:-v15.103.1}
     container_name: erpnext-backend
+    environment:
+      FRAPPE_SITE_NAME_HEADER: ${ERPNEXT_SITE_NAME:-business.${DOMAIN_NAME:-localhost}}
     volumes:
     - ${DOCKER_BASE_DIR}/erpnext/sites:/home/frappe/frappe-bench/sites
     - ${DOCKER_BASE_DIR}/erpnext/logs:/home/frappe/frappe-bench/logs
@@ -711,10 +713,9 @@ services:
     healthcheck:
       start_period: 90s
       test:
-      - CMD
-      - python
-      - -c
-      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/method/ping')
+      - CMD-SHELL
+      - >
+        python -c "import os, urllib.request; req = urllib.request.Request('http://127.0.0.1:8000/api/method/ping', headers={'Host': os.environ['FRAPPE_SITE_NAME_HEADER']}); urllib.request.urlopen(req)"
     depends_on:
       erpnext-init-site:
         condition: service_completed_successfully
@@ -743,10 +744,9 @@ services:
     healthcheck:
       start_period: 60s
       test:
-      - CMD
-      - python
-      - -c
-      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/method/ping')
+      - CMD-SHELL
+      - >
+        python -c "import os, urllib.request; req = urllib.request.Request('http://127.0.0.1:8080/api/method/ping', headers={'Host': os.environ['FRAPPE_SITE_NAME_HEADER']}); urllib.request.urlopen(req)"
     depends_on:
       erpnext-backend:
         condition: service_healthy

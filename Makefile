@@ -1,4 +1,4 @@
-.PHONY: help init init-env up down pull restart logs ps config validate check sync-config docs-build
+.PHONY: help init init-env bootstrap prep-dirs up down pull restart logs ps config validate check sync-config docs-build
 
 BUNDLES ?=
 PROFILES ?=
@@ -8,11 +8,14 @@ TAIL ?= 200
 BUNDLE_ARGS := -f docker-compose.yml $(foreach bundle,$(BUNDLES),-f docker-compose.$(bundle).yml)
 PROFILE_ARGS := $(foreach profile,$(PROFILES),--profile $(profile))
 INIT_BUNDLE_ARGS := $(foreach bundle,$(BUNDLES),--bundle $(bundle))
+BOOTSTRAP_PROFILE_ARGS := $(foreach profile,$(PROFILES),--profile $(profile))
 
 help:
 	@printf '%s\n' \
 		'Starter path:' \
 		'  make init' \
+		'  make prep-dirs' \
+		'  make bootstrap' \
 		'  docker compose up -d' \
 		'' \
 		'Bundle-aware commands:' \
@@ -31,6 +34,11 @@ init:
 	python3 scripts/init-env.py $(INIT_BUNDLE_ARGS)
 
 init-env: init
+
+prep-dirs:
+	python3 scripts/bootstrap-host.py $(INIT_BUNDLE_ARGS) $(BOOTSTRAP_PROFILE_ARGS)
+
+bootstrap: init prep-dirs
 
 up:
 	docker compose $(BUNDLE_ARGS) $(PROFILE_ARGS) up -d $(SERVICE)
