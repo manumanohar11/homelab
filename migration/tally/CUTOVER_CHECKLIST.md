@@ -1,162 +1,123 @@
 # Tally to ERPNext Cutover Checklist
 
-This checklist is for the current site:
+This checklist is for the current live cutover only.
 
 - Company: `Vara Lakshmi Agencies`
 - ERPNext site: `business.manoharsolleti.com`
-- Tally period checked: `1-Apr-2025` to `31-Mar-2026`
-
-Use this when you want ERPNext opening balances on `1-Apr-2026` to match Tally closing balances on `31-Mar-2026`.
-
-## What Is Already Done
-
-- Customers imported
-- Suppliers imported
-- Items imported
-- Addresses imported and linked
-- Contacts imported and linked
-- Contact mobile numbers fixed in ERPNext
-- No accounting entries posted yet
-- No stock entries posted yet
-
-That means the ERPNext site is still clean for cutover posting.
-
-## What Still Needs Your Tally Export
-
-You still need these exact Tally reports from the same closing date, `31-Mar-2026`:
-
-1. Ledger-wise Trial Balance
-2. Item-wise Stock Summary with closing quantity and closing value
-3. Bill-wise receivables and payables outstanding
-
-Without those, stock and party parity can only be partial.
-
-## Step-by-Step Plan
-
-### Step 1: Take a Backup
-
-Before posting any opening balances, take a backup of the ERPNext site.
-
-This is your clean restore point.
-
-### Step 2: Do Not Re-import Masters
-
-Do not re-import:
-
-- Customers
-- Suppliers
-- Items
-- Addresses
-- Contacts
-
-Those are already present in ERPNext.
-
-### Step 3: Export the Missing Tally Reports
-
-From Tally, export:
-
-1. Trial Balance as of `31-Mar-2026`
-2. Stock Summary as of `31-Mar-2026`
-3. Outstanding receivables/payables as of `31-Mar-2026`
-
-Place them under `migration/tally/raw/` and keep the filenames obvious.
-
-### Step 4: Confirm the Target Date Rule
-
-Use this rule everywhere:
-
 - Tally closing date: `31-Mar-2026`
 - ERPNext opening date: `1-Apr-2026`
 
-Do not mix dates between reports.
+Use this together with [`STEP_BY_STEP_OPENING_PROCESS.md`](STEP_BY_STEP_OPENING_PROCESS.md).
 
-### Step 5: Post Party Openings
+## Current State
 
-Create the opening receivables and payables first.
+From the repo and the current cutover pack:
 
-Use:
+- customers imported
+- suppliers imported
+- items imported
+- addresses imported and linked
+- contacts imported and linked
+- contact mobile numbers fixed
+- fiscal year `2026-2027` exists
+- no GL entries posted yet
+- no stock ledger entries posted yet
 
-- `migration/tally/output/party_opening_balances_staging.csv`
+That means the site is still clean for opening cutover posting.
 
-If you want only total parity, one opening amount per party is enough.
+## Backup Status
 
-If you want exact aging parity, use the Tally bill-wise outstanding export and create invoice-level openings.
+A fresh backup was taken before cutover:
 
-### Step 6: Post Stock Opening
+- `business.manoharsolleti.com/private/backups/20260417_195335-business_manoharsolleti_com-database.sql.gz`
+- `business.manoharsolleti.com/private/backups/20260417_195335-business_manoharsolleti_com-site_config_backup.json`
 
-Do not use:
+Do not post opening entries without keeping that restore point available.
 
-- `computed_stock_balances.csv`
+## Current Source of Truth
 
-That file uses transaction amounts and does not reconcile to Tally stock valuation.
+Use these as the final cutover source of truth:
 
-Use Stock Reconciliation in ERPNext with the final item-wise Tally stock summary instead.
+1. `scripts/tally_cutover_from_xml_reports.py`
+2. `migration/tally/output/opening_accounts_to_create.csv`
+3. `migration/tally/output/opening_journal_lines_review.csv`
+4. `migration/tally/output/opening_stock_from_stksum_staging.csv`
+5. `migration/tally/output/party_openings_from_trialbal.csv`
+6. `migration/tally/output/non_party_balance_sheet_from_trialbal.csv`
+7. `migration/tally/output/stock_group_summary_from_stksum.csv`
+8. `migration/tally/output/trial_balance_xml_review.csv`
+9. `migration/tally/output/temporary_opening_clearance_entry.csv`
+10. `migration/tally/reports/xml_cutover_review.md`
 
-This is the file that still needs to be rebuilt from a detailed Tally stock export.
+Do not use the older transaction-derived computed files as the final source for this opening.
 
-### Step 7: Post Non-party Ledger Openings
+## Expected Numbers
 
-After party openings and stock opening are ready, post the remaining balances through one opening Journal Entry.
+From the current XML-based cutover pack:
 
-Use:
+- opening journal rows: `24`
+- opening journal total debit: `37,48,653.17`
+- opening journal total credit: `37,48,653.17`
+- opening stock rows: `333`
+- opening stock total: `37,99,074.02`
+- remaining `Temporary Opening - VLA` credit after journal plus stock: `9,83,185.39`
+- final clearance target: `Reserves and Surplus - VLA`
 
-- `migration/tally/output/computed_ledger_balances.csv`
-- `migration/tally/output/ledger_accounts_staging.csv`
-- `migration/tally/output/trial_balance_xml_review.csv`
+Stock group totals from `stock_group_summary_from_stksum.csv`:
 
-This covers balance sheet balances such as:
+- `12% GOODS`: `0`
+- `18% GOODS`: `8,00,250.60`
+- `5% GOODS`: `27,29,147.70`
+- `EXEMPTED GOODS`: `2,69,675.72`
 
-- Capital
-- Bank
-- Cash
-- Duties and taxes
+## Rules Before Posting
 
-Do not carry prior-year profit and loss rows as opening balances on `1-Apr-2026`.
+1. Do not re-import customers, suppliers, items, addresses, or contacts.
+2. Do not use `Opening Stock` from Trial Balance as a journal row.
+3. Do use stock from `opening_stock_from_stksum_staging.csv`.
+4. Do use `Temporary Opening - VLA` as the balancing account for both the opening journal and stock reconciliation flow.
+5. Do not carry FY `2025-2026` P&L rows into the `1-Apr-2026` opening.
 
-That means do not post opening entries for:
+## Next Exact Action
 
-- Sales
-- Purchases
-- Indirect income
-- Indirect expenses
-- Other FY 2025-26 income or expense rows
+Your next action is:
 
-Those belong to the year that ended on `31-Mar-2026`, not the new year opening.
+1. open ERPNext
+2. go to `Accounting > Chart of Accounts`
+3. create any missing accounts listed in `migration/tally/output/opening_accounts_to_create.csv`
 
-### Step 8: Reconcile After Every Layer
+The current list is:
 
-Check parity in this order:
+1. `CGST - VLA`
+2. `Gadamsetty Venkateswara Rao - VLA`
+3. `Indian Bank - VLA`
+4. `Investment in Venkata Syamala Agencies - VLA`
+5. `Provision for Gst - VLA`
+6. `Punjab National Bank 3750 - VLA`
+7. `SGST - VLA`
+8. `Unavailed ITC - VLA`
 
-1. Stock totals match Tally stock summary
-2. Customer and supplier totals match Tally outstanding
-3. ERPNext Trial Balance matches Tally closing Trial Balance
+For each account:
 
-Do not post the next layer until the current one matches.
+1. search the exact full account name first
+2. if it already exists, do not create a duplicate
+3. if it is missing, create it using the parent account, root type, and account type from `opening_accounts_to_create.csv`
 
-## Important Warnings
+## Posting Order After That
 
-- `computed_stock_balances.csv` is not suitable for final stock valuation posting.
-- `opening_stock_staging.csv` has the correct total stock value, but the group breakup does not match the Tally stock summary screenshot.
-- `opening_stock_from_stksum_staging.csv` is the better source for stock opening from the XML Stock Summary.
-- No GL or stock entries have been posted yet, so now is the right time to finish the cutover correctly.
+After the missing accounts are in place:
 
-## Current Known Good Checks
+1. post `opening_journal_lines_review.csv` as one Opening Entry Journal Entry dated `2026-04-01`
+2. post `opening_stock_from_stksum_staging.csv` through Stock Reconciliation dated `2026-04-01` with `Difference Account = Temporary Opening - VLA`
+3. verify `Temporary Opening - VLA` shows credit `9,83,185.39`
+4. post `temporary_opening_clearance_entry.csv`
+5. verify `Temporary Opening - VLA` is zero
 
-These already match the Tally screenshot:
+## Stop Conditions
 
-- Capital Account
-- Loans (Liability)
-- Current Liabilities
-- Current Assets total
-- Sales Accounts
-- Purchase Accounts
-- Indirect Income
-- Indirect Expenses
+Stop and review before proceeding if any of these happen:
 
-## When You Have the Missing Tally Reports
-
-Once the detailed Tally reports are placed in `migration/tally/raw/`, the next work is:
-
-1. Rebuild the stock opening file
-2. Prepare the final opening posting pack
-3. Verify ERPNext parity against the Tally closing reports
+- the opening journal does not balance to `37,48,653.17`
+- stock total does not match `37,99,074.02`
+- `Temporary Opening - VLA` is not credit `9,83,185.39` after journal plus stock
+- ERPNext Trial Balance starts showing FY `2025-2026` income or expense ledgers as opening balances

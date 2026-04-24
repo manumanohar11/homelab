@@ -9,6 +9,28 @@ This is the exact cutover process for the current ERPNext site and the current T
 
 This process is written for a beginner.
 
+## Automation Option
+
+If you want the repo to perform the ERPNext cutover steps for you, use:
+
+```bash
+python3 scripts/erpnext_tally_cutover.py
+```
+
+Recommended sequence:
+
+```bash
+python3 scripts/erpnext_tally_cutover.py
+python3 scripts/erpnext_tally_cutover.py --apply
+python3 scripts/erpnext_tally_cutover.py --apply --submit
+```
+
+- dry run first
+- then create missing accounts and draft documents
+- then submit them after one more review
+
+If you prefer to control one step at a time, use `--stage accounts`, `--stage journal`, `--stage stock`, or `--stage clearance`.
+
 ## 1. What Was Cleaned Up
 
 These older generated files were removed because they are not the right source for this cutover:
@@ -65,6 +87,21 @@ A fresh ERPNext backup was created before this process:
 4. Use `Temporary Opening - VLA` as the balancing account during cutover.
 5. Use the stock summary XML totals, not the Trial Balance `Opening Stock` row.
 
+This cutover creates opening balances as of `2026-04-01`.
+
+It does **not** create historical ERPNext transaction documents for:
+
+- Sales Invoices
+- Purchase Invoices
+- Receipts
+- Payments
+- Credit Notes
+- Delivery/stock movement history
+
+for the prior period `2025-04-01` to `2026-03-31`.
+
+If you need those old documents visible inside ERPNext, that is a separate voucher-history migration phase.
+
 ## 5. Numbers You Should Expect
 
 From the current XML reports:
@@ -98,7 +135,13 @@ Create the accounts listed in:
 
 - `migration/tally/output/opening_accounts_to_create.csv`
 
-Create them exactly as shown.
+Create only the ones that are still missing.
+
+Before creating each one:
+
+1. search the exact full account name in Chart of Accounts
+2. if it already exists, do not create a duplicate
+3. if it is missing, create it exactly as shown
 
 The accounts to create are:
 

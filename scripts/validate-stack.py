@@ -77,6 +77,7 @@ STARTER_SECRETS = {
     "LINKWARDEN_NEXTAUTH_SECRET",
     "LINKWARDEN_POSTGRES_PASSWORD",
     "LINKWARDEN_MEILI_MASTER_KEY",
+    "COPYPARTY_PASSWORD",
 }
 BUNDLE_SECRETS = {
     "media": {"BITMAGNET_POSTGRES_PASSWORD"},
@@ -97,6 +98,7 @@ BUNDLE_SECRETS = {
 }
 
 EXPECTED_STARTER_SERVICES = {
+    "copyparty",
     "database",
     "docker-socket-proxy",
     "dozzle",
@@ -456,6 +458,7 @@ def validate_example_env_files() -> list[str]:
             "LINKWARDEN_NEXTAUTH_SECRET",
             "LINKWARDEN_POSTGRES_PASSWORD",
             "LINKWARDEN_MEILI_MASTER_KEY",
+            "COPYPARTY_PASSWORD",
         },
         BUNDLE_ENV_FILES["media"]: {"VPN_SERVICE_PROVIDER", "OPENVPN_USER", "OPENVPN_PASSWORD", "SERVER_REGIONS", "BITMAGNET_POSTGRES_PASSWORD"},
         BUNDLE_ENV_FILES["apps"]: {

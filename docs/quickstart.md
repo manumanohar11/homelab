@@ -33,6 +33,7 @@ Starter secrets are generated automatically:
 - `LINKWARDEN_NEXTAUTH_SECRET`
 - `LINKWARDEN_POSTGRES_PASSWORD`
 - `LINKWARDEN_MEILI_MASTER_KEY`
+- `COPYPARTY_PASSWORD`
 
 You still need to review the host paths and timezone in `.env`.
 
@@ -74,6 +75,7 @@ Expected starter services:
 - `linkwarden-meilisearch`
 - `linkwarden`
 - `freshrss`
+- `copyparty`
 - `homarr`
 - `portainer`
 - `dozzle`
@@ -91,6 +93,7 @@ Expected starter services:
 | Immich | `http://your-server:2283` |
 | Linkwarden | `http://your-server:3006` |
 | FreshRSS | `http://your-server:8083` |
+| Copyparty | `http://localhost:3923` |
 | Portainer | `https://your-server:9443` |
 | Dozzle | `http://your-server:8889` |
 | Duplicati | `http://your-server:8200` |

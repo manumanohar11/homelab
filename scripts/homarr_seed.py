@@ -44,6 +44,7 @@ class ServiceOverride:
     icon_slug: str | None = None
     href: str | None = None
     ping_url: str | None = None
+    local_path: str | None = None
     order: int = 500
     include: bool = True
 
@@ -76,6 +77,7 @@ SECTION_ORDER: dict[str, int] = {
     "Documents": 30,
     "Knowledge": 40,
     "Files": 50,
+    "Business": 55,
     "Automation": 60,
     "Media Servers": 70,
     "Media Management": 80,
@@ -92,6 +94,7 @@ SECTION_FAMILIES: dict[str, tuple[str, str]] = {
     "Documents": ("cluster-daily", "#fb923c"),
     "Knowledge": ("cluster-daily", "#fb923c"),
     "Files": ("cluster-daily", "#fb923c"),
+    "Business": ("cluster-daily", "#fb923c"),
     "Automation": ("cluster-control", "#2dd4bf"),
     "Media Servers": ("cluster-media", "#60a5fa"),
     "Media Management": ("cluster-media", "#60a5fa"),
@@ -112,6 +115,12 @@ SERVICE_OVERRIDES: dict[str, ServiceOverride] = {
         description="Live logs",
         section="Monitoring",
         icon_slug="dozzle",
+    ),
+    "duplicati": ServiceOverride(
+        description="Backup console",
+        section="Backups",
+        icon_slug="duplicati",
+        order=10,
     ),
     "glance-homepage": ServiceOverride(
         name="Glance",
@@ -195,6 +204,7 @@ SERVICE_OVERRIDES: dict[str, ServiceOverride] = {
         description="Media streaming",
         section="Media Servers",
         icon_slug="plex",
+        local_path="/web",
         order=10,
     ),
     "portainer": ServiceOverride(
@@ -327,6 +337,96 @@ def load_compose_services(
 
     config = json.loads(result.stdout)
     return config.get("services", {})
+
+
+def docker_json_command(command: list[str], error_message: str) -> Any:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("docker is not installed or not on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"{error_message}: {detail}") from exc
+
+    return json.loads(result.stdout)
+
+
+def docker_text_command(command: list[str], error_message: str) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("docker is not installed or not on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = (exc.stderr or exc.stdout or str(exc)).strip()
+        raise RuntimeError(f"{error_message}: {detail}") from exc
+
+    return result.stdout
+
+
+def load_running_service_details(project_name: str) -> dict[str, dict[str, Any]]:
+    output = docker_text_command(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label=com.docker.compose.project={project_name}",
+            "--format",
+            "{{.ID}}",
+        ],
+        "docker ps failed",
+    )
+    container_ids = [line.strip() for line in output.splitlines() if line.strip()]
+
+    if not container_ids:
+        return {}
+
+    inspect = docker_json_command(
+        ["docker", "inspect", *container_ids],
+        "docker inspect failed",
+    )
+
+    details: dict[str, dict[str, Any]] = {}
+    for container in inspect:
+        labels = container.get("Config", {}).get("Labels", {}) or {}
+        service_name = labels.get("com.docker.compose.service")
+        if not service_name:
+            continue
+        details[service_name] = container
+
+    return details
+
+
+def choose_published_binding(
+    port_map: dict[str, Any] | None,
+) -> tuple[str, str] | None:
+    if not port_map:
+        return None
+
+    for container_port, bindings in port_map.items():
+        if not bindings:
+            continue
+        for binding in bindings:
+            host_ip = (binding or {}).get("HostIp", "")
+            host_port = (binding or {}).get("HostPort")
+            if not host_port:
+                continue
+            if host_ip in {"127.0.0.1", "::1"}:
+                continue
+            return (container_port, host_port)
+
+    return None
 
 
 def slugify(value: str) -> str:
@@ -626,6 +726,93 @@ def build_service_cards(
     return cards
 
 
+def choose_local_scheme(
+    resource: dict[str, str],
+    published_container_port: str | None,
+    published_host_port: str | None,
+) -> str:
+    method = resource.get("targets[0].method", "").lower()
+    if method in {"http", "https"}:
+        return method
+
+    secure_ports = {"443", "8443", "9443"}
+    if published_container_port:
+        container_port = published_container_port.split("/", 1)[0]
+        if container_port in secure_ports:
+            return "https"
+    if published_host_port in secure_ports:
+        return "https"
+    return "http"
+
+
+def build_local_href(
+    local_host: str,
+    service_name: str,
+    override: ServiceOverride,
+    resource: dict[str, str],
+    container: dict[str, Any],
+) -> str | None:
+    binding = choose_published_binding(
+        container.get("NetworkSettings", {}).get("Ports", {}) or {}
+    )
+    published_container_port: str | None = None
+    published_host_port: str | None = None
+
+    if binding is not None:
+        published_container_port, published_host_port = binding
+    elif container.get("HostConfig", {}).get("NetworkMode") == "host":
+        published_host_port = resource.get("targets[0].port")
+        published_container_port = published_host_port
+
+    if not published_host_port:
+        return None
+
+    scheme = choose_local_scheme(resource, published_container_port, published_host_port)
+    path = override.local_path or ""
+    return f"{scheme}://{local_host}:{published_host_port}{path}"
+
+
+def build_running_service_cards(
+    local_host: str,
+    project_name: str,
+) -> list[ServiceCard]:
+    containers = load_running_service_details(project_name)
+    cards: list[ServiceCard] = []
+
+    for service_name, container in containers.items():
+        override = SERVICE_OVERRIDES.get(service_name, ServiceOverride())
+        if not override.include:
+            continue
+
+        labels = container.get("Config", {}).get("Labels", {}) or {}
+        resource = extract_pangolin_resource(labels)
+        section = choose_section(labels, override)
+        description = choose_description(labels, override)
+        href = build_local_href(local_host, service_name, override, resource, container)
+
+        if not section or not href or not description:
+            continue
+
+        item_id, app_id = service_ids(service_name)
+        cards.append(
+            ServiceCard(
+                item_id=item_id,
+                app_id=app_id,
+                service=service_name,
+                name=choose_name(service_name, labels, resource, override),
+                description=description,
+                section=section,
+                icon_slug=choose_icon_slug(service_name, labels, override),
+                href=href,
+                ping_url=choose_ping_url(resource, override),
+                order=override.order,
+            )
+        )
+
+    cards.sort(key=lambda card: (section_sort_key(card.section), card.order, card.name.lower()))
+    return cards
+
+
 def section_rows(cards: list[ServiceCard]) -> list[dict[str, Any]]:
     sections = OrderedDict()
     sections["Overview"] = "Overview"
@@ -864,15 +1051,13 @@ def reset_section_collapse_states(
         )
 
 
-def seed_board(
+def seed_board_from_cards(
     db_path: Path,
-    bundles: tuple[str, ...] = (),
-    profiles: tuple[str, ...] = (),
+    cards: list[ServiceCard],
 ) -> list[str]:
     if not db_path.exists():
         raise FileNotFoundError(f"Homarr database not found at {db_path}")
 
-    cards = build_service_cards(bundles, profiles)
     if not cards:
         raise RuntimeError("No routable services were discovered for the Homarr board.")
 
@@ -1009,6 +1194,14 @@ def seed_board(
     return [card.name for card in cards]
 
 
+def seed_board(
+    db_path: Path,
+    bundles: tuple[str, ...] = (),
+    profiles: tuple[str, ...] = (),
+) -> list[str]:
+    return seed_board_from_cards(db_path, build_service_cards(bundles, profiles))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Seed the Homarr board from the resolved starter or bundle-aware compose config.",
@@ -1036,6 +1229,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Preview the apps that would be seeded without writing to the Homarr database.",
     )
+    parser.add_argument(
+        "--running-only",
+        action="store_true",
+        help="Seed only apps for currently running media-stack containers using local LAN URLs.",
+    )
+    parser.add_argument(
+        "--local-host",
+        help="LAN hostname or IP to use for app URLs in --running-only mode. Defaults to LOCAL_LAN_IP from .env.",
+    )
+    parser.add_argument(
+        "--project-name",
+        default="media-stack",
+        help="Compose project name to inspect in --running-only mode. Defaults to media-stack.",
+    )
     return parser.parse_args()
 
 
@@ -1050,8 +1257,16 @@ def main() -> int:
     args = parse_args()
     bundles = unique_values(args.bundle)
     profiles = unique_values(args.profile)
+    env = load_env(ENV_PATH)
 
-    cards = build_service_cards(bundles, profiles)
+    if args.running_only:
+        local_host = args.local_host or env.get("LOCAL_LAN_IP")
+        if not local_host:
+            raise RuntimeError("LOCAL_LAN_IP is missing from .env. Set it or pass --local-host.")
+        cards = build_running_service_cards(local_host, args.project_name)
+    else:
+        cards = build_service_cards(bundles, profiles)
+
     if not cards:
         raise RuntimeError("No routable services were discovered for the Homarr board.")
 
@@ -1060,9 +1275,11 @@ def main() -> int:
         print_included_apps(app_names, "Dry run only. No changes were written.")
         return 0
 
-    env = load_env(ENV_PATH)
     db_path = args.db_path or resolve_db_path(env)
-    included_apps = seed_board(db_path, bundles, profiles)
+    if args.running_only:
+        included_apps = seed_board_from_cards(db_path, cards)
+    else:
+        included_apps = seed_board(db_path, bundles, profiles)
     print_included_apps(included_apps, f"Seeded Homarr board at {db_path}")
     return 0
 

@@ -17,6 +17,7 @@ This is a bundle-oriented service catalog.
 | Linkwarden Meilisearch | 7700 | Linkwarden search index |
 | Linkwarden | 3006 | Starter bookmarks and archive |
 | FreshRSS | 8083 | Starter RSS reader |
+| Copyparty | 3923 | Starter host file browser, loopback only |
 | Homarr | 3002 | Starter dashboard |
 | Portainer | 9443 | Container management |
 | Dozzle | 8889 | Live logs |

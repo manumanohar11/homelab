@@ -22,6 +22,7 @@ That starts only the starter stack:
 - `linkwarden-meilisearch`
 - `linkwarden`
 - `freshrss`
+- `copyparty`
 - `homarr`
 - `portainer`
 - `dozzle`
@@ -56,6 +57,7 @@ Starter URLs:
 | Immich | `http://your-server:2283` |
 | Linkwarden | `http://your-server:3006` |
 | FreshRSS | `http://your-server:8083` |
+| Copyparty | `http://localhost:3923` |
 | Portainer | `https://your-server:9443` |
 | Dozzle | `http://your-server:8889` |
 | Duplicati | `http://your-server:8200` |

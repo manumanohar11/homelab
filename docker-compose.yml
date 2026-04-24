@@ -374,6 +374,62 @@ services:
       - "pangolin.public-resources.freshrss.targets[0].healthcheck.path=/i/"
       - "pangolin.public-resources.freshrss.targets[0].healthcheck.status=200"
 
+  copyparty:
+    extends:
+      file: docker-compose.common.yml
+      service: _service-large
+    image: ghcr.io/9001/copyparty-ac:latest
+    container_name: copyparty
+    environment:
+      TZ: ${TZ}
+    volumes:
+      - ${DOCKER_BASE_DIR}/copyparty:/cfg
+      - ${COPYPARTY_HOST_PATH:-/}:/host:ro
+    user: ${PUID}:${PGID}
+    networks:
+      - media-stack
+    ports:
+      - "127.0.0.1:${COPYPARTY_HTTP_PORT:-3923}:3923"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3923/')"]
+    command:
+      - -p
+      - "3923"
+      - --rproxy
+      - "1"
+      - --xff-src
+      - 172.20.0.0/16
+      - --idp-h-usr
+      - Remote-User
+      - --idp-cookie
+      - "86400"
+      - --hist
+      - /cfg/hist
+      - --name
+      - ${COPYPARTY_SITE_NAME:-Homelab Files}
+      - -a
+      - ${COPYPARTY_USERNAME:-copyparty}:${COPYPARTY_PASSWORD:?set COPYPARTY_PASSWORD in .env}
+      - -v
+      - /host:host:r.,@acct
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+      - "homepage.group=Files"
+      - "homepage.name=Copyparty"
+      - "homepage.icon=filebrowser"
+      - "homepage.href=https://${COPYPARTY_SUBDOMAIN:-files}.${DOMAIN_NAME:-localhost}"
+      - "homepage.description=Remote Host File Access"
+      - "pangolin.public-resources.copyparty.name=Copyparty"
+      - "pangolin.public-resources.copyparty.protocol=http"
+      - "pangolin.public-resources.copyparty.full-domain=${COPYPARTY_SUBDOMAIN:-files}.${DOMAIN_NAME:-localhost}"
+      - "pangolin.public-resources.copyparty.auth.sso-enabled=true"
+      - "pangolin.public-resources.copyparty.targets[0].hostname=copyparty"
+      - "pangolin.public-resources.copyparty.targets[0].method=http"
+      - "pangolin.public-resources.copyparty.targets[0].port=3923"
+      - "pangolin.public-resources.copyparty.targets[0].healthcheck.hostname=copyparty"
+      - "pangolin.public-resources.copyparty.targets[0].healthcheck.port=3923"
+      - "pangolin.public-resources.copyparty.targets[0].healthcheck.path=/"
+      - "pangolin.public-resources.copyparty.targets[0].healthcheck.status=200"
+
   homarr:
     extends:
       file: docker-compose.common.yml
@@ -395,7 +451,11 @@ services:
       docker-socket-proxy:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      test:
+        - CMD-SHELL
+        - >
+          IP=$$(hostname -i | cut -d' ' -f1);
+          wget --no-verbose --tries=1 --spider "http://$${IP}:3000/"
       interval: 30s
       timeout: 10s
       retries: 3

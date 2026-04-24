@@ -8,7 +8,7 @@ import json
 import re
 import xml.etree.ElementTree as ET
 from collections import defaultdict
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 
 
@@ -17,6 +17,26 @@ DEFAULT_XML_DIR = REPO_ROOT / "migration" / "tally" / "raw" / "XML"
 DEFAULT_MASTER_JSON = REPO_ROOT / "migration" / "tally" / "raw" / "JSON" / "Master.json"
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "migration" / "tally" / "output"
 DEFAULT_REPORT_DIR = REPO_ROOT / "migration" / "tally" / "reports"
+
+
+# ERPNext v15 posts Stock Reconciliation through a 2-decimal valuation-rate path.
+# For this specific VLA cutover, these 1-paisa rate nudges make the posted stock
+# ledger land on both the Tally closing stock total and the expected stock-group
+# totals from the Stock Summary XML.
+ERPNEXT_STOCK_RATE_ADJUSTMENTS = {
+    "AGNI TEA 1KG M360": Decimal("-0.01"),
+    "AMBICA FRUIT 3 IN 1 100G": Decimal("0.01"),
+    "AMBICA NITYA POOJA 12G M10": Decimal("0.01"),
+    "BANSI RAVVA 500G": Decimal("0.01"),
+    "CS DARK SOY SAUCE 90GM M25": Decimal("0.01"),
+    "DR PHENYLE 450ML M90": Decimal("-0.01"),
+    "GK AGARBATTI PO12 M15": Decimal("-0.01"),
+    "GK COIL M45": Decimal("-0.02"),
+    "GODREJ AER SPRAY": Decimal("-0.01"),
+    "MTR SAMBAR 100G M80": Decimal("0.01"),
+    "RAGI FLOUR 500G": Decimal("0.01"),
+    "TATA SALT 1KG": Decimal("0.01"),
+}
 
 
 ASSET_GROUPS = {
@@ -215,13 +235,15 @@ def build_opening_stock_rows(
         valuation_rate = Decimal("0")
         if quantity != 0:
             valuation_rate = amount / quantity
+        erpnext_valuation_rate = valuation_rate.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        erpnext_valuation_rate += ERPNEXT_STOCK_RATE_ADJUSTMENTS.get(item_code, Decimal("0"))
         output_rows.append(
             {
                 "item_code": item_code,
                 "warehouse": warehouse,
                 "qty": decimal_text(quantity),
                 "uom": uom,
-                "valuation_rate": decimal_text(valuation_rate.quantize(Decimal("0.01"))),
+                "valuation_rate": decimal_text(erpnext_valuation_rate),
                 "amount": decimal_text(amount.quantize(Decimal("0.01"))),
                 "tally_closing_qty": row["closing_qty_text"],
                 "tally_closing_rate": row["closing_rate_text"],
@@ -605,6 +627,7 @@ def write_report(
             "- Stock Summary XML is the safer source for opening stock on 1-Apr-2026.",
             "- Sales, purchases, indirect income, and indirect expenses from 1-Apr-2025 to 31-Mar-2026 are prior-year P&L rows and should not be carried as opening balances for 1-Apr-2026.",
             "- Because bill-wise receivables/payables are not maintained, party openings should be posted as net customer/supplier balances.",
+            "- The generated `valuation_rate` values are ERPNext posting rates. A small item-specific adjustment map is applied so ERPNext's 2-decimal stock posting lands on both the Tally stock total and the XML stock-group totals.",
         ]
     )
     if opening_stock_rows:

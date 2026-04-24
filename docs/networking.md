@@ -316,6 +316,14 @@ This list focuses on the ports published on the host. Internal-only sidecars sta
 | 8010 | Paperless-ngx | HTTP | Direct |
 | 8085 | Stirling PDF | HTTP | Direct |
 
+#### Files & Automation
+
+| Port | Service | Protocol | Access |
+|:----:|:--------|:--------:|:-------|
+| 8443 | Nextcloud | HTTPS | Direct |
+| 3923 | Copyparty | HTTP | Loopback only |
+| 5678 | n8n | HTTP | Direct |
+
 #### *Arr Stack (VPN-Routed)
 
 | Port | Service | Protocol | Access |
